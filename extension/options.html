@@ -1,0 +1,47 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LLL settings</title>
+<link rel="stylesheet" href="options.css">
+
+<main>
+  <h1>LLL</h1>
+
+  <section>
+    <h2>Anki</h2>
+    <p class="note">
+      Cards are added through AnkiConnect, which listens on your own machine.
+      Anki has to be open.
+    </p>
+
+    <label>
+      <span>Deck</span>
+      <select id="deck"></select>
+    </label>
+
+    <label>
+      <span>Note type</span>
+      <select id="model"></select>
+    </label>
+
+    <label>
+      <span>Tags</span>
+      <input id="tags" type="text" placeholder="lll" spellcheck="false">
+    </label>
+  </section>
+
+  <section id="mapping-section" hidden>
+    <h2>Fields</h2>
+    <p class="note">
+      What goes where on the card. Anything left blank stays empty.
+    </p>
+    <div id="mapping"></div>
+  </section>
+
+  <p class="actions">
+    <button id="save">Save</button>
+    <span id="status" role="status"></span>
+  </p>
+</main>
+
+<script src="anki.js"></script>
+<script src="options.js"></script>

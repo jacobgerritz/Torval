@@ -3,37 +3,55 @@
   "name": "LLL",
   "version": "0.1.0",
   "description": "Hold Shift and hover any Japanese word to see what it means.",
-
   "browser_specific_settings": {
     "gecko": {
       "id": "lll@jacobgerritz",
       "strict_min_version": "127.0"
     }
   },
-
-  "permissions": ["unlimitedStorage"],
-
+  "permissions": [
+    "storage",
+    "unlimitedStorage"
+  ],
   "background": {
-    "scripts": ["deinflect.js", "lookup.js", "background.js"]
+    "scripts": [
+      "deinflect.js",
+      "lookup.js",
+      "anki.js",
+      "background.js"
+    ]
   },
-
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
       "run_at": "document_idle",
       "all_frames": true
     }
   ],
-
   "web_accessible_resources": [
     {
-      "resources": ["popup.css"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "popup.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
-
   "action": {
-    "default_title": "LLL"
+    "default_title": "LLL — settings"
+  },
+  "host_permissions": [
+    "http://127.0.0.1:8765/*",
+    "http://localhost:8765/*"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
   }
 }

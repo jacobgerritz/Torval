@@ -37,9 +37,30 @@ api.runtime.onMessage.addListener((message) => {
     case 'lookup': return handleLookup(message.text);
     case 'status': return Promise.resolve({ status });
     case 'tags':   return loadTags();
+    case 'ankiAdd':      return ankiAdd(message.note);
+    case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
+    case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     default:       return undefined;
   }
 });
+
+// The toolbar button is the way in to the settings.
+if (api.action && api.action.onClicked) {
+  api.action.onClicked.addListener(() => api.runtime.openOptionsPage());
+}
+
+/** Run an Anki call and hand back its failure as text rather than throwing. */
+async function guard(fn) {
+  try { return { ok: true, result: await fn() }; }
+  catch (err) { return { ok: false, error: err.message }; }
+}
+
+async function ankiAdd(note) {
+  return guard(async () => {
+    const { ankiConfig } = await api.storage.local.get('ankiConfig');
+    return LLLAnki.addNote(ankiConfig, note);
+  });
+}
 
 async function handleLookup(text) {
   if (status.state !== 'ready') return { status, groups: [] };

@@ -1,0 +1,89 @@
+/* LLL — settings page. Same restraint as the popup, a little roomier. */
+
+:root { color-scheme: dark; }
+
+body {
+  margin: 0;
+  padding: 48px 24px;
+  background: #0f1012;
+  color: #e7e8ea;
+  font: 13px/1.6 -apple-system, "Segoe UI", sans-serif;
+}
+
+main { max-width: 520px; margin: 0 auto; }
+
+h1 {
+  margin: 0 0 32px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7078;
+}
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+section { margin-bottom: 32px; }
+
+.note {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: #7d828b;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+label > span {
+  flex: 0 0 170px;
+  color: #a9aeb8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+select,
+input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  background: #17181b;
+  color: #e7e8ea;
+  border: 1px solid #2c2e33;
+  border-radius: 4px;
+  font: inherit;
+}
+
+select:focus,
+input:focus {
+  outline: none;
+  border-color: #4a4f58;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button {
+  padding: 6px 16px;
+  background: #24262b;
+  color: #e7e8ea;
+  border: 1px solid #34373d;
+  border-radius: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover { background: #2c2f35; }
+
+#status { font-size: 12px; color: #7d828b; }
+#status.error { color: #d08a7a; }

@@ -44,6 +44,7 @@
   // Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana.
   const JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
   const MAX_SCAN = 16;
+  const SENTENCE_END = /[。．.！!？?…\n\r\t]/;
   const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'SELECT', 'TEXTAREA', 'OPTION']);
   const INLINE_DISPLAY = new Set(['inline', 'inline-block', 'inline-flex', 'contents', 'ruby', 'ruby-base', 'ruby-text']);
 
@@ -64,6 +65,7 @@
   let scanScheduled = false;
   let tags = {};
   let ui = null;
+  let context = null;   // the sentence the current lookup came from
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 
@@ -86,7 +88,7 @@
 
     // A selection plus Shift looks up the selection; otherwise use the cursor.
     const selected = selectionText();
-    if (selected) lookup(selected, selectionAnchor());
+    if (selected) lookup(selected.text, selectionAnchor(), selected);
     else scheduleScan();
   }, true);
 
@@ -122,14 +124,14 @@
 
   function scan() {
     if (!isCurrent()) return;
-    const text = textAtPoint(pointer.x, pointer.y);
+    const found = textAtPoint(pointer.x, pointer.y);
     // While Shift is held the popup follows what you point at, so pointing at
     // something that is not a word closes it rather than leaving the last
     // result stranded behind the cursor. Let go of Shift and it stays put, so
     // you can move over to it and read.
-    if (!text) { hide(); return; }
-    if (text === lastQuery) return;
-    lookup(text, pointer);
+    if (!found) { hide(); return; }
+    if (found.text === lastQuery) return;
+    lookup(found.text, pointer, found);
   }
 
   // -------------------------------------------------------------------------
@@ -142,7 +144,8 @@
     if (SKIP_TAGS.has((caret.node.parentElement || {}).tagName)) return null;
     const offset = resolveCharacter(caret.node, caret.offset, x, y);
     if (offset === -1) return null;
-    return leadingJapanese(forwardText(caret.node, offset, MAX_SCAN));
+    const text = leadingJapanese(forwardText(caret.node, offset, MAX_SCAN));
+    return text ? { text, node: caret.node, offset } : null;
   }
 
   /**
@@ -235,7 +238,10 @@
   function selectionText() {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return null;
-    return leadingJapanese(sel.toString().trim().slice(0, MAX_SCAN));
+    const text = leadingJapanese(sel.toString().trim().slice(0, MAX_SCAN));
+    if (!text) return null;
+    const range = sel.getRangeAt(0);
+    return { text, node: range.startContainer, offset: range.startOffset };
   }
 
   function selectionAnchor() {
@@ -245,12 +251,72 @@
     return r.width || r.height ? { x: r.left, y: r.bottom } : pointer;
   }
 
+  /**
+   * The sentence the word sits in, plus where in it the word starts.
+   *
+   * Same walk as forwardText, but in both directions and without the sixteen
+   * character limit: gather the block's text, find where we are in it, and cut
+   * back to the nearest full stop on either side.
+   */
+  function sentenceAt(node, offset) {
+    const block = blockAncestor(node);
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        const parent = n.parentElement;
+        return !parent || SKIP_TAGS.has(parent.tagName)
+          ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      }
+    });
+
+    let text = '';
+    let index = -1;
+    let n;
+    while ((n = walker.nextNode())) {
+      if (n === node) index = text.length + offset;
+      text += n.data;
+    }
+    if (index < 0) return null;
+
+    let start = index;
+    let end = index;
+    while (start > 0 && !SENTENCE_END.test(text[start - 1])) start--;
+    while (end < text.length && !SENTENCE_END.test(text[end])) end++;
+    if (end < text.length) end++;          // keep the full stop itself
+
+    const slice = text.slice(start, end);
+    const lead = slice.length - slice.trimStart().length;
+    return { text: slice.trim().slice(0, 300), index: index - start - lead };
+  }
+
+  /** The sentence with the looked-up word wrapped in bold, ready for a card. */
+  function markSentence(sentence, length) {
+    const { text, index } = sentence;
+    if (index < 0 || index >= text.length) return escapeHtml(text);
+    return escapeHtml(text.slice(0, index)) +
+      '<b>' + escapeHtml(text.slice(index, index + length)) + '</b>' +
+      escapeHtml(text.slice(index + length));
+  }
+
+  function definitionHtml(entry) {
+    const numbered = entry.s.length > 1;
+    return entry.s
+      .map((sense, i) => (numbered ? (i + 1) + '. ' : '') + escapeHtml(sense.g.join('; ')))
+      .join('<br>');
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
   // -------------------------------------------------------------------------
   // Asking the background script
   // -------------------------------------------------------------------------
 
-  async function lookup(text, at) {
+  async function lookup(text, at, where) {
     lastQuery = text;
+    // Captured now rather than when "+" is clicked: on a page whose text keeps
+    // changing — subtitles, above all — the sentence may be gone by then.
+    context = where ? sentenceAt(where.node, where.offset) : null;
     const token = ++queryToken;
     let reply;
     try {
@@ -308,6 +374,7 @@
   async function showMessage(text, at) {
     const { card } = await build();
     card.textContent = '';
+    card.scrollTop = 0;
     const note = document.createElement('div');
     note.className = 'note';
     note.textContent = text;
@@ -318,6 +385,7 @@
   async function showResults(groups, at) {
     const { card } = await build();
     card.textContent = '';
+    card.scrollTop = 0;   // a new word is a new thing to read, from the top
 
     card.appendChild(renderGroup(groups[0], true));
 
@@ -348,11 +416,11 @@
       label.textContent = group.surface;
       el.appendChild(label);
     }
-    for (const hit of group.hits) el.appendChild(renderEntry(hit));
+    for (const hit of group.hits) el.appendChild(renderEntry(hit, group.surface));
     return el;
   }
 
-  function renderEntry(hit) {
+  function renderEntry(hit, surface) {
     const entry = hit.entry;
     const el = document.createElement('div');
     el.className = 'entry';
@@ -376,6 +444,15 @@
       el.textContent = reading;
       head.appendChild(el);
     }
+
+    const add = document.createElement('button');
+    add.className = 'add';
+    add.textContent = '+';
+    add.title = 'Add to Anki';
+    add.addEventListener('click', () => {
+      mine(add, el, { word: word.textContent, reading: reading || '', entry, surface });
+    });
+    head.appendChild(add);
     el.appendChild(head);
 
     if (hit.reasons.length) {
@@ -417,6 +494,45 @@
     });
     el.appendChild(list);
     return el;
+  }
+
+  /**
+   * Turn one entry into a card. The four pieces go off to the background
+   * script, which is the only part that may reach your local Anki; which field
+   * each piece lands in is set once in LLL's options.
+   */
+  async function mine(button, entryEl, { word, reading, entry, surface }) {
+    button.disabled = true;
+    button.textContent = '·';
+    const old = entryEl.querySelector('.error');
+    if (old) old.remove();
+
+    const note = {
+      word,
+      reading,
+      sentence: context ? context.text : '',
+      sentenceMarked: context ? markSentence(context, surface.length) : '',
+      definition: definitionHtml(entry)
+    };
+
+    let reply;
+    try {
+      reply = await api.runtime.sendMessage({ type: 'ankiAdd', note });
+    } catch (err) {
+      reply = { ok: false, error: String(err) };
+    }
+
+    if (reply && reply.ok) {
+      button.textContent = '✓';
+      button.classList.add('done');
+      return;
+    }
+    button.textContent = '+';
+    button.disabled = false;
+    const message = document.createElement('div');
+    message.className = 'error';
+    message.textContent = (reply && reply.error) || 'Could not add the card.';
+    entryEl.appendChild(message);
   }
 
   function posLabel(code) {

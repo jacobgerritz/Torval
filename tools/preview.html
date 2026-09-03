@@ -104,6 +104,7 @@ window.browser = {
     async sendMessage(msg) {
       if (msg.type === 'tags') return TAGS;
       if (msg.type === 'status') return { status: { state: 'ready' } };
+      if (msg.type === 'ankiAdd') { window.__lastNote = msg.note; return { ok: true, result: 1 }; }
       if (msg.type === 'lookup') {
         return { status: { state: 'ready' }, groups: await LLLLookup.search(msg.text, db) };
       }

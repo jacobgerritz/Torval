@@ -20,6 +20,7 @@ const DATA = join(ROOT, 'extension', 'data');
 const require = createRequire(import.meta.url);
 const Lookup = require(join(ROOT, 'extension', 'lookup.js'));
 const Deinflect = require(join(ROOT, 'extension', 'deinflect.js'));
+const Anki = require(join(ROOT, 'extension', 'anki.js'));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
   console.error('No dictionary built yet. Run: node tools/build-dict.mjs');
@@ -216,6 +217,48 @@ const run = async () => {
   for (let i = 0; i < 100; i++) await Lookup.search(sentences[i % sentences.length], db);
   const ms = (performance.now() - t0) / 100;
   check(`lookup is fast enough (${ms.toFixed(1)}ms per hover)`, ms < 25, `${ms.toFixed(1)}ms`);
+
+  // --- Anki ------------------------------------------------------------
+  // The real field list from a sentence-mining note type should need no setup.
+  const guessed = Anki.guessMapping(
+    ['Sentence', 'Target Word', 'Definitions', 'Dictionary Definitions', 'Reading',
+     'Sentence Audio', 'Word Audio', 'Images', 'Source', 'Pitch', 'Sentence English']);
+  check('field mapping is guessed from the field names',
+    guessed['Target Word'] === 'word' && guessed['Reading'] === 'reading' &&
+    guessed['Sentence'] === 'sentence' && guessed['Definitions'] === 'definition',
+    JSON.stringify(guessed));
+  check('fields it cannot place are left blank rather than guessed at',
+    guessed['Sentence Audio'] === '' && guessed['Pitch'] === '' && guessed['Images'] === '',
+    JSON.stringify(guessed));
+  check('a source is claimed by one field only',
+    guessed['Dictionary Definitions'] === '', JSON.stringify(guessed));
+
+  // Build a note without touching the network.
+  let sent = null;
+  globalThis.fetch = async (url, init) => {
+    sent = JSON.parse(init.body);
+    return { ok: true, json: async () => ({ result: 1, error: null }) };
+  };
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: guessed, tags: ['lll'] },
+    { word: '食べる', reading: 'たべる', sentence: '食べなかった。',
+      sentenceMarked: '<b>食べなかった</b>。', definition: '1. to eat' });
+  check('the card carries the word, reading, sentence and definition',
+    sent.params.note.fields['Target Word'] === '食べる' &&
+    sent.params.note.fields['Reading'] === 'たべる' &&
+    sent.params.note.fields['Sentence'] === '食べなかった。' &&
+    sent.params.note.fields['Definitions'] === '1. to eat',
+    JSON.stringify(sent && sent.params.note.fields));
+  check('unmapped fields are left off the card entirely',
+    !('Pitch' in sent.params.note.fields), JSON.stringify(Object.keys(sent.params.note.fields)));
+  check('duplicates are refused by default',
+    sent.params.note.options.allowDuplicate === false);
+
+  let refused = null;
+  await Anki.addNote({ deck: 'D', model: 'M', fields: {} }, { word: 'x' }).catch((e) => { refused = e.message; });
+  check('an unmapped note type is refused with an explanation', !!refused && /options/.test(refused), refused);
+  await Anki.addNote(null, { word: 'x' }).catch((e) => { refused = e.message; });
+  check('no deck chosen yet is refused with an explanation', /deck/.test(refused), refused);
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',

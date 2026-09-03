@@ -38,6 +38,7 @@ again each time until it is packaged and signed. That is a step for later.
 | **Shift** with text selected | look up the selection |
 | **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
+| **+** | add the word to Anki |
 
 While Shift is held the popup follows whatever you point at, and closes if you
 point at something that is not a word. Let go of Shift and it stays put, so you
@@ -50,6 +51,36 @@ thing that is a word — point at 日 in 日本語 and you get 日本語, not �
 It undoes conjugation on the way. 食べなかった is not in any dictionary, so it is
 walked back to 食べる and the steps taken are shown underneath, small and grey:
 *negative → past*.
+
+---
+
+## Anki
+
+Cards go straight into Anki through **AnkiConnect**, the Anki add-on that opens
+a small server on your own machine. Anki has to be open; nothing leaves your
+computer.
+
+Open the settings from LLL's toolbar button and choose a deck and a note type.
+Both lists are read from Anki itself, so a name can never be slightly wrong.
+LLL then fills in the field mapping by guessing from the field names — a note
+type with fields called *Target Word*, *Reading*, *Sentence* and *Definitions*
+needs no setting up at all. Anything it guesses wrongly is one dropdown away,
+and anything left blank stays empty on the card.
+
+Four things can be put on a card:
+
+| | |
+|---|---|
+| **Target word** | the dictionary form, so 食べなかった files under 食べる |
+| **Reading** | the kana |
+| **Sentence** | the whole sentence the word came from |
+| **Definition** | every sense, numbered |
+
+There is also *Sentence, word in bold*, which is the same sentence with the word
+as it actually appeared wrapped in `<b>`.
+
+Duplicates are refused, so pressing **+** on a word you already have tells you so
+rather than making a second card.
 
 ---
 
@@ -76,6 +107,10 @@ browser and owns the database. Pages ask it questions by message.
 under the mouse, and draws the popup. The popup is built inside a *shadow root*,
 a sealed-off document of its own, so no website's styling can reach it and it
 looks the same everywhere.
+
+**`extension/anki.js`** — the Anki side. One HTTP request to your own machine.
+
+**`extension/options.js`** — the settings page.
 
 **`extension/popup.css`** — how it looks. The only file that decides that.
 
@@ -106,14 +141,11 @@ would otherwise invent words that do not exist.
 
 In rough order of intent:
 
-- **Anki cards.** One key to turn the word on screen into a card, with the
-  sentence it came from.
 - **Known and unknown words.** Colour every word on the page by whether you have
   met it, the way Migaku does.
 - **Subtitle mining.** Cards that carry the audio and the frame they came from.
-
-The lookup result already carries everything a card needs, so the first of these
-does not require anything here to be rewritten.
+  The note type already has fields waiting for them.
+- **Packaging.** Sign it, so it survives a Firefox restart.
 
 ---
 
