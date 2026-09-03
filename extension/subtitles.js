@@ -187,148 +187,6 @@ var LLLSubtitles = (function () {
   }
 
   // -------------------------------------------------------------------------
-  // Choosing a track by hand
-  // -------------------------------------------------------------------------
-
-  // Same palette as the subtitle line and the popup: one dark card, one
-  // border colour, one bright text colour.
-  var picker = null;
-  var pickerList = null;
-  var pickerVideoId = null;
-
-  /**
-   * Show every subtitle track this video offers, each with a button to try it
-   * directly — automatic fetching has too many ways to land on an empty
-   * response or the wrong track between a manual and an auto-generated one for
-   * that choice to always be left silent. Shown once per video; closing it
-   * does not reopen it until the next one loads.
-   */
-  function showTrackPicker(tracks, id) {
-    if (pickerVideoId === id) return;   // already shown for this video
-    pickerVideoId = id;
-
-    ensurePicker();
-    pickerList.textContent = '';
-    tracks.forEach(function (t) {
-      pickerList.appendChild(pickerRow(t, id));
-    });
-
-    var screenRow = document.createElement('div');
-    screenRow.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid #292b30;';
-    var screenButton = pickerButton('Read from the screen instead', function () {
-      fallBackToWatching();
-      pickerStatus(screenRow, 'Now reading captions off the screen.');
-    });
-    screenRow.appendChild(screenButton);
-    pickerList.appendChild(screenRow);
-
-    picker.style.display = 'block';
-  }
-
-  function pickerRow(track, id) {
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;';
-
-    var label = document.createElement('span');
-    label.textContent = track.languageCode + (track.auto ? ' (auto-generated)' : '');
-    label.style.cssText = 'flex:1;color:#dfe1e5;';
-    row.appendChild(label);
-
-    var status = document.createElement('span');
-    status.style.cssText = 'font-size:11px;color:#767b84;';
-    row.appendChild(status);
-
-    var button = pickerButton('Use', async function () {
-      if (videoId !== id) return;   // moved to a different video since this opened
-      button.disabled = true;
-      status.textContent = 'trying…';
-      try {
-        var loaded = await fetchTrack(track);
-        if (videoId !== id) return;
-        if (loaded && loaded.length) {
-          cues = loaded;
-          state = 'ready';
-          console.log('LLL:', cues.length, 'subtitle lines ready — chosen by hand');
-          status.textContent = '✓ ' + loaded.length + ' lines loaded';
-        } else {
-          // Building this address ourselves is the older, unreliable method —
-          // real subtitles may already be active via the one YouTube's own
-          // player uses, caught separately and not affected by this failing.
-          status.textContent = state === 'ready'
-            ? 'no data this way (already using YouTube’s own address instead)'
-            : 'no data for this track';
-        }
-      } catch (err) {
-        status.textContent = 'failed — ' + (err && err.message || 'see the console');
-      }
-      button.disabled = false;
-    });
-    row.appendChild(button);
-    return row;
-  }
-
-  function pickerButton(text, onClick) {
-    var button = document.createElement('button');
-    button.textContent = text;
-    button.style.cssText = [
-      'padding:3px 10px', 'background:#1c1e22', 'color:#dfe1e5',
-      'border:1px solid #34373d', 'border-radius:4px', 'font-size:12px', 'cursor:pointer'
-    ].join(';');
-    button.addEventListener('click', onClick);
-    return button;
-  }
-
-  function pickerStatus(row, text) {
-    var note = document.createElement('div');
-    note.textContent = text;
-    note.style.cssText = 'margin-top:4px;font-size:11px;color:#767b84;';
-    row.appendChild(note);
-  }
-
-  /** Reflect what happened with the track LLL picked automatically. */
-  function notePickerOutcome(track, ok, count) {
-    if (!pickerList) return;
-    var note = document.createElement('div');
-    note.style.cssText = 'margin-top:8px;padding-top:8px;border-top:1px solid #292b30;font-size:12px;color:#a9aeb8;';
-    note.textContent = ok
-      ? '✓ automatically loaded ' + track.languageCode + ' — ' + count + ' lines'
-      : '✗ ' + track.languageCode + ' gave no data automatically — try a track above, or another video.';
-    pickerList.appendChild(note);
-  }
-
-  function ensurePicker() {
-    if (picker) return;
-
-    var player = document.querySelector('.html5-video-player') || document.body;
-    picker = document.createElement('div');
-    picker.setAttribute('data-lll-picker', '');
-    picker.style.cssText = [
-      'position:absolute', 'top:12px', 'right:12px', 'z-index:61', 'display:none',
-      'max-width:280px', 'max-height:70%', 'overflow-y:auto',
-      'background:#16171a', 'border:1px solid #292b30', 'border-radius:6px',
-      'box-shadow:0 8px 28px rgba(0,0,0,.5)', 'padding:10px 12px',
-      'font:13px/1.5 -apple-system,"Segoe UI",sans-serif', 'color:#dfe1e5'
-    ].join(';');
-
-    var head = document.createElement('div');
-    head.style.cssText = 'display:flex;align-items:center;margin-bottom:6px;';
-    var title = document.createElement('span');
-    title.textContent = 'LLL — subtitles';
-    title.style.cssText = 'flex:1;font-weight:600;';
-    var close = document.createElement('button');
-    close.textContent = '×';
-    close.title = 'Close';
-    close.style.cssText = 'background:none;border:0;color:#767b84;font-size:16px;cursor:pointer;padding:0 2px;';
-    close.addEventListener('click', function () { picker.style.display = 'none'; });
-    head.append(title, close);
-
-    pickerList = document.createElement('div');
-
-    picker.append(head, pickerList);
-    player.appendChild(picker);
-  }
-
-  // -------------------------------------------------------------------------
   // Plan 1: ask YouTube for the file
   // -------------------------------------------------------------------------
 
@@ -366,14 +224,6 @@ var LLLSubtitles = (function () {
       return fallBackToWatching();
     }
 
-    // However this turns out, a track list exists — worth putting in front of
-    // the reader rather than only ever deciding silently on their behalf.
-    // Automatic fetching so often lands on an empty response or a wrong
-    // choice between a manual and an auto-generated track that a one-click
-    // way to try a different one is worth more here than most videos will
-    // ever need it.
-    showTrackPicker(tracks, id);
-
     var track = pickTrack(tracks);
     if (!track) {
       console.warn('LLL: this video has no Japanese subtitle track. Tracks offered:',
@@ -389,15 +239,12 @@ var LLLSubtitles = (function () {
         cues = loaded;
         state = 'ready';
         console.log('LLL:', cues.length, 'subtitle lines ready, direct from YouTube');
-        notePickerOutcome(track, true, cues.length);
         return;
       }
       console.warn('LLL: YouTube would not hand over subtitle data for this video, ' +
         'in any format this tried.');
-      notePickerOutcome(track, false, 0);
     } catch (err) {
       console.warn('LLL: could not load subtitles —', err && err.message);
-      notePickerOutcome(track, false, 0);
     }
     fallBackToWatching();
   }
