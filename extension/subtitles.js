@@ -238,7 +238,20 @@ var LLLSubtitles = (function () {
       return '';
     }
     var text = await res.text();
-    if (!text) console.warn('LLL: subtitle request succeeded but the body was empty.');
+    if (!text) {
+      // A 200 with nothing in it can mean YouTube withheld the data, or it can
+      // mean something on this machine quietly swapped the response for an
+      // empty one before it got here — several ad-blocker filters do exactly
+      // that, rather than failing the request outright. Whether the URL we get
+      // back still matches the one we asked for is how those are told apart.
+      if (res.redirected || res.url !== url) {
+        console.warn('LLL: the request was redirected to', res.url,
+          '— something on this machine is very likely intercepting it, not YouTube.');
+      } else {
+        console.warn('LLL: subtitle request succeeded but the body was empty',
+          '(no redirect — this looks like YouTube itself, not a blocker).');
+      }
+    }
     return text;
   }
 
