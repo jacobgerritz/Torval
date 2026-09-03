@@ -12,11 +12,14 @@
  *
  * Turn YouTube's own captions off; these replace them.
  *
- * Getting the track is the fragile part. The addresses live in the page's own
- * player data, and they only answer to a request made from the page itself —
- * fetched from anywhere else they return an empty body. Firefox lets a content
- * script read page globals through `wrappedJSObject`, which is how this reaches
- * them without injecting anything into the page.
+ * Getting the track is the fragile part, in two ways. The address for it lives
+ * in the player's own data, which is read through `wrappedJSObject` — Firefox's
+ * way of letting a content script reach the page's variables — rather than
+ * anything injected into the page. And fetching that address can come back
+ * with a 200 and an empty body if YouTube is not satisfied with the request's
+ * session state, which a plain fetch cannot always arrange. Both failure modes
+ * are logged to the console rather than swallowed, because guessing which one
+ * happened from the outside wastes a round trip each time.
  */
 
 var LLLSubtitles = (function () {
@@ -157,24 +160,35 @@ var LLLSubtitles = (function () {
   }
 
   /**
-   * Fetch as the page would.
+   * Fetch the subtitle file.
    *
-   * This matters more than it looks. Under Manifest V3 a content script's own
-   * fetch goes out as the extension, not as the page — and YouTube answers a
-   * subtitle request that did not come from YouTube with an empty body. Firefox
-   * keeps the page's own fetch reachable as `content.fetch`, which is exactly
-   * what this needs; without it the request looks foreign and comes back blank.
+   * A content script's fetch runs in the page's own context in Firefox, so
+   * this is already "as the page" — no special handling needed. An earlier
+   * version routed this through a borrowed `content.fetch` on a theory that it
+   * was not, and broke on the much more basic mistake of calling a method
+   * after separating it from the object it belongs to: fetch (like most
+   * WebIDL methods) refuses to run unless it is still attached to its Window
+   * when called, which `var f = x.fetch; f()` does not preserve.
+   *
+   * An empty body with a 200 status is a real possibility here regardless —
+   * YouTube gates some caption requests on session state a plain fetch may not
+   * have — so that case is still reported rather than treated as success.
    */
   async function request(url) {
-    var fetcher = (typeof content !== 'undefined' && content && content.fetch)
-      ? content.fetch
-      : window.fetch;
-    var res = await fetcher(url, { credentials: 'include' });
+    var res;
+    try {
+      res = await fetch(url, { credentials: 'include' });
+    } catch (err) {
+      console.warn('LLL: subtitle request failed —', err && err.message);
+      return '';
+    }
     if (!res.ok) {
       console.warn('LLL: subtitle request came back', res.status);
       return '';
     }
-    return res.text();
+    var text = await res.text();
+    if (!text) console.warn('LLL: subtitle request succeeded but the body was empty.');
+    return text;
   }
 
   /**
