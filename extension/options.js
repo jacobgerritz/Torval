@@ -15,7 +15,6 @@ const SOURCE_LABELS = [
   ['word', 'Target word'],
   ['reading', 'Reading'],
   ['sentence', 'Sentence'],
-  ['sentenceMarked', 'Sentence, word in bold'],
   ['definition', 'Definition']
 ];
 

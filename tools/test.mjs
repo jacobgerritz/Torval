@@ -241,12 +241,12 @@ const run = async () => {
   };
   await Anki.addNote(
     { deck: 'D', model: 'M', fields: guessed, tags: ['lll'] },
-    { word: '食べる', reading: 'たべる', sentence: '食べなかった。',
-      sentenceMarked: '<b>食べなかった</b>。', definition: '1. to eat' });
+    { word: '食べる', reading: 'たべる', sentence: '<b>食べなかった</b>。',
+      definition: '1. to eat' });
   check('the card carries the word, reading, sentence and definition',
     sent.params.note.fields['Target Word'] === '食べる' &&
     sent.params.note.fields['Reading'] === 'たべる' &&
-    sent.params.note.fields['Sentence'] === '食べなかった。' &&
+    sent.params.note.fields['Sentence'] === '<b>食べなかった</b>。' &&
     sent.params.note.fields['Definitions'] === '1. to eat',
     JSON.stringify(sent && sent.params.note.fields));
   check('unmapped fields are left off the card entirely',

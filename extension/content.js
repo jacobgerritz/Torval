@@ -510,7 +510,10 @@
     const note = {
       word,
       reading,
-      sentence: context ? context.text : '',
+      // The bold marks the word exactly as the page wrote it, inflection and
+      // all, while the Target Word field carries the dictionary form.
+      sentence: context ? markSentence(context, surface.length) : '',
+      // Kept so a mapping saved before the two were merged still fills in.
       sentenceMarked: context ? markSentence(context, surface.length) : '',
       definition: definitionHtml(entry)
     };

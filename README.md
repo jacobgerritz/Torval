@@ -73,11 +73,12 @@ Four things can be put on a card:
 |---|---|
 | **Target word** | the dictionary form, so 食べなかった files under 食べる |
 | **Reading** | the kana |
-| **Sentence** | the whole sentence the word came from |
+| **Sentence** | the whole sentence, with the word in bold |
 | **Definition** | every sense, numbered |
 
-There is also *Sentence, word in bold*, which is the same sentence with the word
-as it actually appeared wrapped in `<b>`.
+The bold marks the word **as the page wrote it**, so a conjugated form is
+highlighted in full — 「<b>食べなかった</b>ので、お腹が空いた。」 — while the Target
+Word field still says 食べる.
 
 Duplicates are refused, so pressing **+** on a word you already have tells you so
 rather than making a second card.

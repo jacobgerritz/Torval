@@ -17,7 +17,7 @@ var LLLAnki = (function () {
 
   // What LLL can put on a card. The options page lets you point each field of
   // your note type at one of these.
-  var SOURCES = ['word', 'reading', 'sentence', 'sentenceMarked', 'definition'];
+  var SOURCES = ['word', 'reading', 'sentence', 'definition'];
 
   // Used to guess the mapping the first time, so a sensibly named note type
   // needs no setting up. First field to claim a source keeps it.
