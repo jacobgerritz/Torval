@@ -18,6 +18,7 @@
       "deinflect.js",
       "lookup.js",
       "anki.js",
+      "pitch.js",
       "background.js"
     ]
   },

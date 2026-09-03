@@ -61,6 +61,13 @@ async function guard(fn) {
 async function ankiAdd(note) {
   return guard(async () => {
     const { ankiConfig } = await api.storage.local.get('ankiConfig');
+    // The pitch diagram is drawn from dictionary data rather than fetched, so
+    // it is filled in here; anki.js only has to place it in the right field.
+    // Skipped entirely unless the card actually has somewhere to put it.
+    const fields = (ankiConfig && ankiConfig.fields) || {};
+    if (Object.keys(fields).some((f) => fields[f] === 'pitch')) {
+      note = { ...note, pitch: await LLLPitch.graphFor(note.word, note.reading) };
+    }
     return LLLAnki.addNote(ankiConfig, note);
   });
 }

@@ -1,7 +1,8 @@
-# Raw JMdict download (10 MB) — fetched by tools/build-dict.mjs
+# Raw downloads (JMdict, Kanjium accents) — fetched by the tools/build-* scripts
 data/
 
-# Built dictionary (42 MB) — regenerate with: node tools/build-dict.mjs
+# Built dictionary and pitch data — regenerate with:
+#   node tools/build-dict.mjs && node tools/build-pitch.mjs
 extension/data/
 
 node_modules/

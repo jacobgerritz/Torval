@@ -18,6 +18,12 @@ into a form the extension can read quickly.
 node tools/build-dict.mjs
 ```
 
+Then the pitch accent data, which is separate and much smaller:
+
+```bash
+node tools/build-pitch.mjs
+```
+
 **2. Load it into Firefox.** Go to `about:debugging` → *This Firefox* → *Load
 Temporary Add-on…* and pick `extension/manifest.json`.
 
@@ -82,12 +88,25 @@ Four things can be put on a card:
 | **Sentence** | the whole sentence, with the word in bold |
 | **Definition** | every sense, numbered |
 | **Word audio** | a recording of the word, if one can be found |
+| **Pitch accent** | the accent diagram, drawn as an SVG |
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
 mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
 recording instead — so LLL hashes what comes back and discards that one, leaving
 the field empty rather than filling your collection with identical clips. Anki
 downloads and stores nothing itself; LLL passes it the file.
+
+Pitch accents come from **Kanjium**, which derives from the NHK accent
+dictionary and 大辞林 — the same data Yomitan and AJT Pitch Accent use. A word's
+whole pattern follows from one number, where the pitch drops, and the diagram is
+drawn from that: a dot per mora, high or low. The hollow dot on the end is the
+particle that would follow, which is the only thing distinguishing 橋 (pitch
+drops after it) from 日本語 (it does not). It is drawn in `currentColor`, so it
+takes the colour of whatever card it lands on, night mode included.
+
+A reading alone is not enough to place an accent — 箸, 橋 and 端 are all はし with
+three different accents — so where the word cannot be identified the field is
+left empty rather than guessed at.
 
 The bold marks the word **as the page wrote it**, so a conjugated form is
 highlighted in full — 「<b>食べなかった</b>ので、お腹が空いた。」 — while the Target
@@ -123,6 +142,8 @@ a sealed-off document of its own, so no website's styling can reach it and it
 looks the same everywhere.
 
 **`extension/anki.js`** — the Anki side. One HTTP request to your own machine.
+
+**`extension/pitch.js`** — pitch accents, and drawing them.
 
 **`extension/options.js`** — the settings page.
 

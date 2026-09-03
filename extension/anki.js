@@ -17,7 +17,7 @@ var LLLAnki = (function () {
 
   // What LLL can put on a card. The options page lets you point each field of
   // your note type at one of these.
-  var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio'];
+  var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio', 'pitch'];
 
   // JapanesePod101's dictionary endpoint. It answers every request with an mp3
   // and a 200, whether or not it actually has the word: when it does not, you
@@ -39,7 +39,8 @@ var LLLAnki = (function () {
     [/^(reading|kana|furigana|pronunciation)$/i, 'reading'],
     [/^(sentence|example|context|sentence japanese)$/i, 'sentence'],
     [/^(definitions?|dictionary definitions?|meaning|gloss(es)?|back|english)$/i, 'definition'],
-    [/^(word ?audio|audio|term ?audio)$/i, 'audio']
+    [/^(word ?audio|audio|term ?audio)$/i, 'audio'],
+    [/^(pitch|pitch ?accent|accent)$/i, 'pitch']
   ];
 
   async function invoke(url, action, params) {

@@ -21,6 +21,8 @@ const require = createRequire(import.meta.url);
 const Lookup = require(join(ROOT, 'extension', 'lookup.js'));
 const Deinflect = require(join(ROOT, 'extension', 'deinflect.js'));
 const Anki = require(join(ROOT, 'extension', 'anki.js'));
+const Pitch = require(join(ROOT, 'extension', 'pitch.js'));
+Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
   console.error('No dictionary built yet. Run: node tools/build-dict.mjs');
@@ -227,8 +229,12 @@ const run = async () => {
     guessed['Target Word'] === 'word' && guessed['Reading'] === 'reading' &&
     guessed['Sentence'] === 'sentence' && guessed['Definitions'] === 'definition',
     JSON.stringify(guessed));
+  check('audio and pitch fields are recognised too',
+    guessed['Word Audio'] === 'audio' && guessed['Pitch'] === 'pitch',
+    JSON.stringify(guessed));
   check('fields it cannot place are left blank rather than guessed at',
-    guessed['Sentence Audio'] === '' && guessed['Pitch'] === '' && guessed['Images'] === '',
+    guessed['Sentence Audio'] === '' && guessed['Images'] === '' &&
+    guessed['Source'] === '' && guessed['Sentence English'] === '',
     JSON.stringify(guessed));
   check('a source is claimed by one field only',
     guessed['Dictionary Definitions'] === '', JSON.stringify(guessed));
@@ -327,6 +333,47 @@ const run = async () => {
     check('ます is still ranked as a kana word',
       (await Lookup.search('ます', db))[0].hits[0].entry.s.some((sn) => sn.p.includes('aux-v')));
   }
+
+  // --- pitch accent -----------------------------------------------------
+  // Small kana join the mora before them; ー, っ and ん stand alone.
+  check('きょ is one mora, っ and ん are their own',
+    Pitch.moras('べんきょう').join('|') === 'べ|ん|きょ|う' &&
+    Pitch.moras('がっこう').join('|') === 'が|っ|こ|う',
+    Pitch.moras('べんきょう').join('|'));
+
+  // The pattern follows entirely from where the pitch drops. The extra value on
+  // the end is the particle that would follow the word.
+  check('flat words stay up, and stay up past the end',
+    JSON.stringify(Pitch.heights(4, 0)) === '[false,true,true,true,true]');
+  check('a drop after the first mora takes everything down with it',
+    JSON.stringify(Pitch.heights(3, 1)) === '[true,false,false,false]');
+  check('a drop in the middle comes back down before the end',
+    JSON.stringify(Pitch.heights(3, 2)) === '[false,true,false,false]');
+
+  // 箸 and 橋 are both はし and differ only in pitch — the case that proves a
+  // reading alone cannot decide the accent.
+  check('箸 is 1 and 橋 is 2, told apart by their kanji',
+    (await Pitch.accentFor('箸', 'はし')) === 1 && (await Pitch.accentFor('橋', 'はし')) === 2,
+    (await Pitch.accentFor('箸', 'はし')) + '/' + (await Pitch.accentFor('橋', 'はし')));
+  check('an ambiguous bare reading is refused rather than guessed',
+    (await Pitch.accentFor('はし', '')) === null);
+
+  for (const [word, reading, accent] of
+    [['食べる', 'たべる', 2], ['日本語', 'にほんご', 0], ['先生', 'せんせい', 3], ['綺麗', 'きれい', 1]]) {
+    check(`${word} drops at ${accent}`, (await Pitch.accentFor(word, reading)) === accent,
+      'got ' + (await Pitch.accentFor(word, reading)));
+  }
+
+  const graph = await Pitch.graphFor('食べる', 'たべる');
+  check('the graph is an svg with a dot per mora plus the particle',
+    graph.startsWith('<svg') && (graph.match(/<circle/g) || []).length === 4,
+    (graph.match(/<circle/g) || []).length + ' circles');
+  check('the graph follows the card colour rather than fixing its own',
+    graph.includes('currentColor') && !/#[0-9a-f]{3,6}/i.test(graph));
+  check('an unknown word gets no graph at all, not an empty one',
+    (await Pitch.graphFor('ぬわあああ', 'ぬわあああ')) === '');
+  check('Pitch is guessed from the field name',
+    Anki.guessMapping(['Pitch'])['Pitch'] === 'pitch');
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',
