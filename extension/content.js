@@ -111,6 +111,7 @@
       hide();
       return;
     }
+    if (e.key === '3' && markTopAsKnown(e)) return;
     if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
@@ -122,6 +123,43 @@
 
   window.addEventListener('keyup', (e) => { if (e.key === 'Shift') shiftDown = false; }, true);
   window.addEventListener('blur', () => { shiftDown = false; });
+
+  /**
+   * 3 marks the word being pointed at as known, without reaching for the ✓.
+   *
+   * Most of what you meet while reading is a word you already know, and saying
+   * so is the one thing worth doing often enough that it should not cost a
+   * mouse movement. The number is 3 because that is where "known" sits in the
+   * scheme every other tool of this kind uses, so the finger already knows it —
+   * and it leaves 1 and 2 free should there ever be more than two answers to
+   * the question.
+   *
+   * It sets rather than toggles. Pressing it twice should not undo it: with a
+   * key this easy to lean on, an accidental repeat must be harmless. Unmarking
+   * is the ✓ in the popup, where it takes a deliberate click.
+   *
+   * Answers whether it did anything, because the key has to be taken away from
+   * the page when it did — YouTube reads the number keys as "jump to 30% of
+   * the video", and marking a word must not also lose your place.
+   */
+  function markTopAsKnown(e) {
+    if (!ui || ui.host.style.display !== 'block') return false;
+    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+
+    const focused = document.activeElement;
+    if (focused && (focused.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return false;
+
+    // First in the popup is the longest match, which is the word under the
+    // cursor; the ones below it are the shorter words sitting inside it.
+    const button = ui.card.querySelector('.know');
+    if (!button || !button.setKnown) return false;
+
+    e.preventDefault();
+    e.stopPropagation();
+    button.setKnown(true);
+    return true;
+  }
 
   window.addEventListener('mousemove', (e) => {
     pointer = { x: e.clientX, y: e.clientY };
@@ -670,8 +708,14 @@
     let known = !!hit.known;
     paint();
 
-    button.addEventListener('click', async () => {
-      const wanted = !known;
+    // Clicking asks for the opposite of whatever it is now; the 3 key asks for
+    // known outright. Both end up here, so there is one description of what
+    // marking a word actually does.
+    button.addEventListener('click', () => set(!known));
+    button.setKnown = set;
+
+    async function set(wanted) {
+      if (wanted === known) return;
       button.disabled = true;
       let reply;
       try {
@@ -687,11 +731,13 @@
       // The score and every mark of that word on the page both answer at once.
       if (typeof LLLBar !== 'undefined') LLLBar.adjust(hit.word, wanted);
       if (typeof LLLHighlight !== 'undefined') LLLHighlight.mark(hit.word, wanted);
-    });
+    }
 
     function paint() {
       button.classList.toggle('on', known);
-      button.title = known ? 'Known — click to unmark' : 'Mark as already known';
+      button.title = known
+        ? 'Known — click to unmark'
+        : 'Mark as already known (or press 3)';
     }
     return button;
   }

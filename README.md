@@ -51,8 +51,10 @@ again each time until it is packaged and signed. That is a step for later.
 | **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
 | **A** / **D** | step back and forward a subtitle line |
+| **3** | mark the word you are pointing at as known |
 | **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
+| **✓** | mark as known, or unmark it |
 
 While Shift is held the popup follows whatever you point at, and closes if you
 point at something that is not a word. Let go of Shift and it stays put, so you
@@ -265,6 +267,13 @@ settings. Words get there two ways.
 are different questions: **+** means *teach me this*, **✓** means *I already
 have this*. The tick toggles, because the commonest mistake to make with it is
 pressing it on the wrong word.
+
+Or press **3** while pointing at the word, without reaching for the tick. Most
+of what you meet while reading is something you already know, and saying so is
+the one thing done often enough that it should not cost a mouse movement. The
+number is **3** because that is where "known" sits in the scheme every other
+tool of this kind uses. Unlike the tick it only ever *sets* known — leaning on
+the key twice must be harmless — so unmarking stays a deliberate click.
 
 **In bulk.** Paste in something you have already read, or load a plain text
 file, and press **Add words from this text**.
