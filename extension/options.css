@@ -87,3 +87,19 @@ button:hover { background: #2c2f35; }
 
 #status { font-size: 12px; color: #7d828b; }
 #status.error { color: #d08a7a; }
+
+.footer-link {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid #232529;
+}
+
+.footer-link a {
+  font-size: 12px;
+  color: #8fb0c4;
+  text-decoration: none;
+}
+
+.footer-link a:hover {
+  text-decoration: underline;
+}

@@ -131,10 +131,17 @@ var LLLLookup = (function () {
     var limit = typeof entry.kv === 'number' ? entry.kv : entry.k.length;
     var showable = entry.k.slice(0, limit);
     var isKanji = showable.indexOf(matched) !== -1;
-    return {
-      word: isKanji ? matched : (showable[0] || matched),
-      reading: isKanji ? entry.r[0] : (showable.length ? matched : '')
-    };
+    if (isKanji) return { word: matched, reading: entry.r[0] };
+
+    // Matched via a reading, not a kanji spelling. A word tagged "usually
+    // kana" should stay in kana rather than surface whichever kanji spelling
+    // happens to be listed first — コーヒー is "usually kana" over its own
+    // kanji spelling 珈琲, so hovering コーヒー should not display 珈琲.
+    var usuallyKana = entry.s.some(function (sense) {
+      return sense.m && sense.m.indexOf('uk') !== -1;
+    });
+    if (usuallyKana || !showable.length) return { word: matched, reading: '' };
+    return { word: showable[0], reading: matched };
   }
 
   /**
@@ -259,12 +266,48 @@ var LLLLookup = (function () {
     return false;
   }
 
+  // Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana — the
+  // same set content.js uses to decide where a word could start.
+  var JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
+
+  /**
+   * Read every Japanese word out of a passage of text and hand back the
+   * dictionary form each one resolves to, once each.
+   *
+   * This is not a separate piece of machinery — it is `search` itself, run
+   * forward across a whole passage instead of stopping at the first word. At
+   * each position it takes the longest match, deinflects it the same way a
+   * hover would, and moves past however many characters that consumed, so
+   * 走っていました is recorded as 走る — the same dictionary form a hover on it
+   * would have shown. This is what "known words" is built on: reading a
+   * passage once teaches the word regardless of which sentence it turned up
+   * conjugated in.
+   */
+  async function extractWords(text, db) {
+    var seen = new Set();
+    var words = [];
+    var i = 0;
+    while (i < text.length) {
+      if (!JAPANESE.test(text[i])) { i++; continue; }
+      var groups = await search(text.slice(i, i + MAX_SCAN), db);
+      if (groups.length && groups[0].hits.length) {
+        var word = groups[0].hits[0].word;
+        if (!seen.has(word)) { seen.add(word); words.push(word); }
+        i += groups[0].length;
+      } else {
+        i++;
+      }
+    }
+    return words;
+  }
+
   return {
     search: search,
     displayForm: displayForm,
     frequencyBand: frequencyBand,
     sharedTags: sharedTags,
     sharedPos: sharedPos,
+    extractWords: extractWords,
     MAX_SCAN: MAX_SCAN
   };
 })();

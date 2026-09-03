@@ -452,6 +452,18 @@ const run = async () => {
   check('data built before kv existed shows its spellings rather than none',
     Lookup.displayForm({ k: ['本'], r: ['ほん'], s: [] }, '本').reading === 'ほん');
 
+  // A word usually written in kana still has a kanji spelling filed in the
+  // dictionary, and matching it by that kanji spelling should show it — but
+  // matching it by its kana should never surface the kanji instead. コーヒー
+  // is "usually kana" over its own listed spelling 珈琲.
+  const coffeeEntry = (await db.getEntries(['コーヒー'])).get('コーヒー')[0];
+  check('a usually-kana word matched by its kana stays in kana',
+    JSON.stringify(Lookup.displayForm(coffeeEntry, 'コーヒー')) === '{"word":"コーヒー","reading":""}',
+    JSON.stringify(Lookup.displayForm(coffeeEntry, 'コーヒー')));
+  check('the same word matched by its own kanji still shows that kanji',
+    JSON.stringify(Lookup.displayForm(coffeeEntry, '珈琲')) === '{"word":"珈琲","reading":"コーヒー"}',
+    JSON.stringify(Lookup.displayForm(coffeeEntry, '珈琲')));
+
   check('every hit is named, ready for the popup and the card',
     (await Lookup.search('日本語', db))[0].hits.every((h) => h.word && h.reading));
 
@@ -523,6 +535,33 @@ const run = async () => {
   check('a part of speech identical on every sense is shared in full',
     JSON.stringify(Lookup.sharedPos(yomuEntry).sort()) === '["v5m","vt"]',
     JSON.stringify(Lookup.sharedPos(yomuEntry)));
+
+  // --- extracting known words from a passage of text ----------------------
+  // This is what "known words" is built on: the same search a hover uses,
+  // run forward across a whole passage rather than stopping at one word.
+  const passage = '今日は早く起きて、コーヒーを飲みました。それから本を読んでいました。';
+  const extracted = await Lookup.extractWords(passage, db);
+  check('conjugated words are recorded by their dictionary form',
+    extracted.includes('起きる') && extracted.includes('飲む') && extracted.includes('読む'),
+    JSON.stringify(extracted));
+  check('a kana-only word is still picked up', extracted.includes('コーヒー'), JSON.stringify(extracted));
+  check('punctuation and particles do not themselves become entries',
+    !extracted.includes('。') && !extracted.includes('、'), JSON.stringify(extracted));
+
+  check('the same word said twice in a passage is only recorded once',
+    (await Lookup.extractWords('食べました。食べました。', db))
+      .filter((w) => w === '食べる').length === 1);
+
+  check('non-Japanese text yields nothing, not an error',
+    JSON.stringify(await Lookup.extractWords('Hello, world! 123', db)) === '[]');
+
+  check('an empty passage yields an empty list',
+    JSON.stringify(await Lookup.extractWords('', db)) === '[]');
+
+  // A word split by punctuation should still be found on the far side of it.
+  check('extraction continues past punctuation to the next word',
+    (await Lookup.extractWords('本、車、人', db)).length === 3,
+    JSON.stringify(await Lookup.extractWords('本、車、人', db)));
 
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.

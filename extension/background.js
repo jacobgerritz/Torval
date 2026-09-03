@@ -45,6 +45,9 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     case 'ytFetch':      return ytFetch(message.url, message.init);
+    case 'extractWords': return guard(() => extractWords(message.text));
+    case 'knownWords':   return guard(() => knownWords());
+    case 'addKnownWords': return guard(() => addKnownWords(message.words));
     default:       return undefined;
   }
 });
@@ -128,6 +131,32 @@ async function handleLookup(text) {
     console.error('LLL lookup failed', err);
     return { status: { state: 'error', message: String(err) }, groups: [] };
   }
+}
+
+/** Every dictionary word in a passage of text — see LLLLookup.extractWords. */
+async function extractWords(text) {
+  if (status.state !== 'ready') throw new Error('The dictionary is still loading — try again in a moment.');
+  await ready;
+  return LLLLookup.extractWords(text, { getEntries });
+}
+
+/** Every known word, and how many there are. */
+async function knownWords() {
+  const { knownWords } = await api.storage.local.get('knownWords');
+  const map = knownWords || {};
+  return { words: Object.keys(map), count: Object.keys(map).length };
+}
+
+/** Add words to the known set. Already-known ones are left alone. */
+async function addKnownWords(words) {
+  const { knownWords } = await api.storage.local.get('knownWords');
+  const map = knownWords || {};
+  let added = 0;
+  for (const word of words) {
+    if (!map[word]) { map[word] = Date.now(); added++; }
+  }
+  await api.storage.local.set({ knownWords: map });
+  return { added, total: Object.keys(map).length };
 }
 
 function loadTags() {
