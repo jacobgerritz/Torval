@@ -1,0 +1,219 @@
+/*
+ * LLL — test suite
+ *
+ *   node --max-old-space-size=4096 tools/test.mjs
+ *
+ * Loads the built dictionary into memory and runs the extension's real lookup
+ * code against it. The only thing stubbed is the storage layer: the extension
+ * reads from IndexedDB, this reads from a Map. Everything above that — the
+ * deinflection rules, the scan-every-length search, the ranking — is the same
+ * code that ships.
+ */
+
+import { readFileSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const DATA = join(ROOT, 'extension', 'data');
+const require = createRequire(import.meta.url);
+const Lookup = require(join(ROOT, 'extension', 'lookup.js'));
+const Deinflect = require(join(ROOT, 'extension', 'deinflect.js'));
+
+if (!existsSync(join(DATA, 'meta.json'))) {
+  console.error('No dictionary built yet. Run: node tools/build-dict.mjs');
+  process.exit(1);
+}
+
+const meta = JSON.parse(readFileSync(join(DATA, 'meta.json'), 'utf8'));
+const entries = [];
+for (let i = 0; i < meta.entryChunks; i++) {
+  for (const e of JSON.parse(readFileSync(join(DATA, `entries-${String(i).padStart(3, '0')}.json`), 'utf8'))) {
+    e.id = entries.length;
+    entries.push(e);
+  }
+}
+const index = new Map();
+for (let i = 0; i < meta.indexChunks; i++) {
+  for (const [term, ids] of JSON.parse(readFileSync(join(DATA, `index-${String(i).padStart(3, '0')}.json`), 'utf8'))) {
+    index.set(term, ids);
+  }
+}
+
+const db = {
+  async getEntries(terms) {
+    const out = new Map();
+    for (const term of terms) {
+      const ids = index.get(term);
+      if (ids) out.set(term, ids.map((id) => entries[id]));
+    }
+    return out;
+  }
+};
+
+let passed = 0;
+const failures = [];
+
+function check(name, ok, detail) {
+  if (ok) passed++;
+  else failures.push(`${name}${detail ? '\n      ' + detail : ''}`);
+}
+
+/** The top match for `text` should be `expected` characters of surface text. */
+async function topMatch(text, expectedSurface, expectedHeadword, expectedReasons) {
+  const groups = await Lookup.search(text, db);
+  if (!groups.length) return check(text, false, 'no match at all');
+  const top = groups[0];
+  const hit = top.hits[0];
+  const headword = hit.entry.k[0] || hit.entry.r[0];
+  const reasons = hit.reasons.join(' < ');
+
+  const okSurface = top.surface === expectedSurface;
+  const okHead = expectedHeadword === undefined || headword === expectedHeadword;
+  const okReasons = expectedReasons === undefined || reasons === expectedReasons;
+
+  check(
+    `${text}`,
+    okSurface && okHead && okReasons,
+    `got surface "${top.surface}" headword "${headword}" reasons "${reasons}"; ` +
+    `wanted surface "${expectedSurface}"` +
+    (expectedHeadword ? ` headword "${expectedHeadword}"` : '') +
+    (expectedReasons !== undefined ? ` reasons "${expectedReasons}"` : '')
+  );
+}
+
+/** `text` should produce a match whose headword is `headword` somewhere in the results. */
+async function contains(text, headword) {
+  const groups = await Lookup.search(text, db);
+  const found = groups.some((g) => g.hits.some((h) => h.entry.k[0] === headword || h.entry.r[0] === headword));
+  check(`${text} contains ${headword}`, found,
+    'got ' + JSON.stringify(groups.map((g) => g.hits.map((h) => h.entry.k[0] || h.entry.r[0]))));
+}
+
+/** `text` must NOT produce `headword` — guards against the deinflector inventing words. */
+async function excludes(text, headword) {
+  const groups = await Lookup.search(text, db);
+  const found = groups.some((g) => g.hits.some((h) => h.entry.k[0] === headword || h.entry.r[0] === headword));
+  check(`${text} excludes ${headword}`, !found, 'but it matched');
+}
+
+const run = async () => {
+  console.log(`dictionary: ${meta.entries} entries, ${meta.terms} forms (built ${meta.built})\n`);
+
+  // --- longest-match segmentation --------------------------------------
+  // The cursor sits at the start of a sentence; we must not stop at 日 or 日本.
+  await topMatch('日本語を勉強しています', '日本語', '日本語');
+  await topMatch('図書館で本を読む', '図書館', '図書館');
+  await topMatch('新しい車を買った', '新しい', '新しい');
+
+  // --- verb conjugation -------------------------------------------------
+  await topMatch('食べる', '食べる', '食べる', '');
+  await topMatch('食べます', '食べます', '食べる', 'polite');
+  await topMatch('食べました', '食べました', '食べる', 'polite < past');
+  await topMatch('食べません', '食べません', '食べる', 'polite < negative');
+  await topMatch('食べませんでした', '食べませんでした', '食べる', 'polite < negative past');
+  await topMatch('食べなかった', '食べなかった', '食べる', 'negative < past');
+  // JMdict lists 食べられる ("edible") as a word of its own, so that wins the top
+  // slot; the passive of 食べる has to still be offered alongside it.
+  await contains('食べられる', '食べられる');
+  await contains('食べられる', '食べる');
+  await topMatch('食べさせられた', '食べさせられた', '食べる', 'causative passive < past');
+  await topMatch('食べたくなかった', '食べたくなかった', '食べる', 'want to < negative < past');
+  await topMatch('食べている', '食べている', '食べる', '-te < progressive');
+  await topMatch('食べてしまった', '食べてしまった', '食べる', '-te < completely < past');
+  await topMatch('食べちゃった', '食べちゃった', '食べる', '-te < completely < past');
+
+  // Godan across all nine rows, in their trickiest (て/た) forms.
+  await topMatch('買って', '買って', '買う', '-te');
+  await topMatch('書いた', '書いた', '書く', 'past');
+  await topMatch('泳いで', '泳いで', '泳ぐ', '-te');
+  await topMatch('話して', '話して', '話す', '-te');
+  await contains('待った', '待つ');   // 待った is also a noun in its own right
+  await topMatch('死んで', '死んで', '死ぬ', '-te');
+  await topMatch('遊んだ', '遊んだ', '遊ぶ', 'past');
+  await topMatch('読んで', '読んで', '読む', '-te');
+  await topMatch('取って', '取って', '取る', '-te');
+  // 行く is the classic irregular て-form — 行いて would be wrong.
+  await contains('行って', '行く');
+
+  // Irregulars.
+  await contains('来ました', '来る');
+  await contains('こなかった', '来る');
+  await contains('しています', 'する');
+  // JMdict has no 勉強する entry, so する has to be peeled off to reach 勉強.
+  await contains('勉強しました', '勉強');
+  await contains('運動できない', '運動');
+
+  // --- adjectives -------------------------------------------------------
+  await topMatch('高くない', '高くない', '高い', 'negative');
+  await topMatch('高かった', '高かった', '高い', 'past');
+  await topMatch('高くなかった', '高くなかった', '高い', 'negative < past');
+  await topMatch('美しくて', '美しくて', '美しい', '-te');
+  await contains('よかった', '良い');
+  await contains('静かじゃない', '静か');
+  await contains('元気でした', '元気');
+
+  // --- kana-only and readings ------------------------------------------
+  await contains('わかりました', '分かる');
+  await contains('ありがとう', 'ありがとう');
+  await contains('コーヒーを', 'コーヒー');
+
+  // --- guarding against invented words ---------------------------------
+  // 少ない is an adjective; the ichidan rule would make it the verb 少る.
+  await excludes('少ない', '少る');
+  // きれい must lead with 綺麗, not with 切れる reached via the masu-stem of きれ.
+  const kirei = await Lookup.search('きれい', db);
+  check('きれい leads with 綺麗', kirei[0].surface === 'きれい', 'got ' + kirei[0].surface);
+  // A run of kana that is not a word should not produce a long bogus match.
+  const junk = await Lookup.search('ぁぃぅぇぉ', db);
+  check('nonsense input stays empty-ish', junk.every((g) => g.length <= 2),
+    'got ' + JSON.stringify(junk.map((g) => g.surface)));
+
+  // --- shorter matches are kept and ordered ----------------------------
+  const groups = await Lookup.search('日本語', db);
+  check('shorter matches are offered below the longest',
+    groups.length >= 2 && groups[0].surface === '日本語' && groups.some((g) => g.surface === '日本'),
+    'got ' + JSON.stringify(groups.map((g) => g.surface)));
+
+  // The same entry must not be repeated at several lengths: 勉強しています would
+  // otherwise list 勉強 four times, once per trailing fragment.
+  const benkyouGroups = await Lookup.search('勉強しています', db);
+  const seen = benkyouGroups.flatMap((g) => g.hits.map((h) => h.entry.id));
+  check('each entry appears at only one length', seen.length === new Set(seen).size,
+    'got ' + JSON.stringify(benkyouGroups.map((g) => g.surface + ':' + g.hits.length)));
+
+  // --- common words outrank obscure homographs -------------------------
+  const hito = await Lookup.search('人', db);
+  check('人 leads with the common entry', hito[0].hits[0].entry.f > 0,
+    'got f=' + hito[0].hits[0].entry.f);
+
+  // --- part-of-speech data survived the XML parse ----------------------
+  const taberu = (await db.getEntries(['食べる'])).get('食べる')[0];
+  check('食べる is tagged v1', taberu.s[0].p.includes('v1'), JSON.stringify(taberu.s[0].p));
+  const benkyou = (await db.getEntries(['勉強'])).get('勉強')[0];
+  check('勉強 carries the vs tag on an inherited sense',
+    benkyou.s.some((s) => s.p.includes('vs')), JSON.stringify(benkyou.s.map((s) => s.p)));
+
+  // --- speed ------------------------------------------------------------
+  const sentences = ['日本語を勉強しています', '食べさせられた', '新しい車を買った', '図書館で本を読んでいました'];
+  const t0 = performance.now();
+  for (let i = 0; i < 100; i++) await Lookup.search(sentences[i % sentences.length], db);
+  const ms = (performance.now() - t0) / 100;
+  check(`lookup is fast enough (${ms.toFixed(1)}ms per hover)`, ms < 25, `${ms.toFixed(1)}ms`);
+
+  // --- deinflector sanity ----------------------------------------------
+  check('deinflect returns the untouched word first',
+    Deinflect.deinflect('食べる')[0].term === '食べる');
+  check('deinflect terminates on pathological input',
+    Deinflect.deinflect('ってってってってってって').length < 400);
+
+  console.log(`${passed} passed, ${failures.length} failed`);
+  if (failures.length) {
+    console.log('\nFailures:');
+    for (const f of failures) console.log('  - ' + f);
+    process.exit(1);
+  }
+};
+
+run();

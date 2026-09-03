@@ -1,0 +1,8 @@
+# Raw JMdict download (10 MB) — fetched by tools/build-dict.mjs
+data/
+
+# Built dictionary (42 MB) — regenerate with: node tools/build-dict.mjs
+extension/data/
+
+node_modules/
+*.log

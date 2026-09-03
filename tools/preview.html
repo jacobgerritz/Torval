@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LLL preview</title>
+<!--
+  A page for working on how the popup looks and behaves, without having to
+  reload the extension in Firefox every time.
+
+      node tools/serve.mjs      ->  http://localhost:8137/tools/preview.html
+
+  It runs the real content.js, deinflect.js and lookup.js. The only fake part is
+  the dictionary: a dozen entries are written inline below instead of the real
+  218,000. Correctness against the real data is covered by tools/test.mjs.
+
+  The sample text deliberately includes the awkward cases — a word split across
+  two <span>s, a word wrapped in ruby furigana, and text sitting next to a block
+  boundary — because those are what break hover detection in the wild.
+-->
+<style>
+  body {
+    margin: 0; padding: 40px;
+    background: #0f1012; color: #d9dade;
+    font: 16px/2 "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font: 600 13px/1 -apple-system, "Segoe UI", sans-serif; letter-spacing: .08em;
+       text-transform: uppercase; color: #6b7078; margin: 0 0 28px; }
+  p { margin: 0 0 20px; }
+  .hint { font: 12px/1.7 -apple-system, "Segoe UI", sans-serif; color: #6b7078; }
+  rt { font-size: 10px; color: #7d828b; }
+</style>
+
+<main>
+  <h1>LLL preview</h1>
+  <p class="hint">Hold <b>Shift</b> and point at a word. <b>Esc</b> closes.</p>
+
+  <p>日本語を勉強しています。</p>
+  <p>昨日は figure 新しい車を買った。</p>
+  <p>友達と<span>図書</span><span>館</span>で本を読んでいました。</p>
+  <p><ruby>食<rt>た</rt></ruby>べなかったので、お腹が空いた。</p>
+  <p>あの人はとても親切で、料理も上手です。</p>
+  <p class="hint">English text should never trigger a lookup.</p>
+</main>
+
+<script src="../extension/deinflect.js"></script>
+<script src="../extension/lookup.js"></script>
+<script>
+// --- a dozen real JMdict entries, copied out of the built data ---------------
+const SAMPLE = [
+  { k: ['日本語'], r: ['にほんご'], f: 70, s: [{ p: ['n'], g: ['Japanese (language)'] }] },
+  { k: ['日本'], r: ['にほん'], f: 80, s: [{ p: ['n'], g: ['Japan'] }] },
+  { k: ['勉強'], r: ['べんきょう'], f: 60, s: [
+      { p: ['n', 'vs', 'vt'], g: ['study', 'diligence'] },
+      { p: ['n', 'vs', 'vt'], g: ['discount', 'reduction'] },
+      { p: ['n', 'vs', 'vt'], g: ['experience', 'lesson (for the future)'] }] },
+  { k: ['新しい'], r: ['あたらしい'], f: 65, s: [{ p: ['adj-i'], g: ['new', 'novel', 'fresh', 'recent', 'latest'] }] },
+  { k: ['車'], r: ['くるま'], f: 55, s: [{ p: ['n'], g: ['car', 'automobile', 'vehicle'] }, { p: ['n'], g: ['wheel'] }] },
+  { k: ['買う'], r: ['かう'], f: 58, s: [{ p: ['v5u', 'vt'], g: ['to buy', 'to purchase'] },
+      { p: ['v5u', 'vt'], g: ['to value', 'to have a high opinion of'] },
+      { p: ['v5u', 'vt'], g: ['to incur (someone’s anger)'] }] },
+  { k: ['図書館'], r: ['としょかん'], f: 45, s: [{ p: ['n'], g: ['library'] }] },
+  { k: ['図書'], r: ['としょ'], f: 20, s: [{ p: ['n'], g: ['books'] }] },
+  { k: ['読む'], r: ['よむ'], f: 62, s: [{ p: ['v5m', 'vt'], g: ['to read'] },
+      { p: ['v5m', 'vt'], g: ['to recite (e.g. a sutra)', 'to chant'] },
+      { p: ['v5m', 'vt'], g: ['to predict', 'to guess', 'to forecast'] },
+      { p: ['v5m', 'vt'], g: ['to count'] }] },
+  { k: ['食べる'], r: ['たべる'], f: 66, s: [{ p: ['v1', 'vt'], g: ['to eat'] },
+      { p: ['v1', 'vt'], g: ['to live on (e.g. a salary)', 'to live off', 'to subsist on'] }] },
+  { k: ['親切'], r: ['しんせつ'], f: 40, s: [{ p: ['adj-na', 'n'], m: ['uk'], g: ['kind', 'gentle', 'friendly'] }] },
+  { k: ['料理'], r: ['りょうり'], f: 52, s: [{ p: ['n', 'vs', 'vt'], g: ['cooking', 'cookery', 'cuisine'] },
+      { p: ['n', 'vs', 'vt'], g: ['dealing with', 'handling', 'administration'] }] },
+  { k: ['上手'], r: ['じょうず'], f: 48, s: [{ p: ['adj-na', 'n'], g: ['skill', 'skillful', 'good at'] }] },
+  { k: ['本'], r: ['ほん'], f: 75, s: [{ p: ['n'], g: ['book', 'volume', 'script'] }, { p: ['pref'], g: ['this', 'present'] }] },
+  { k: ['人'], r: ['ひと'], f: 90, s: [{ p: ['n'], g: ['person', 'someone'] }, { p: ['n'], g: ['human beings', 'mankind'] }] }
+];
+
+const entries = SAMPLE.map((e, id) => Object.assign(e, { id }));
+const index = new Map();
+for (const e of entries) {
+  for (const term of [...e.k, ...e.r]) {
+    if (!index.has(term)) index.set(term, []);
+    index.get(term).push(e.id);
+  }
+}
+const db = {
+  async getEntries(terms) {
+    const out = new Map();
+    for (const t of terms) if (index.has(t)) out.set(t, index.get(t).map((id) => entries[id]));
+    return out;
+  }
+};
+
+const TAGS = {
+  n: 'noun (common) (futsuumeishi)', vs: 'noun or participle which takes the aux. verb suru',
+  vt: 'transitive verb', vi: 'intransitive verb', v1: 'Ichidan verb', v5u: 'Godan verb with u ending',
+  v5m: 'Godan verb with mu ending', 'adj-i': 'adjective (keiyoushi)', 'adj-na': 'adjectival nouns',
+  pref: 'prefix', uk: 'word usually written using kana alone'
+};
+
+// --- stand in for the extension's messaging ---------------------------------
+window.browser = {
+  runtime: {
+    id: 'preview',
+    getURL: (p) => '../extension/' + p,
+    async sendMessage(msg) {
+      if (msg.type === 'tags') return TAGS;
+      if (msg.type === 'status') return { status: { state: 'ready' } };
+      if (msg.type === 'lookup') {
+        return { status: { state: 'ready' }, groups: await LLLLookup.search(msg.text, db) };
+      }
+    }
+  }
+};
+</script>
+<script src="../extension/content.js"></script>
