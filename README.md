@@ -50,17 +50,28 @@ again each time until it is packaged and signed. That is a step for later.
 | **Shift** with text selected | look up the selection |
 | **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
+| **A** / **D** | step back and forward a subtitle line |
+| **click a sense** | put only that meaning on the card |
+| **+** | add the word to Anki |
+
+While Shift is held the popup follows whatever you point at, and closes if you
+point at something that is not a word. Let go of Shift and it stays put, so you
+can move across and read it.
 
 Tags that hold for the whole word — `uk`, "usually written in kana" — sit beside
 it rather than against every definition. JMdict files them per sense, but a tag
 on *every* sense is describing the word, and 事 carrying "usually kana" ten times
 over says nothing ten times. Where a tag really is on only some senses it stays
 with them: 綺麗 is usually kana when it means "clean", not when it means "pretty",
-and that is worth knowing.
+and that is worth knowing. Part of speech works the same way: 勉強 is a
+transitive suru-verb for one sense and intransitive for another and just a plain
+noun for a third, so only "noun" — what every sense actually agrees on — sits
+beside the word; each sense's own line carries whatever it adds beyond that.
 
 Two small numbers follow the reading. The one in brackets is the **pitch
 accent**: 0 means the pitch never drops, otherwise it is the mora it drops
-after; the diagram of it goes on the card rather than in the popup. The other is how **common** the word is: 読む is *top 1k*, 図書館 is *top 10k*.
+after; the diagram of it goes on the card rather than in the popup. The other
+is how **common** the word is: 読む is *top 1k*, 図書館 is *top 10k*.
 
 That is a band rather than a rank on purpose. A bare number asks you to know the
 scale already — #7,261 means nothing unless you have a feel for what #3,000 is
@@ -69,13 +80,6 @@ and #400 is real; the gap between #7,261 and #7,800 is noise. A round band says
 both of those at once and needs no legend. The exact rank is on hover for when
 it matters. A word with no band at all is one the corpus never saw, which tells
 you something in itself.
-| **A** / **D** | step back and forward a subtitle line |
-| **click a sense** | put only that meaning on the card |
-| **+** | add the word to Anki |
-
-While Shift is held the popup follows whatever you point at, and closes if you
-point at something that is not a word. Let go of Shift and it stays put, so you
-can move across and read it.
 
 Point at the *first* character of a word. Japanese has no spaces, so the
 extension reads forward from wherever you are pointing and finds the longest
@@ -144,11 +148,6 @@ By default a card carries every sense of the word. Clicking a sense before
 pressing **+** narrows it to the meanings you actually met — 語 is both "word;
 term" and "language", and you rarely want both. Clicking nothing means all of
 them, so the ordinary case needs no clicks.
-
-Pressing **+** on a word you already have says so rather than making a second
-card. That check is on the *word*: one sentence often teaches three words, and
-mining all three is the point. Anki's own duplicate rule compares first fields,
-which on a sentence-mining note type is the sentence, so it is left off.
 
 ---
 
