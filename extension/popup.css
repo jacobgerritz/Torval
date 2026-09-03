@@ -1,9 +1,14 @@
 /*
  * LLL — the popup's whole appearance.
  *
- * This is loaded inside a shadow root, so nothing here can affect the page and
- * nothing on the page can affect it. Edit freely; it is the only file that
- * decides how the thing looks.
+ * Loaded inside a shadow root, so nothing here can affect the page and nothing
+ * on the page can affect it. Edit freely; it is the only file that decides how
+ * the thing looks.
+ *
+ * The palette is deliberately small: four greys and one blue — the word, the
+ * definitions, everything secondary, the separators, and the reading. An
+ * earlier version gave the pitch, the tags and the frequency a colour each, and
+ * the result was a popup where six things asked for attention at once.
  */
 
 :host {
@@ -15,64 +20,82 @@
 
 .card {
   box-sizing: border-box;
-  max-width: 380px;
+  max-width: 360px;
   max-height: 60vh;
   overflow-y: auto;
-  padding: 10px 12px;
+  padding: 11px 13px 12px;
 
-  background: #17181b;
-  border: 1px solid #2c2e33;
+  background: #16171a;
+  border: 1px solid #292b30;
   border-radius: 6px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
 
   font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
                "Yu Gothic UI", Meiryo, sans-serif;
   font-size: 13px;
   line-height: 1.5;
-  color: #e7e8ea;
+  color: #dfe1e5;
   text-align: left;
   cursor: default;
   user-select: text;
 }
 
 .card::-webkit-scrollbar { width: 8px; }
-.card::-webkit-scrollbar-thumb { background: #34373d; border-radius: 4px; }
+.card::-webkit-scrollbar-thumb { background: #303339; border-radius: 4px; }
 
-/* --- entries ----------------------------------------------------------- */
+/* --- the word ---------------------------------------------------------- */
 
 .entry + .entry {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #232529;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #222429;
 }
 
 .head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 9px;
 }
 
 .word {
   font-size: 18px;
-  line-height: 1.3;
-  color: #f2f3f5;
+  line-height: 1.35;
+  color: #f4f5f7;
 }
 
 .reading {
   font-size: 12px;
-  color: #8fb0c4;
+  color: #93b4c6;
 }
 
+/*
+ * Everything secondary on one line: how common, the pitch accent, what kind of
+ * word. Kept off the headword's line so the word stays the thing you see first.
+ */
+.meta {
+  margin-top: 1px;
+  font-size: 11px;
+  color: #767b84;
+}
+
+.sep {
+  margin: 0 5px;
+  color: #43474e;
+}
+
+/* How the written form was got back to the dictionary form. */
 .reasons {
   margin-top: 1px;
   font-size: 11px;
-  color: #7d828b;
+  font-style: italic;
+  color: #6b7079;
 }
 
+/* --- the definitions --------------------------------------------------- */
+
 .senses {
-  margin: 5px 0 0;
-  padding-left: 18px;
+  margin: 6px 0 0;
+  padding-left: 17px;
 }
 
 .senses li {
@@ -80,83 +103,46 @@
 }
 
 .senses li::marker {
-  color: #5f646c;
   font-size: 11px;
+  color: #5a5f67;
 }
 
-/* Grammar labels. Kept small and grey so the English stays the thing you read. */
-.pos,
-.misc {
+/* Only what a sense adds over the line above it. */
+.qualifier {
   margin-right: 5px;
-  font-size: 10px;
-  letter-spacing: 0.02em;
-  color: #757a83;
-  white-space: nowrap;
-}
-
-.misc {
-  color: #8a7f63;
+  font-size: 11px;
+  color: #767b84;
 }
 
 /* --- shorter matches --------------------------------------------------- */
 
 .shorter {
-  margin-top: 6px;
-  padding-top: 8px;
-  border-top: 1px solid #232529;
+  margin-top: 8px;
+  padding-top: 9px;
+  border-top: 1px solid #222429;
+}
+
+.shorter .group + .group {
+  margin-top: 12px;
 }
 
 .surface {
   margin-bottom: 3px;
   font-size: 11px;
-  color: #7d828b;
-}
-
-.shorter .group + .group {
-  margin-top: 10px;
+  color: #6b7079;
 }
 
 /* --- controls ---------------------------------------------------------- */
 
-.toggle {
-  margin-top: 5px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  font-size: 11px;
-  color: #6f7480;
-  cursor: pointer;
-}
-
-.toggle::before {
-  content: "▸ ";
-}
-
-.toggle.open::before {
-  content: "▾ ";
-}
-
-.toggle:hover {
-  color: #a9aeb8;
-}
-
-.note {
-  font-size: 12px;
-  color: #9aa0a8;
-}
-
-/* --- adding to Anki ---------------------------------------------------- */
-
 .add {
   margin-left: auto;
-  padding: 0 4px;
+  padding: 0 2px;
   border: 0;
   background: none;
   font: inherit;
   font-size: 15px;
   line-height: 1;
-  color: #5f646c;
+  color: #565b63;
   cursor: pointer;
 }
 
@@ -164,20 +150,28 @@
 .add:disabled { cursor: default; }
 .add.done { color: #6f9e78; }
 
+.toggle {
+  margin-top: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: #6b7079;
+  cursor: pointer;
+}
+
+.toggle::before { content: "▸ "; }
+.toggle.open::before { content: "▾ "; }
+.toggle:hover { color: #a4a9b2; }
+
 .error {
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 11px;
-  color: #d08a7a;
+  color: #c98a7c;
 }
 
-/* The pitch accent, as a number: 0 flat, otherwise where the pitch drops. */
-.pitch {
-  font-size: 11px;
-  color: #7f8f7f;
-}
-
-/* How common the word is: its rank in a corpus of Japanese media. */
-.freq {
-  font-size: 11px;
-  color: #6f7480;
+.note {
+  font-size: 12px;
+  color: #949aa3;
 }

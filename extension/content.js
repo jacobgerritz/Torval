@@ -48,14 +48,27 @@
   const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'SELECT', 'TEXTAREA', 'OPTION']);
   const INLINE_DISPLAY = new Set(['inline', 'inline-block', 'inline-flex', 'contents', 'ruby', 'ruby-base', 'ruby-text']);
 
-  // Part-of-speech codes are terse in JMdict; these are the ones worth spelling
-  // out. Anything else falls back to the dictionary's own description.
-  const POS_LABELS = {
+  // JMdict's tags in plain words. The codes are compact but opaque, and there is
+  // room here to say what they mean. Anything not listed falls back to the
+  // dictionary's own description of it.
+  const LABELS = {
+    // parts of speech
     n: 'noun', pn: 'pronoun', adv: 'adverb', 'adj-i': 'i-adjective', 'adj-na': 'na-adjective',
-    'adj-no': 'の-adjective', 'adj-pn': 'pre-noun adjectival', exp: 'expression', int: 'interjection',
-    conj: 'conjunction', prt: 'particle', pref: 'prefix', suf: 'suffix', ctr: 'counter',
+    'adj-no': 'の-adjective', 'adj-pn': 'pre-noun adjectival', exp: 'expression',
+    int: 'interjection', conj: 'conjunction', prt: 'particle', pref: 'prefix', suf: 'suffix',
+    ctr: 'counter', num: 'numeric', aux: 'auxiliary', 'aux-v': 'auxiliary verb',
+    'aux-adj': 'auxiliary adjective', cop: 'copula', 'n-suf': 'noun suffix',
+    'n-pref': 'noun prefix', 'adv-to': 'adverb taking と',
     v1: 'ichidan verb', 'v1-s': 'ichidan verb', vk: 'irregular verb', 'vs-i': 'irregular verb',
-    'vs-s': 'irregular verb', vs: 'noun + する', vt: 'transitive', vi: 'intransitive'
+    'vs-s': 'irregular verb', vs: 'noun + する', vz: 'ずる verb', vt: 'transitive',
+    vi: 'intransitive', 'vr': 'irregular り verb',
+    // usage
+    uk: 'usually kana', abbr: 'abbreviation', col: 'colloquial', sl: 'slang',
+    arch: 'archaic', obs: 'obsolete', rare: 'rare', dated: 'dated', hist: 'historical',
+    hon: 'honorific', hum: 'humble', pol: 'polite', fam: 'familiar', vulg: 'vulgar',
+    derog: 'derogatory', joc: 'humorous', poet: 'poetic', chn: "children's language",
+    fem: 'female term', male: 'male term', 'on-mim': 'onomatopoeic', id: 'idiom',
+    proverb: 'proverb', quote: 'quotation', yoji: 'four-character idiom', form: 'literary'
   };
 
   let shiftDown = false;
@@ -420,15 +433,29 @@
     return el;
   }
 
+  /**
+   * One dictionary entry.
+   *
+   *     親切  しんせつ                                    +
+   *     top 5k · [1] · usually kana · na-adjective, noun
+   *       1  kind; gentle; friendly
+   *
+   * The word gets a line to itself. Everything secondary — how common it is,
+   * its pitch, what kind of word it is — goes on one muted line beneath, rather
+   * than trailing after the headword where it competes with it. The definitions
+   * then all start at the same place, which is what makes them scannable: with
+   * the grammar labels inline, every line began somewhere different.
+   */
   function renderEntry(hit, surface) {
     const entry = hit.entry;
     const el = document.createElement('div');
     el.className = 'entry';
 
+    // Which spelling and reading to show is decided in lookup.js, so the popup,
+    // the pitch accent and the card all name the word the same way.
     const head = document.createElement('div');
     head.className = 'head';
-    // Which spelling and reading to show is decided in lookup.js, so the
-    // popup, the pitch accent and the card all name the word the same way.
+
     const word = document.createElement('span');
     word.className = 'word';
     word.textContent = hit.word;
@@ -441,42 +468,6 @@
       head.appendChild(reading);
     }
 
-    // The accent as its number: 0 is flat, otherwise the mora the pitch drops
-    // after. Brief enough to sit inline; the diagram is left for the card.
-    if (typeof hit.pitch === 'number') {
-      const pitch = document.createElement('span');
-      pitch.className = 'pitch';
-      pitch.textContent = '[' + hit.pitch + ']';
-      pitch.title = hit.pitch === 0
-        ? 'flat — the pitch never drops'
-        : 'the pitch drops after mora ' + hit.pitch;
-      head.appendChild(pitch);
-    }
-
-    // Tags that hold for the whole entry sit beside the word, because that is
-    // what they describe: "uk" is about how the word is written, which cannot
-    // differ from one definition to the next.
-    for (const code of hit.shared || []) {
-      const tag = document.createElement('span');
-      tag.className = 'misc';
-      tag.textContent = code;
-      tag.title = tags[code] || code;
-      head.appendChild(tag);
-    }
-
-    // How common the word is. Shown as a band rather than a bare rank, which
-    // would ask you to know the scale already. The exact number is on hover for
-    // when it matters. Nothing at all for words the corpus never saw, which is
-    // itself worth knowing.
-    if (hit.band) {
-      const freq = document.createElement('span');
-      freq.className = 'freq';
-      freq.textContent = hit.band;
-      freq.title = 'ranked #' + hit.entry.q.toLocaleString('en-US') +
-        ' in a corpus of Japanese media';
-      head.appendChild(freq);
-    }
-
     const add = document.createElement('button');
     add.className = 'add';
     add.textContent = '+';
@@ -487,6 +478,21 @@
     head.appendChild(add);
     el.appendChild(head);
 
+    const meta = [];
+    if (hit.band) {
+      meta.push([hit.band, 'ranked #' + entry.q.toLocaleString('en-US') +
+        ' in a corpus of Japanese media']);
+    }
+    if (typeof hit.pitch === 'number') {
+      meta.push(['[' + hit.pitch + ']', hit.pitch === 0
+        ? 'flat — the pitch never drops'
+        : 'the pitch drops after mora ' + hit.pitch]);
+    }
+    for (const code of hit.shared || []) meta.push([label(code), tags[code] || code]);
+    if (entry.s[0].p.length) meta.push([entry.s[0].p.map(label).join(', '), '']);
+
+    if (meta.length) el.appendChild(renderMeta(meta));
+
     if (hit.reasons.length) {
       const why = document.createElement('div');
       why.className = 'reasons';
@@ -496,37 +502,51 @@
 
     const list = document.createElement('ol');
     list.className = 'senses';
-    let previousPos = null;
-    entry.s.forEach((sense) => {
+    let previous = entry.s[0].p.join(',');   // already said on the meta line
+
+    entry.s.forEach((sense, i) => {
       const li = document.createElement('li');
 
-      // Most entries carry the same grammar tags on every sense. Printing
-      // "noun · noun + する · transitive" against all four definitions of 読む
-      // buries the English, so only show them when they actually change.
+      // Only what this sense adds: the grammar it does not share with the line
+      // above, and any tag that applies to it alone.
+      const qualifiers = [];
       const pos = sense.p.join(',');
-      const showPos = pos !== previousPos;
-      previousPos = pos;
-
-      for (const code of showPos ? sense.p : []) {
-        const tag = document.createElement('span');
-        tag.className = 'pos';
-        tag.textContent = posLabel(code);
-        tag.title = tags[code] || code;
-        li.appendChild(tag);
+      if (i > 0 && pos !== previous) qualifiers.push(...sense.p.map(label));
+      previous = pos;
+      for (const code of sense.m || []) {
+        if ((hit.shared || []).indexOf(code) === -1) qualifiers.push(label(code));
       }
-      const shared = hit.shared || [];
-      for (const code of (sense.m || []).filter((c) => shared.indexOf(c) === -1)) {
-        const tag = document.createElement('span');
-        tag.className = 'misc';
-        tag.textContent = code;
-        tag.title = tags[code] || code;
-        li.appendChild(tag);
+
+      if (qualifiers.length) {
+        const note = document.createElement('span');
+        note.className = 'qualifier';
+        note.textContent = qualifiers.join(', ');
+        li.appendChild(note);
       }
       li.appendChild(document.createTextNode(sense.g.join('; ')));
       list.appendChild(li);
     });
+
     el.appendChild(list);
     return el;
+  }
+
+  function renderMeta(parts) {
+    const line = document.createElement('div');
+    line.className = 'meta';
+    parts.forEach(([text, hint], i) => {
+      if (i) {
+        const sep = document.createElement('span');
+        sep.className = 'sep';
+        sep.textContent = '·';
+        line.appendChild(sep);
+      }
+      const span = document.createElement('span');
+      span.textContent = text;
+      if (hint) span.title = hint;
+      line.appendChild(span);
+    });
+    return line;
   }
 
   /**
@@ -571,11 +591,15 @@
     entryEl.appendChild(message);
   }
 
-  function posLabel(code) {
-    if (POS_LABELS[code]) return POS_LABELS[code];
+  /**
+   * A JMdict tag in words. The codes are compact but opaque — "uk" tells you
+   * nothing until someone explains it — and this popup has room to say it.
+   */
+  function label(code) {
+    if (LABELS[code]) return LABELS[code];
     if (code.startsWith('v5')) return 'godan verb';
     const described = tags[code];
-    return described ? described.split('(')[0].trim() : code;
+    return described ? described.split('(')[0].trim().toLowerCase() : code;
   }
 
   /** Put the popup near the cursor, nudged back on screen if it would overflow. */
