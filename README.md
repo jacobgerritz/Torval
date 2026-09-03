@@ -51,9 +51,12 @@ again each time until it is packaged and signed. That is a step for later.
 | **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
 
-The number in brackets after the reading is the pitch accent: 0 means the pitch
-never drops, otherwise it is the mora it drops after. The diagram of it goes on
-the card rather than in the popup.
+Two small numbers follow the reading. The one in brackets is the **pitch
+accent**: 0 means the pitch never drops, otherwise it is the mora it drops
+after; the diagram of it goes on the card rather than in the popup. The one
+after the hash is how **common** the word is — its rank in a corpus of Japanese
+media, so 読む is #414 and 図書館 is #7,261. A word with no number is one the
+corpus never saw, which tells you something in itself.
 | **+** | add the word to Anki |
 
 While Shift is held the popup follows whatever you point at, and closes if you
@@ -189,6 +192,13 @@ In rough order of intent:
 ---
 
 ## Dictionary data
+
+Frequency ranks come from **JPDB**, scraped from a corpus of anime, manga, light
+novels and visual novels — media Japanese rather than newspaper Japanese, which
+is the point. They are attached to the entries when the dictionary is built, so
+there is no separate file and no second lookup. They also decide which of two
+equally good matches goes first, which JMdict's own priority markers did poorly:
+those are coarse bands covering only the commonest 24,000 words.
 
 The dictionary is **JMdict**, from the [Electronic Dictionary Research and
 Development Group](https://www.edrdg.org/), used under

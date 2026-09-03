@@ -46,31 +46,31 @@
 <script>
 // --- a dozen real JMdict entries, copied out of the built data ---------------
 const SAMPLE = [
-  { k: ['日本語'], kv: 1, r: ['にほんご'], f: 70, s: [{ p: ['n'], g: ['Japanese (language)'] }] },
-  { k: ['日本'], kv: 1, r: ['にほん'], f: 80, s: [{ p: ['n'], g: ['Japan'] }] },
-  { k: ['勉強'], kv: 1, r: ['べんきょう'], f: 60, s: [
+  { k: ['日本語'], kv: 1, q: 4705, r: ['にほんご'], f: 70, s: [{ p: ['n'], g: ['Japanese (language)'] }] },
+  { k: ['日本'], kv: 1, q: 1146, r: ['にほん'], f: 80, s: [{ p: ['n'], g: ['Japan'] }] },
+  { k: ['勉強'], kv: 1, q: 1329, r: ['べんきょう'], f: 60, s: [
       { p: ['n', 'vs', 'vt'], g: ['study', 'diligence'] },
       { p: ['n', 'vs', 'vt'], g: ['discount', 'reduction'] },
       { p: ['n', 'vs', 'vt'], g: ['experience', 'lesson (for the future)'] }] },
-  { k: ['新しい'], kv: 1, r: ['あたらしい'], f: 65, s: [{ p: ['adj-i'], g: ['new', 'novel', 'fresh', 'recent', 'latest'] }] },
-  { k: ['車'], kv: 1, r: ['くるま'], f: 55, s: [{ p: ['n'], g: ['car', 'automobile', 'vehicle'] }, { p: ['n'], g: ['wheel'] }] },
-  { k: ['買う'], kv: 1, r: ['かう'], f: 58, s: [{ p: ['v5u', 'vt'], g: ['to buy', 'to purchase'] },
+  { k: ['新しい'], kv: 1, q: 699, r: ['あたらしい'], f: 65, s: [{ p: ['adj-i'], g: ['new', 'novel', 'fresh', 'recent', 'latest'] }] },
+  { k: ['車'], kv: 1, q: 745, r: ['くるま'], f: 55, s: [{ p: ['n'], g: ['car', 'automobile', 'vehicle'] }, { p: ['n'], g: ['wheel'] }] },
+  { k: ['買う'], kv: 1, q: 334, r: ['かう'], f: 58, s: [{ p: ['v5u', 'vt'], g: ['to buy', 'to purchase'] },
       { p: ['v5u', 'vt'], g: ['to value', 'to have a high opinion of'] },
       { p: ['v5u', 'vt'], g: ['to incur (someone’s anger)'] }] },
-  { k: ['図書館'], kv: 1, r: ['としょかん'], f: 45, s: [{ p: ['n'], g: ['library'] }] },
-  { k: ['図書'], kv: 1, r: ['としょ'], f: 20, s: [{ p: ['n'], g: ['books'] }] },
-  { k: ['読む'], kv: 1, r: ['よむ'], f: 62, s: [{ p: ['v5m', 'vt'], g: ['to read'] },
+  { k: ['図書館'], kv: 1, q: 7261, r: ['としょかん'], f: 45, s: [{ p: ['n'], g: ['library'] }] },
+  { k: ['図書'], kv: 1, q: 24380, r: ['としょ'], f: 20, s: [{ p: ['n'], g: ['books'] }] },
+  { k: ['読む'], kv: 1, q: 414, r: ['よむ'], f: 62, s: [{ p: ['v5m', 'vt'], g: ['to read'] },
       { p: ['v5m', 'vt'], g: ['to recite (e.g. a sutra)', 'to chant'] },
       { p: ['v5m', 'vt'], g: ['to predict', 'to guess', 'to forecast'] },
       { p: ['v5m', 'vt'], g: ['to count'] }] },
-  { k: ['食べる'], kv: 1, r: ['たべる'], f: 66, s: [{ p: ['v1', 'vt'], g: ['to eat'] },
+  { k: ['食べる'], kv: 1, q: 184, r: ['たべる'], f: 66, s: [{ p: ['v1', 'vt'], g: ['to eat'] },
       { p: ['v1', 'vt'], g: ['to live on (e.g. a salary)', 'to live off', 'to subsist on'] }] },
-  { k: ['親切'], kv: 1, r: ['しんせつ'], f: 40, s: [{ p: ['adj-na', 'n'], m: ['uk'], g: ['kind', 'gentle', 'friendly'] }] },
-  { k: ['料理'], kv: 1, r: ['りょうり'], f: 52, s: [{ p: ['n', 'vs', 'vt'], g: ['cooking', 'cookery', 'cuisine'] },
+  { k: ['親切'], kv: 1, q: 4986, r: ['しんせつ'], f: 40, s: [{ p: ['adj-na', 'n'], m: ['uk'], g: ['kind', 'gentle', 'friendly'] }] },
+  { k: ['料理'], kv: 1, q: 1585, r: ['りょうり'], f: 52, s: [{ p: ['n', 'vs', 'vt'], g: ['cooking', 'cookery', 'cuisine'] },
       { p: ['n', 'vs', 'vt'], g: ['dealing with', 'handling', 'administration'] }] },
-  { k: ['上手'], kv: 1, r: ['じょうず'], f: 48, s: [{ p: ['adj-na', 'n'], g: ['skill', 'skillful', 'good at'] }] },
-  { k: ['本'], kv: 1, r: ['ほん'], f: 75, s: [{ p: ['n'], g: ['book', 'volume', 'script'] }, { p: ['pref'], g: ['this', 'present'] }] },
-  { k: ['人'], kv: 1, r: ['ひと'], f: 90, s: [{ p: ['n'], g: ['person', 'someone'] }, { p: ['n'], g: ['human beings', 'mankind'] }] }
+  { k: ['上手'], kv: 1, q: 1731, r: ['じょうず'], f: 48, s: [{ p: ['adj-na', 'n'], g: ['skill', 'skillful', 'good at'] }] },
+  { k: ['本'], kv: 1, q: 233, r: ['ほん'], f: 75, s: [{ p: ['n'], g: ['book', 'volume', 'script'] }, { p: ['pref'], g: ['this', 'present'] }] },
+  { k: ['人'], kv: 1, q: 35, r: ['ひと'], f: 90, s: [{ p: ['n'], g: ['person', 'someone'] }, { p: ['n'], g: ['human beings', 'mankind'] }] }
 ];
 
 const entries = SAMPLE.map((e, id) => Object.assign(e, { id }));

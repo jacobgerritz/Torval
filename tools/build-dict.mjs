@@ -11,7 +11,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
-import { gunzipSync } from 'node:zlib';
+import { gunzipSync, inflateRawSync } from 'node:zlib';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,6 +20,14 @@ const SOURCE = join(ROOT, 'data', 'JMdict_e.gz');
 const OUT = join(ROOT, 'extension', 'data');
 const SOURCE_URL = 'http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz';
 const CHUNK_BYTES = 4 * 1024 * 1024;
+
+// Word frequency, from JPDB's corpus of anime, manga, light novels and visual
+// novels — the Japanese people actually read for pleasure. A rank is attached to
+// each entry here rather than shipped as a file of its own, because one number
+// per entry costs nothing and saves the extension a whole second lookup.
+const FREQ_FILE = join(ROOT, 'data', 'jpdb-frequency.zip');
+const FREQ_URL = 'https://github.com/Kuuuube/yomitan-dictionaries/raw/main/' +
+  'dictionaries/JPDB_v2.2_Frequency_Kana_2024-10-13.zip';
 
 // How much weight each JMdict priority marker carries. Only used for ordering
 // results, so the exact numbers matter less than their relative size.
@@ -68,6 +76,23 @@ async function main() {
 
   console.log(`  ${entries.length} entries, ${index.size} searchable forms`);
 
+  const frequency = await loadFrequency();
+  let ranked = 0;
+  for (const entry of entries) {
+    // A word can be written several ways with different ranks (見る is far
+    // commoner than 観る). Take the commonest, since that is the word.
+    let best = 0;
+    const forms = entry.k.length ? entry.k : entry.r;
+    for (const form of forms) {
+      for (const reading of entry.r) {
+        const rank = frequency.get(form + '\t' + reading) || frequency.get(form);
+        if (rank && (!best || rank < best)) best = rank;
+      }
+    }
+    if (best) { entry.q = best; ranked++; }
+  }
+  console.log(`  ${ranked} entries carry a frequency rank`);
+
   mkdirSync(OUT, { recursive: true });
   for (const f of readdirSync(OUT)) {
     if (/^(entries|index)-\d+\.json$/.test(f) || f === 'meta.json' || f === 'tags.json') {
@@ -80,7 +105,7 @@ async function main() {
   writeFileSync(join(OUT, 'tags.json'), JSON.stringify(tags));
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({
     // Bumping this number makes the extension rebuild its database on next start.
-    version: 2,
+    version: 3,
     built: new Date().toISOString().slice(0, 10),
     entries: entries.length,
     terms: index.size,
@@ -90,6 +115,82 @@ async function main() {
   }));
 
   console.log(`  wrote ${entryChunks} entry chunks + ${indexChunks} index chunks to extension/data/`);
+}
+
+/**
+ * Read the JPDB frequency list into "word\treading" -> rank.
+ *
+ * The list gives two ranks per word: how often it appears at all, and how often
+ * it appears written in kana. The kana one is marked with ㋕. For 日本語 those are
+ * #4705 and #140824 — the second only says that people rarely write にほんご out
+ * in kana, which is not what "how common is this word" means. So the plain rank
+ * wins wherever there is one, and the kana rank is kept only for words that are
+ * always kana anyway, like every particle.
+ */
+async function loadFrequency() {
+  if (!existsSync(FREQ_FILE)) {
+    mkdirSync(dirname(FREQ_FILE), { recursive: true });
+    console.log('Downloading frequency data from', FREQ_URL);
+    const res = await fetch(FREQ_URL);
+    if (!res.ok) throw new Error(`download failed: ${res.status}`);
+    writeFileSync(FREQ_FILE, Buffer.from(await res.arrayBuffer()));
+  }
+
+  const files = unzip(readFileSync(FREQ_FILE));
+  const ranks = new Map();       // the plain rank
+  const kanaOnly = new Map();    // the ㋕ rank, used only as a fallback
+
+  for (const name of Object.keys(files)) {
+    if (!name.includes('term_meta_bank')) continue;
+    for (const [term, kind, data] of JSON.parse(files[name].toString('utf8'))) {
+      if (kind !== 'freq') continue;
+
+      const inner = data && data.frequency !== undefined ? data.frequency : data;
+      const value = typeof inner === 'number' ? inner : inner && inner.value;
+      if (!value) continue;
+
+      const shown = typeof inner === 'object' ? String(inner.displayValue || '') : '';
+      const key = data && data.reading ? term + '\t' + data.reading : term;
+      const into = shown.includes('㋕') ? kanaOnly : ranks;
+      const seen = into.get(key);
+      if (!seen || value < seen) into.set(key, value);
+    }
+  }
+
+  kanaOnly.forEach((value, key) => { if (!ranks.has(key)) ranks.set(key, value); });
+  console.log(`  ${ranks.size} frequency ranks`);
+  return ranks;
+}
+
+/**
+ * Just enough of the zip format to get the files out — the frequency list is
+ * distributed as one, and this saves taking on a dependency to read it.
+ */
+function unzip(buffer) {
+  let end = buffer.length - 22;
+  while (end >= 0 && buffer.readUInt32LE(end) !== 0x06054b50) end--;
+  if (end < 0) throw new Error('not a zip file');
+
+  const count = buffer.readUInt16LE(end + 10);
+  let at = buffer.readUInt32LE(end + 16);
+  const files = {};
+
+  for (let i = 0; i < count; i++) {
+    const nameLength = buffer.readUInt16LE(at + 28);
+    const method = buffer.readUInt16LE(at + 10);
+    const compressed = buffer.readUInt32LE(at + 20);
+    const localAt = buffer.readUInt32LE(at + 42);
+    const name = buffer.toString('utf8', at + 46, at + 46 + nameLength);
+
+    // The local header repeats the name and extra fields at its own lengths.
+    const start = localAt + 30 +
+      buffer.readUInt16LE(localAt + 26) + buffer.readUInt16LE(localAt + 28);
+    const body = buffer.subarray(start, start + compressed);
+    files[name] = method === 0 ? body : inflateRawSync(body);
+
+    at += 46 + nameLength + buffer.readUInt16LE(at + 30) + buffer.readUInt16LE(at + 32);
+  }
+  return files;
 }
 
 /** Pull the <!ENTITY x "..."> definitions out of the DTD at the top of the file. */

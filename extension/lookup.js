@@ -145,6 +145,11 @@ var LLLLookup = (function () {
     if (aw !== bw) return aw - bw;
     var af = isFunctionWord(a), bf = isFunctionWord(b);
     if (af !== bf) return af ? -1 : 1;
+    // A real frequency rank beats JMdict's own priority markers, which are
+    // coarse bands covering only the commonest 24,000 words. Entries the
+    // frequency list has never heard of sort last, which is about right.
+    var aq = a.entry.q || Infinity, bq = b.entry.q || Infinity;
+    if (aq !== bq) return aq - bq;
     if (a.entry.f !== b.entry.f) return b.entry.f - a.entry.f;
     return a.entry.id - b.entry.id;
   }

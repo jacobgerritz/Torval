@@ -453,6 +453,17 @@
       head.appendChild(pitch);
     }
 
+    // How common the word is, as its rank in a corpus of Japanese media. Absent
+    // for words the corpus never saw, which is itself worth knowing.
+    if (hit.entry.q) {
+      const freq = document.createElement('span');
+      freq.className = 'freq';
+      freq.textContent = '#' + hit.entry.q.toLocaleString('en-US');
+      freq.title = 'the ' + hit.entry.q.toLocaleString('en-US') +
+        'th commonest word in JPDB’s corpus';
+      head.appendChild(freq);
+    }
+
     const add = document.createElement('button');
     add.className = 'add';
     add.textContent = '+';

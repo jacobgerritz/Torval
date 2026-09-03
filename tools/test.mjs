@@ -360,6 +360,25 @@ const run = async () => {
   check('every hit is named, ready for the popup and the card',
     (await Lookup.search('日本語', db))[0].hits.every((h) => h.word && h.reading));
 
+  // --- frequency --------------------------------------------------------
+  const rankOf = async (text) => (await Lookup.search(text, db))[0].hits[0].entry.q;
+  for (const [word, ceiling] of [['人', 200], ['食べる', 500], ['本', 500], ['日本語', 8000]]) {
+    const q = await rankOf(word);
+    check(`${word} is ranked, and ranked common (#${q})`, q > 0 && q < ceiling, 'got ' + q);
+  }
+  check('a common word outranks an obscure one',
+    (await rankOf('食べる')) < (await rankOf('図書館')),
+    (await rankOf('食べる')) + ' vs ' + (await rankOf('図書館')));
+
+  // The rank has to belong to the word, not to whether anyone writes it in kana:
+  // 日本語 is a common word that is almost never spelled にほんご.
+  check('the rank is the word’s, not its kana spelling’s',
+    (await rankOf('日本語')) < 20000, 'got ' + (await rankOf('日本語')));
+
+  check('words the corpus never saw simply have no rank',
+    (await Lookup.search('齟齬', db))[0].hits[0].entry.q === undefined ||
+    (await Lookup.search('齟齬', db))[0].hits[0].entry.q > 0);
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',

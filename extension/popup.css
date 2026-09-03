@@ -175,3 +175,9 @@
   font-size: 11px;
   color: #7f8f7f;
 }
+
+/* How common the word is: its rank in a corpus of Japanese media. */
+.freq {
+  font-size: 11px;
+  color: #6f7480;
+}
