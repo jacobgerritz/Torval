@@ -32,39 +32,32 @@ let tagsPromise = null;
 let status = { state: 'starting', progress: 0 };
 
 // ---------------------------------------------------------------------------
-// Correcting the headers YouTube's endpoints get
+// Granting these responses the CORS permission YouTube never sends
 // ---------------------------------------------------------------------------
 
 /**
- * Every one of LLL's requests to YouTube's own internal endpoints has come
- * back with a technically valid 200 and nothing in it, on every video and
- * every endpoint tried — a pattern that fits a missing header better than it
- * fits YouTube deciding, individually, to refuse each one.
+ * A 200 with nothing in it, from the content script, on every video and every
+ * endpoint tried, is "blocked by OpaqueResponseBlocking" — a browser-level
+ * read block on a cross-origin response that never granted the reader CORS
+ * permission. Rewriting the *request*'s headers, tried previously, could
+ * never have fixed that: it turned out not to even run, because Firefox does
+ * not fire webRequest for a background script's own requests — a documented,
+ * deliberate limitation (Mozilla bug 1273138) that does not apply to Chrome.
+ * The fetches are back in the content script for that reason, where
+ * webRequest does see them.
  *
- * A real page navigating to youtube.com always carries a Referer pointing at
- * the page making the request. `Referer` is a forbidden header name — no
- * fetch() call, not even from a background script, is allowed to set it —
- * so an extension's own request either carries none at all or one pointing at
- * the extension's own address instead. If YouTube's internal endpoints read
- * that as a signal, it would explain a request that is otherwise entirely
- * well-formed still coming back empty.
- *
- * Firefox is unusual among browsers in keeping the *blocking* webRequest API
- * available under Manifest V3 — Chrome dropped it — and blocking is what lets
- * an extension rewrite a header before the request leaves the machine, rather
- * than only observe it afterward. This is scoped to only the endpoints LLL
- * itself calls; it does not touch any other traffic on the page.
+ * Fixed at the layer the block actually happens on: the response. Before the
+ * browser evaluates whether the read is allowed, this adds the header that
+ * says it is — the same technique CORS-unblocking extensions use generally,
+ * here scoped to only the four endpoints LLL itself calls.
  */
-if (api.webRequest && api.webRequest.onBeforeSendHeaders) {
-  api.webRequest.onBeforeSendHeaders.addListener(
+if (api.webRequest && api.webRequest.onHeadersReceived) {
+  api.webRequest.onHeadersReceived.addListener(
     (details) => {
-      const headers = details.requestHeaders.filter((h) => {
-        const name = h.name.toLowerCase();
-        return name !== 'referer' && name !== 'origin';
-      });
-      headers.push({ name: 'Referer', value: 'https://www.youtube.com/' });
-      headers.push({ name: 'Origin', value: 'https://www.youtube.com' });
-      return { requestHeaders: headers };
+      const headers = (details.responseHeaders || [])
+        .filter((h) => h.name.toLowerCase() !== 'access-control-allow-origin');
+      headers.push({ name: 'Access-Control-Allow-Origin', value: '*' });
+      return { responseHeaders: headers };
     },
     {
       urls: [
@@ -74,7 +67,7 @@ if (api.webRequest && api.webRequest.onBeforeSendHeaders) {
         'https://www.youtube.com/youtubei/v1/get_transcript*'
       ]
     },
-    ['blocking', 'requestHeaders']
+    ['blocking', 'responseHeaders']
   );
 }
 
@@ -91,7 +84,6 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiDuplicate': return ankiDuplicate(message.word);
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
-    case 'ytFetch':      return ytFetch(message.url, message.init);
     case 'extractWords': return guard(() => extractWords(message.text));
     case 'knownWords':   return guard(() => knownWords());
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
@@ -108,27 +100,6 @@ if (api.action && api.action.onClicked) {
 async function guard(fn) {
   try { return { ok: true, result: await fn() }; }
   catch (err) { return { ok: false, error: err.message }; }
-}
-
-/**
- * Fetch a YouTube address on behalf of the content script.
- *
- * A content script's own fetch looks like it runs as the page, but for
- * network purposes Firefox does not treat it that way: the request is
- * attributed to the extension rather than to youtube.com, which YouTube's
- * internal endpoints do not grant CORS to — the browser itself then withholds
- * the response body, which shows up in the page's console as "blocked by
- * OpaqueResponseBlocking". A background script does not have that problem:
- * with a host permission for the target origin — already listed for YouTube —
- * it gets a genuine cross-origin fetch, the same way word audio is already
- * fetched from outside youtube.com elsewhere in this file.
- */
-async function ytFetch(url, init) {
-  return guard(async () => {
-    const res = await fetch(url, init || {});
-    const text = await res.text();
-    return { ok: res.ok, status: res.status, redirected: res.redirected, url: res.url, text };
-  });
 }
 
 /**

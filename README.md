@@ -176,26 +176,22 @@ fallback for the one before it, not a choice between them:
    player data fresh, immediately before asking, rather than reusing whatever
    the page already had sitting in it.
 
-   Both of the first two go through the background script rather than
-   fetching directly from the page. A content script's own fetch looks like
-   it runs as the page, but Firefox does not treat it that way for network
-   purposes — the request is attributed to the extension, which YouTube's
-   internal endpoints do not grant CORS to, and the browser withholds the
-   response body itself (visible in the page's console as "blocked by
-   OpaqueResponseBlocking"). A background script with a host permission for
-   the target origin gets a genuine cross-origin fetch instead — the same way
-   word audio is already fetched from outside youtube.com.
+   A content script's own fetch looks like it runs as the page, but Firefox
+   does not treat it that way for network purposes: the request is attributed
+   to the extension, which YouTube's internal endpoints do not grant CORS to,
+   and the browser withholds the response body itself — a 200 with nothing in
+   it, visible in the console as "blocked by OpaqueResponseBlocking".
 
-   Even from there, every request came back with a technically valid 200 and
-   nothing in it, on every video and every endpoint tried — a pattern that
-   fits a missing header better than YouTube refusing each one individually.
-   `Referer` is a forbidden header name: no fetch() call, not even from a
-   background script, is allowed to set it, so a request a real page would
-   always send with one pointing at itself instead carries none, or one
-   pointing at the extension. Firefox is unusual in keeping the *blocking*
-   webRequest API available under Manifest V3 — Chrome dropped it — and
-   LLL uses it to rewrite the Referer and Origin on just these requests before
-   they leave the machine, to what a real YouTube page would have sent.
+   The fix lives on the *response* side. LLL uses Firefox's `webRequest` API
+   — kept available for blocking use under Manifest V3, unlike Chrome — to add
+   the CORS permission YouTube's response never grants, before the browser
+   decides whether the read is allowed. This has to run from the content
+   script rather than the background script: Firefox does not fire
+   `webRequest` for a background script's own requests at all, a documented,
+   deliberate limitation (Chrome's does) that cost one earlier attempt —
+   rewriting the request's own headers from the background script — before it
+   was found and corrected. It is scoped to only the four endpoints LLL itself
+   calls; nothing else on the page is touched.
 3. **Read the captions off the screen as they play**, timing each line by
    watching it appear and disappear. This is what the simplest subtitle tools
    do, and it always works, because it is only reading what is already there.

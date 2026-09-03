@@ -414,59 +414,28 @@ var LLLSubtitles = (function () {
   }
 
   async function ytPost(endpoint, key, context, body) {
-    var res = await backgroundFetch('https://www.youtube.com/youtubei/v1/' + endpoint +
-      '?key=' + encodeURIComponent(key), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(Object.assign({ context: context }, body))
-    });
-    if (!res) return null;
+    var res;
+    try {
+      res = await fetch('https://www.youtube.com/youtubei/v1/' + endpoint +
+        '?key=' + encodeURIComponent(key), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ context: context }, body))
+      });
+    } catch (err) {
+      console.warn('LLL:', endpoint, 'request failed —', err && err.message);
+      return null;
+    }
     if (!res.ok) {
       console.warn('LLL:', endpoint, 'request came back', res.status);
       return null;
     }
     try {
-      return JSON.parse(res.text);
+      return await res.json();
     } catch (err) {
       console.warn('LLL:', endpoint, 'response was not valid JSON —', err && err.message);
       return null;
     }
-  }
-
-  /**
-   * Make the request through the background script rather than from here.
-   *
-   * A content script's fetch looks like it runs as the page, but for network
-   * purposes Firefox does not treat it that way: the request is attributed to
-   * the extension, which YouTube's internal endpoints do not grant CORS to, so
-   * the browser itself withholds the response body — seen directly as "blocked
-   * by OpaqueResponseBlocking" in the console. Every earlier attempt at this
-   * failed identically regardless of which endpoint or format was asked for,
-   * which fits this explanation far better than YouTube choosing to refuse
-   * each one individually.
-   *
-   * The background script does not have this problem: it already reaches an
-   * external site successfully for word audio, because a background script
-   * with a host permission for that origin gets a real cross-origin fetch,
-   * which is what this needs too. `host_permissions` already lists YouTube.
-   */
-  async function backgroundFetch(url, init) {
-    var reply;
-    try {
-      reply = await api.runtime.sendMessage({
-        type: 'ytFetch',
-        url: url,
-        init: Object.assign({ credentials: 'include' }, init || {})
-      });
-    } catch (err) {
-      console.warn('LLL: could not reach the background script —', err && err.message);
-      return null;
-    }
-    if (!reply || !reply.ok) {
-      console.warn('LLL: the background fetch failed —', reply && reply.error);
-      return null;
-    }
-    return reply.result;   // { ok, status, redirected, url, text }
   }
 
   /** The first value found anywhere under this key, searching depth-first. */
@@ -559,21 +528,25 @@ var LLLSubtitles = (function () {
   }
 
   /**
-   * Fetch the subtitle file, through the background script — see
-   * backgroundFetch for why a content script cannot do this reliably itself.
-   * An empty body with a 200 status is still a real possibility even from
-   * there: whether that is a blocker rewriting the response or YouTube itself
-   * withholding it is told apart by whether the response's own URL still
-   * matches what was asked for.
+   * Fetch the subtitle file directly. The response-side fix lives in
+   * background.js's onHeadersReceived, which grants this the CORS permission
+   * YouTube's own response never carries — see the comment there for why
+   * that is the correct layer to fix this at, rather than the request side.
    */
   async function request(url) {
-    var res = await backgroundFetch(url, {});
-    if (!res) return '';
+    var res;
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      console.warn('LLL: subtitle request failed —', err && err.message);
+      return '';
+    }
     if (!res.ok) {
       console.warn('LLL: subtitle request came back', res.status);
       return '';
     }
-    if (!res.text) {
+    var text = await res.text();
+    if (!text) {
       if (res.redirected || res.url !== url) {
         console.warn('LLL: the request was redirected to', res.url,
           '— something on this machine is very likely intercepting it, not YouTube.');
@@ -582,7 +555,7 @@ var LLLSubtitles = (function () {
           '(no redirect — this is YouTube itself, not a blocker).');
       }
     }
-    return res.text;
+    return text;
   }
 
   /**
