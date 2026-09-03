@@ -389,6 +389,31 @@ const run = async () => {
   check('a word with no rank gets no band rather than "rare"',
     Lookup.frequencyBand(undefined) === '' && Lookup.frequencyBand(0) === '');
 
+  // --- tags that belong to the word, not to one meaning ------------------
+  // 事 is tagged "usually written in kana" on all ten of its senses. That is a
+  // fact about the word, and printing it ten times says nothing ten times.
+  const kotoEntry = (await db.getEntries(['事'])).get('事')
+    .find((e) => e.s.length > 5);
+  check('a tag on every sense is recognised as the word’s',
+    Lookup.sharedTags(kotoEntry).includes('uk'),
+    JSON.stringify(kotoEntry.s.map((sn) => sn.m || [])));
+
+  // 綺麗 is the opposite case, and the reason not to simply hoist every "uk":
+  // JMdict marks its "clean" and "completely" senses as usually-kana but not its
+  // "pretty" sense, and that distinction is worth keeping.
+  const kireiEntry = (await db.getEntries(['綺麗'])).get('綺麗')[0];
+  check('a tag on only some senses is left where it belongs',
+    !Lookup.sharedTags(kireiEntry).includes('uk'),
+    JSON.stringify(kireiEntry.s.map((sn) => sn.m || [])));
+
+  // A tag on only some senses genuinely describes those senses.
+  const partly = { s: [{ m: ['uk', 'col'] }, { m: ['uk'] }, { m: ['uk', 'arch'] }] };
+  check('a tag on only some senses stays with them',
+    JSON.stringify(Lookup.sharedTags(partly)) === '["uk"]',
+    JSON.stringify(Lookup.sharedTags(partly)));
+  check('an entry with no tags at all is handled',
+    JSON.stringify(Lookup.sharedTags({ s: [{ g: ['x'] }, { g: ['y'] }] })) === '[]');
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',

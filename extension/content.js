@@ -453,6 +453,17 @@
       head.appendChild(pitch);
     }
 
+    // Tags that hold for the whole entry sit beside the word, because that is
+    // what they describe: "uk" is about how the word is written, which cannot
+    // differ from one definition to the next.
+    for (const code of hit.shared || []) {
+      const tag = document.createElement('span');
+      tag.className = 'misc';
+      tag.textContent = code;
+      tag.title = tags[code] || code;
+      head.appendChild(tag);
+    }
+
     // How common the word is. Shown as a band rather than a bare rank, which
     // would ask you to know the scale already. The exact number is on hover for
     // when it matters. Nothing at all for words the corpus never saw, which is
@@ -503,7 +514,8 @@
         tag.title = tags[code] || code;
         li.appendChild(tag);
       }
-      for (const code of sense.m || []) {
+      const shared = hit.shared || [];
+      for (const code of (sense.m || []).filter((c) => shared.indexOf(c) === -1)) {
         const tag = document.createElement('span');
         tag.className = 'misc';
         tag.textContent = code;

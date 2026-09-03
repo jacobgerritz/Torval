@@ -137,6 +137,26 @@ var LLLLookup = (function () {
     };
   }
 
+  /**
+   * Tags carried by every sense of an entry.
+   *
+   * JMdict files these per sense, but some of them cannot vary between
+   * definitions: "uk" says the word is usually written in kana, which is a fact
+   * about the word, not about any one meaning of it. Printed against all four
+   * senses of a word it is just noise repeated four times. So a tag on every
+   * sense is lifted out and shown once, beside the word; a tag on only some
+   * senses genuinely belongs to those, and stays with them.
+   */
+  function sharedTags(entry) {
+    if (!entry.s.length) return [];
+    var first = entry.s[0].m || [];
+    return first.filter(function (code) {
+      return entry.s.every(function (sense) {
+        return (sense.m || []).indexOf(code) !== -1;
+      });
+    });
+  }
+
   // How common a word is, rounded to the precision the number deserves.
   //
   // A bare rank asks you to know the scale already: #7,261 means nothing unless
@@ -230,7 +250,13 @@ var LLLLookup = (function () {
     return false;
   }
 
-  return { search: search, displayForm: displayForm, frequencyBand: frequencyBand, MAX_SCAN: MAX_SCAN };
+  return {
+    search: search,
+    displayForm: displayForm,
+    frequencyBand: frequencyBand,
+    sharedTags: sharedTags,
+    MAX_SCAN: MAX_SCAN
+  };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = LLLLookup;

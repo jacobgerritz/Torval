@@ -113,6 +113,7 @@ window.browser = {
         for (const g of groups) for (const h of g.hits) {
           if (h.word in ACCENTS) h.pitch = ACCENTS[h.word];
           h.band = LLLLookup.frequencyBand(h.entry.q);
+          h.shared = LLLLookup.sharedTags(h.entry);
         }
         return { status: { state: 'ready' }, groups };
       }

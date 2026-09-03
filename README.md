@@ -51,6 +51,13 @@ again each time until it is packaged and signed. That is a step for later.
 | **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
 
+Tags that hold for the whole word — `uk`, "usually written in kana" — sit beside
+it rather than against every definition. JMdict files them per sense, but a tag
+on *every* sense is describing the word, and 事 carrying "usually kana" ten times
+over says nothing ten times. Where a tag really is on only some senses it stays
+with them: 綺麗 is usually kana when it means "clean", not when it means "pretty",
+and that is worth knowing.
+
 Two small numbers follow the reading. The one in brackets is the **pitch
 accent**: 0 means the pitch never drops, otherwise it is the mora it drops
 after; the diagram of it goes on the card rather than in the popup. The other is how **common** the word is: 読む is *top 1k*, 図書館 is *top 10k*.
