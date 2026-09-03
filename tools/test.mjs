@@ -701,6 +701,24 @@ const run = async () => {
   check('a segment with neither is empty rather than throwing',
     Subs.segmentText({}) === '' && Subs.segmentText(null) === '');
 
+  // --- picking which track to use -----------------------------------------
+  // A video can carry both a manual and an auto-generated Japanese track;
+  // nothing about their order says which is which, so the manual one is
+  // preferred by property, not position.
+  check('a manual track is preferred over an auto one that comes first',
+    Subs.pickTrack([
+      { languageCode: 'ja', baseUrl: 'auto', auto: true },
+      { languageCode: 'ja', baseUrl: 'manual', auto: false }
+    ]).baseUrl === 'manual');
+  check('the auto track is used when it is the only Japanese one available',
+    Subs.pickTrack([
+      { languageCode: 'en', baseUrl: 'x', auto: false },
+      { languageCode: 'ja', baseUrl: 'auto', auto: true }
+    ]).baseUrl === 'auto');
+  check('a non-Japanese track list has nothing to pick',
+    Subs.pickTrack([{ languageCode: 'en', baseUrl: 'x', auto: false }]) === undefined ||
+    Subs.pickTrack([{ languageCode: 'en', baseUrl: 'x', auto: false }]) === null);
+
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its
   // files instead of filling the collection with copies.

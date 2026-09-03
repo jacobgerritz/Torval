@@ -71,7 +71,11 @@ var LLLSubtitles = (function () {
    * roughly the right place is a poor way to do it.
    */
   function keys(e) {
-    if (!enabled || !cues.length || !video) return;
+    // The line currently playing lives in `openCue`, not `cues`, until it
+    // ends — so this cannot require `cues` to be non-empty, or the very first
+    // line of a video (still open, nothing committed yet) would silently
+    // block A and D before step() ever got a chance to look at openCue too.
+    if (!enabled || (!cues.length && !openCue) || !video) return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
 
     var focused = document.activeElement;
@@ -185,7 +189,7 @@ var LLLSubtitles = (function () {
       return fallBackToWatching();
     }
 
-    var track = tracks.find(function (t) { return LANGUAGES.indexOf(t.languageCode) !== -1; });
+    var track = pickTrack(tracks);
     if (!track) {
       console.warn('LLL: this video has no Japanese subtitle track. Tracks offered:',
         tracks.map(function (t) { return t.languageCode; }).join(', '));
@@ -491,7 +495,10 @@ var LLLSubtitles = (function () {
       /"captionTracks":(\[.*?\])\s*,\s*"(?:audioTracks|translationLanguages|defaultAudioTrackIndex)"/);
     if (!match) return null;
     try {
-      var fromHtml = JSON.parse(match[1]);   // JSON.parse handles the escapes itself
+      var raw = JSON.parse(match[1]);   // JSON.parse handles the escapes itself
+      var fromHtml = raw.map(function (t) {
+        return { languageCode: String(t.languageCode), baseUrl: String(t.baseUrl), auto: t.kind === 'asr' };
+      });
       console.log('LLL: found', fromHtml.length, 'subtitle tracks in the page source');
       return fromHtml;
     } catch (err) {
@@ -551,13 +558,33 @@ var LLLSubtitles = (function () {
       if (!list || !list.length) return null;
       var out = [];
       for (var i = 0; i < list.length; i++) {
-        out.push({ languageCode: String(list[i].languageCode), baseUrl: String(list[i].baseUrl) });
+        out.push({
+          languageCode: String(list[i].languageCode),
+          baseUrl: String(list[i].baseUrl),
+          auto: list[i].kind === 'asr'
+        });
       }
       console.log('LLL: found', out.length, 'subtitle tracks via', from);
       return out;
     } catch (err) {
       return null;
     }
+  }
+
+  /**
+   * The Japanese track to use, preferring one an actual person wrote.
+   *
+   * A video can carry more than one Japanese track: a manually authored one
+   * and an auto-generated (kind "asr") one, and nothing about their order in
+   * the list says which is which. Auto captions are also where the
+   * word-by-word reveal that isContinuation() exists for comes from, so a
+   * human-made track is the better choice whenever there is one to choose.
+   */
+  function pickTrack(tracks) {
+    var candidates = tracks.filter(function (t) { return LANGUAGES.indexOf(t.languageCode) !== -1; });
+    if (!candidates.length) return null;
+    var manual = candidates.find(function (t) { return !t.auto; });
+    return manual || candidates[0];
   }
 
   /** YouTube's json3: a list of events, each with its start, length and text. */
@@ -809,6 +836,7 @@ var LLLSubtitles = (function () {
     findAllKey: findAllKey,
     segmentText: segmentText,
     step: step,
+    pickTrack: pickTrack,
     insertObserved: insertObserved,
     isContinuation: isContinuation,
     status: function () { return state; },
