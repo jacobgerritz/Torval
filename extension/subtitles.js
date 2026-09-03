@@ -251,7 +251,12 @@ var LLLSubtitles = (function () {
           console.log('LLL:', cues.length, 'subtitle lines ready — chosen by hand');
           status.textContent = '✓ ' + loaded.length + ' lines loaded';
         } else {
-          status.textContent = 'no data for this track';
+          // Building this address ourselves is the older, unreliable method —
+          // real subtitles may already be active via the one YouTube's own
+          // player uses, caught separately and not affected by this failing.
+          status.textContent = state === 'ready'
+            ? 'no data this way (already using YouTube’s own address instead)'
+            : 'no data for this track';
         }
       } catch (err) {
         status.textContent = 'failed — ' + (err && err.message || 'see the console');
