@@ -20,8 +20,13 @@
 (function () {
   const api = globalThis.browser || globalThis.chrome;
   if (!api || !api.runtime || !api.runtime.id) return;
-  if (window.__lllLoaded) return;
-  window.__lllLoaded = true;
+
+  // Reloading the extension while pages are open leaves the previous copy of
+  // this script running, popup and all — and a flag on `window` does not catch
+  // it, because Firefox gives each injected copy its own view of the page's
+  // globals. So ask the page instead: if an older popup is sitting in the DOM,
+  // take it out. The old copy keeps its now-detached element and goes quiet.
+  for (const orphan of document.querySelectorAll('[data-lll-popup]')) orphan.remove();
 
   // Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana.
   const JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
@@ -80,6 +85,19 @@
     if (shiftDown) scheduleScan();
   }, true);
 
+  // Anything that is not "reading the popup" closes it: clicking the page,
+  // scrolling it, or taking the mouse out of the frame entirely. Scrolling and
+  // clicking inside the popup itself are exempt, which is why these check the
+  // event's path — the popup lives in a shadow root, so a plain target check
+  // would not recognise its own contents.
+  window.addEventListener('mousedown', (e) => { if (!insidePopup(e)) hide(); }, true);
+  window.addEventListener('scroll', (e) => { if (!insidePopup(e)) hide(); }, true);
+  document.addEventListener('mouseleave', () => hide());
+
+  function insidePopup(e) {
+    return !!ui && e.composedPath().indexOf(ui.host) !== -1;
+  }
+
   // A short delay rather than requestAnimationFrame: it settles rapid mouse
   // movement into one lookup, and unlike rAF it still runs in tabs the browser
   // has decided not to paint.
@@ -91,9 +109,12 @@
 
   function scan() {
     const text = textAtPoint(pointer.x, pointer.y);
-    // Nothing under the cursor is not a reason to close: the popup stays until
-    // Escape, so you can read it without having to keep the mouse still.
-    if (!text || text === lastQuery) return;
+    // While Shift is held the popup follows what you point at, so pointing at
+    // something that is not a word closes it rather than leaving the last
+    // result stranded behind the cursor. Let go of Shift and it stays put, so
+    // you can move over to it and read.
+    if (!text) { hide(); return; }
+    if (text === lastQuery) return;
     lookup(text, pointer);
   }
 
@@ -246,6 +267,7 @@
     if (ui) return ui;
 
     const host = document.createElement('div');
+    host.setAttribute('data-lll-popup', '');
     host.style.display = 'none';
     const root = host.attachShadow({ mode: 'open' });
 
@@ -345,9 +367,8 @@
     const list = document.createElement('ol');
     list.className = 'senses';
     let previousPos = null;
-    entry.s.forEach((sense, i) => {
+    entry.s.forEach((sense) => {
       const li = document.createElement('li');
-      if (i >= 2) li.hidden = true;
 
       // Most entries carry the same grammar tags on every sense. Printing
       // "noun · noun + する · transitive" against all four definitions of 読む
@@ -374,19 +395,6 @@
       list.appendChild(li);
     });
     el.appendChild(list);
-
-    if (entry.s.length > 2) {
-      const more = document.createElement('button');
-      more.className = 'toggle';
-      more.textContent = `${entry.s.length - 2} more`;
-      more.addEventListener('click', () => {
-        const hiddenNow = list.children[2].hidden;
-        for (let i = 2; i < list.children.length; i++) list.children[i].hidden = !hiddenNow;
-        more.textContent = hiddenNow ? 'fewer' : `${entry.s.length - 2} more`;
-        more.classList.toggle('open', hiddenNow);
-      });
-      el.appendChild(more);
-    }
     return el;
   }
 

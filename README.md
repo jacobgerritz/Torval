@@ -36,9 +36,12 @@ again each time until it is packaged and signed. That is a step for later.
 |---|---|
 | **Shift** + point at a word | look it up |
 | **Shift** with text selected | look up the selection |
-| **Esc** | close |
-| **more** | the rest of the definitions |
+| **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
+
+While Shift is held the popup follows whatever you point at, and closes if you
+point at something that is not a word. Let go of Shift and it stays put, so you
+can move across and read it.
 
 Point at the *first* character of a word. Japanese has no spaces, so the
 extension reads forward from wherever you are pointing and finds the longest
