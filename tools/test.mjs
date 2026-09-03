@@ -582,6 +582,28 @@ const run = async () => {
   check('a line ends where the next begins',
     overlapping[0].end === 3, JSON.stringify(overlapping));
 
+  // Reading captions off the screen: rewatching a scene must not duplicate a
+  // line, or A/D would stutter on two entries that say the same thing.
+  let observed = [];
+  Subs.insertObserved(observed, { start: 5, end: 7, text: '食べない' });
+  Subs.insertObserved(observed, { start: 12, end: 14, text: '食べた' });
+  check('lines are collected as they are seen',
+    observed.length === 2, JSON.stringify(observed));
+
+  Subs.insertObserved(observed, { start: 5.3, end: 7.3, text: '食べない' });
+  check('the same line seen again near the same spot refreshes it rather than duplicating',
+    observed.length === 2 && observed[0].start === 5.3, JSON.stringify(observed));
+
+  Subs.insertObserved(observed, { start: 40, end: 42, text: '食べない' });
+  check('the same line recurring much later (a different scene) is kept separately',
+    observed.length === 3, JSON.stringify(observed));
+
+  observed = [];
+  Subs.insertObserved(observed, { start: 10, end: 12, text: 'B' });
+  Subs.insertObserved(observed, { start: 3, end: 5, text: 'A' });
+  check('lines are kept in time order even when seen out of order (rewinding to rewatch)',
+    observed.map((c) => c.text).join('') === 'AB', JSON.stringify(observed));
+
   Subs._setCues(parsed);
   check('the line playing at a given moment is found',
     Subs.cueAt(1.5).text === '日本語を勉強しています。' && Subs.cueAt(4).text.startsWith('図書館'),

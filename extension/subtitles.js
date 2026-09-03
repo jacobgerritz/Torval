@@ -1,39 +1,44 @@
 /*
- * LLL — subtitles of our own
+ * LLL — timing YouTube's subtitles
  *
- * YouTube draws its captions as a pile of styled spans that change shape without
- * warning, and tells you nothing about when a line starts or ends. So LLL fetches
- * the subtitle track itself and draws it: text we control, hoverable like any
- * other text on the page, and — the part that matters — with exact timings.
+ * The point of this file is not to show subtitles — YouTube already does that —
+ * it is to know exactly when each line starts and ends, which YouTube's own
+ * captions never tell anyone. That timing is what lets a line be replayed and
+ * recorded precisely, and what lets A and D jump between lines.
  *
- * Those timings are what makes clean audio possible. Knowing a line runs from
- * 91.2s to 94.8s means the recording can be exactly that line, rather than
- * whatever happened to be playing while you read.
+ * Two ways of getting it, tried in order:
  *
- * Turn YouTube's own captions off; these replace them.
+ *   1. Ask YouTube for the subtitle file directly. When this works it is
+ *      immediate and exact, and it knows about lines you have not reached yet.
+ *      It does not always work: YouTube can answer with a 200 and an empty
+ *      body, apparently at its own discretion, per video. There is no code fix
+ *      for that — it is a decision made on YouTube's side, not an error.
  *
- * Getting the track is the fragile part, in two ways. The address for it lives
- * in the player's own data, which is read through `wrappedJSObject` — Firefox's
- * way of letting a content script reach the page's variables — rather than
- * anything injected into the page. And fetching that address can come back
- * with a 200 and an empty body if YouTube is not satisfied with the request's
- * session state, which a plain fetch cannot always arrange. Both failure modes
- * are logged to the console rather than swallowed, because guessing which one
- * happened from the outside wastes a round trip each time.
+ *   2. Fall back to reading YouTube's own captions as they play, timing each
+ *      line by watching it appear and disappear. This is what most "read a
+ *      video's subtitles" tools actually do, and it always works, because it
+ *      is just reading what is already on screen. The one cost is that a line
+ *      is only known once it has been shown at least once — so pressing D
+ *      cannot jump to a line the video has not reached yet, only back through
+ *      ones already seen.
+ *
+ * Either way, YouTube's own captions are the thing on screen and should stay
+ * turned on — nothing here draws a replacement for them.
  */
 
 var LLLSubtitles = (function () {
   'use strict';
 
   var LANGUAGES = ['ja', 'ja-JP'];
+  var MAX_LOOKUP_ATTEMPTS = 12;    // ~12s of retrying before giving up on the player existing
+  var MIN_OBSERVED_SECONDS = 0.15; // shorter than this is a DOM flicker, not a line
 
   var enabled = false;
   var videoId = null;
   var cues = [];
   var index = 0;
   var video = null;
-  var overlay = null;
-  var state = 'idle';        // idle | loading | ready | unavailable
+  var state = 'idle';        // idle | loading | ready | watching | unavailable
   var attempts = 0;
 
   function enable() {
@@ -96,74 +101,77 @@ var LLLSubtitles = (function () {
       videoId = id;
       cues = [];
       index = 0;
+      openCue = null;
       state = 'idle';
       attempts = 0;
-      removeOverlay();
       console.log('LLL: video is now', id || '(none — not a watch page)');
     }
 
     // Keep trying for a while. This script starts before YouTube's player
     // exists, so the first look almost always finds nothing; giving up on that
-    // would mean never loading subtitles at all.
-    if (id && state !== 'loading' && state !== 'ready' && attempts < 12) {
+    // would mean never loading subtitles at all. Once a definite answer comes
+    // back — ready, watching, or genuinely unavailable — this stops retrying.
+    if (id && state === 'idle' && attempts < MAX_LOOKUP_ATTEMPTS) {
       attempts++;
       load(id);
     }
 
     video = document.querySelector('video');
-    if (video && cues.length) show();
   }
 
   // -------------------------------------------------------------------------
-  // Getting the track
+  // Plan 1: ask YouTube for the file
   // -------------------------------------------------------------------------
 
   async function load(id) {
     state = 'loading';
+
+    var tracks = null;
     try {
-      var tracks = captionTracks();
-      if (!tracks || !tracks.length) {
-        if (attempts >= 12) {
-          console.warn('LLL: gave up looking for subtitle tracks in this page’s player data.');
-        }
-        state = 'unavailable';
-        return;
-      }
+      tracks = captionTracks();
+    } catch (err) {
+      console.warn('LLL: could not read the track list —', err && err.message);
+    }
 
-      var track = tracks.find(function (t) { return LANGUAGES.indexOf(t.languageCode) !== -1; });
-      if (!track) {
-        console.warn('LLL: this video has no Japanese subtitles. Tracks offered:',
-          tracks.map(function (t) { return t.languageCode; }).join(', '));
-        state = 'unavailable';
-        return;
-      }
+    if (!tracks || !tracks.length) {
+      // Likely just early — the player has not finished setting itself up yet.
+      if (attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
+      console.warn('LLL: gave up looking for subtitle tracks in this page’s player data.');
+      return fallBackToWatching();
+    }
 
+    var track = tracks.find(function (t) { return LANGUAGES.indexOf(t.languageCode) !== -1; });
+    if (!track) {
+      console.warn('LLL: this video has no Japanese subtitle track. Tracks offered:',
+        tracks.map(function (t) { return t.languageCode; }).join(', '));
+      return fallBackToWatching();
+    }
+
+    try {
       console.log('LLL: fetching the', track.languageCode, 'subtitle track');
       var loaded = await fetchTrack(track);
       if (videoId !== id) return;         // navigated away while fetching
-      if (!loaded) {
-        console.warn('LLL: YouTube would not hand over subtitle data for this video, ' +
-          'in any format this tried.');
-        state = 'unavailable';
+      if (loaded && loaded.length) {
+        cues = loaded;
+        state = 'ready';
+        console.log('LLL:', cues.length, 'subtitle lines ready, direct from YouTube');
         return;
       }
-      cues = loaded;
-      state = cues.length ? 'ready' : 'unavailable';
-      console.log('LLL:', cues.length, 'subtitle lines ready — turn YouTube’s captions off');
+      console.warn('LLL: YouTube would not hand over subtitle data for this video, ' +
+        'in any format this tried.');
     } catch (err) {
       console.warn('LLL: could not load subtitles —', err && err.message);
-      state = 'unavailable';
     }
+    fallBackToWatching();
   }
 
   /**
    * Try more than one response format for the same track.
    *
-   * json3 is the usual choice and what most subtitle tools ask for — but it is
-   * also the one seen going quiet before: a 200 with an empty body, as though
-   * YouTube is satisfied the address is valid but is withholding that
-   * particular format. YouTube's own default format (plain timedtext XML) is
-   * tried next on the chance that only json3 is affected.
+   * json3 is the usual choice and what most subtitle tools ask for. YouTube's
+   * own default format (plain timedtext XML) is tried next on the chance that
+   * only json3 is being withheld — seen happen once, though in the case that
+   * prompted this both came back empty.
    */
   async function fetchTrack(track) {
     var formats = [
@@ -214,16 +222,10 @@ var LLLSubtitles = (function () {
    * Fetch the subtitle file.
    *
    * A content script's fetch runs in the page's own context in Firefox, so
-   * this is already "as the page" — no special handling needed. An earlier
-   * version routed this through a borrowed `content.fetch` on a theory that it
-   * was not, and broke on the much more basic mistake of calling a method
-   * after separating it from the object it belongs to: fetch (like most
-   * WebIDL methods) refuses to run unless it is still attached to its Window
-   * when called, which `var f = x.fetch; f()` does not preserve.
-   *
-   * An empty body with a 200 status is a real possibility here regardless —
-   * YouTube gates some caption requests on session state a plain fetch may not
-   * have — so that case is still reported rather than treated as success.
+   * this is already "as the page" — no special handling needed there. An empty
+   * body with a 200 status is a real possibility regardless: whether that is a
+   * blocker rewriting the response or YouTube itself withholding it is told
+   * apart by whether the response's own URL still matches what was asked for.
    */
   async function request(url) {
     var res;
@@ -239,17 +241,12 @@ var LLLSubtitles = (function () {
     }
     var text = await res.text();
     if (!text) {
-      // A 200 with nothing in it can mean YouTube withheld the data, or it can
-      // mean something on this machine quietly swapped the response for an
-      // empty one before it got here — several ad-blocker filters do exactly
-      // that, rather than failing the request outright. Whether the URL we get
-      // back still matches the one we asked for is how those are told apart.
       if (res.redirected || res.url !== url) {
         console.warn('LLL: the request was redirected to', res.url,
           '— something on this machine is very likely intercepting it, not YouTube.');
       } else {
         console.warn('LLL: subtitle request succeeded but the body was empty',
-          '(no redirect — this looks like YouTube itself, not a blocker).');
+          '(no redirect — this is YouTube itself, not a blocker).');
       }
     }
     return text;
@@ -341,42 +338,84 @@ var LLLSubtitles = (function () {
   }
 
   // -------------------------------------------------------------------------
-  // Drawing them
+  // Plan 2: read the screen
   // -------------------------------------------------------------------------
 
-  function show() {
-    var cue = cueAt(video.currentTime);
-    if (!cue) { removeOverlay(); return; }
-    if (!overlay) createOverlay();
-    if (overlay.firstChild.textContent !== cue.text) overlay.firstChild.textContent = cue.text;
+  var observing = false;
+  var observedContainer = null;
+  var captionObserver = null;
+  var openCue = null;    // { start, text } — a line currently being timed
+
+  function fallBackToWatching() {
+    state = 'watching';
+    console.log('LLL: reading captions off the screen instead of asking for the file — ' +
+      'make sure Japanese is the caption language turned on in the player.');
+    startObserving();
   }
 
-  function createOverlay() {
-    var player = document.querySelector('.html5-video-player') || document.body;
-    overlay = document.createElement('div');
-    overlay.setAttribute('data-lll-subtitle', '');
-    overlay.style.cssText = [
-      'position:absolute', 'left:0', 'right:0', 'bottom:8%',
-      'z-index:60', 'display:flex', 'justify-content:center',
-      'pointer-events:none', 'padding:0 6%'
-    ].join(';');
-
-    var line = document.createElement('span');
-    // The text itself must be hoverable — that is the whole point — even though
-    // the box around it should not swallow clicks meant for the player.
-    line.style.cssText = [
-      'pointer-events:auto', 'user-select:text', 'cursor:default',
-      'background:rgba(8,8,10,0.78)', 'color:#f2f3f5',
-      'padding:4px 12px', 'border-radius:4px',
-      'font:500 26px/1.45 "Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif',
-      'text-align:center', 'white-space:pre-wrap'
-    ].join(';');
-    overlay.appendChild(line);
-    player.appendChild(overlay);
+  function startObserving() {
+    if (observing) return;
+    observing = true;
+    setInterval(attachObserver, 1000);   // YouTube periodically replaces this element
+    setInterval(checkCaption, 250);      // a plain safety net alongside the observer
+    attachObserver();
   }
 
-  function removeOverlay() {
-    if (overlay) { overlay.remove(); overlay = null; }
+  function attachObserver() {
+    var container = document.querySelector('.ytp-caption-window-container, .captions-text');
+    if (container === observedContainer) return;
+    if (captionObserver) captionObserver.disconnect();
+    observedContainer = container;
+    if (!container) return;
+    captionObserver = new MutationObserver(checkCaption);
+    captionObserver.observe(container, { childList: true, subtree: true, characterData: true });
+    checkCaption();
+  }
+
+  function captionText() {
+    var el = document.querySelector('.ytp-caption-window-container, .captions-text');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  /** Text changed on screen: close whatever line was open, open whatever is new. */
+  function checkCaption() {
+    if (!enabled || !video) return;
+    var text = captionText();
+    if (text === (openCue ? openCue.text : '')) return;
+
+    var now = video.currentTime;
+    if (openCue && now - openCue.start >= MIN_OBSERVED_SECONDS) {
+      upsertCue({ start: openCue.start, end: now, text: openCue.text });
+    }
+    openCue = text ? { start: now, text: text } : null;
+  }
+
+  function upsertCue(cue) {
+    insertObserved(cues, cue);
+    index = 0;   // cueAt's forward-scan position no longer means anything reliable
+  }
+
+  /**
+   * Add a freshly timed line into the ones seen so far.
+   *
+   * Rewatching a scene shows the same line again; without this it would appear
+   * a second time in `cues`, and A/D would stutter — stepping to what looks
+   * like a new line that says exactly what the one before it said. A line
+   * recurring within a second of where it was seen last is treated as the same
+   * one and its timing is simply refreshed. Kept sorted by start time, since
+   * rewinding to rewatch means lines are not always seen in order.
+   */
+  function insertObserved(list, cue) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].text === cue.text && Math.abs(list[i].start - cue.start) < 1) {
+        list[i] = cue;
+        return list;
+      }
+    }
+    var at = 0;
+    while (at < list.length && list[at].start < cue.start) at++;
+    list.splice(at, 0, cue);
+    return list;
   }
 
   // -------------------------------------------------------------------------
@@ -417,6 +456,7 @@ var LLLSubtitles = (function () {
     parse: parse,
     parseXml: parseXml,
     step: step,
+    insertObserved: insertObserved,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; }
   };
