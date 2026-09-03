@@ -199,6 +199,18 @@ Whichever way found the timing, **A** steps back a line and **D** forward.
 Part-way through a line, A restarts it; pressing it again goes to the line
 before, which is how you rewatch something you did not catch.
 
+**A small panel appears once per video**, listing every subtitle track it
+offers with a button to try each one directly. Automatic fetching has too many
+ways to land on an empty response, or to pick an auto-generated track over a
+manual one that would have worked better, for that choice to always be made
+silently — this is the same request the automatic pass makes, just handed to
+you instead of guessed at. Closing it does not bring it back until the next
+video loads. Whichever track LLL picked automatically is reported at the
+bottom of the list, so you can see at a glance whether it is worth trying
+another. A **manually authored track is always preferred automatically** when
+one exists, since auto-generated captions are also where the word-by-word
+reveal mentioned below comes from.
+
 In the on-screen fallback specifically, auto-generated captions are often
 revealed a few words at a time as recognition catches up rather than appearing
 whole. LLL treats a growing or slightly revised line as the same line still
@@ -225,6 +237,27 @@ come back empty — that is what the protection is for, not a limitation to be
 worked around. Where capture is refused the card is still made, without media.
 
 Subtitles are YouTube-only for now.
+
+---
+
+## Known words
+
+A running count of words you already know, reachable from a link at the bottom
+of LLL's settings. Paste text into it, or load a plain text file, and press
+**Add words from this text**.
+
+Nothing new is built to read the text: it runs through `extractWords`, the
+exact longest-match search a Shift-hover already uses, moved forward across a
+whole passage instead of stopping at the first word. 走っていました is recorded
+as 走る — the same dictionary form a hover on it would show — so reading a
+passage once teaches the word regardless of which sentence it turned up
+conjugated in, and running the same text through a second time adds nothing,
+since it is already known.
+
+This exists for what comes next: comparing a video's vocabulary against this
+list for a comprehension score. That needs the whole transcript before a
+single second has played, which is exactly what the first of the three
+subtitle methods above supplies when it works.
 
 ---
 
@@ -261,6 +294,8 @@ looks the same everywhere.
 **`extension/video.js`** — replaying a line to record it, and grabbing the frame.
 
 **`extension/options.js`** — the settings page.
+
+**`extension/known.js`** — the known-words page.
 
 **`extension/popup.css`** — how it looks. The only file that decides that.
 
