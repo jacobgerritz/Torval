@@ -185,6 +185,17 @@ fallback for the one before it, not a choice between them:
    OpaqueResponseBlocking"). A background script with a host permission for
    the target origin gets a genuine cross-origin fetch instead — the same way
    word audio is already fetched from outside youtube.com.
+
+   Even from there, every request came back with a technically valid 200 and
+   nothing in it, on every video and every endpoint tried — a pattern that
+   fits a missing header better than YouTube refusing each one individually.
+   `Referer` is a forbidden header name: no fetch() call, not even from a
+   background script, is allowed to set it, so a request a real page would
+   always send with one pointing at itself instead carries none, or one
+   pointing at the extension. Firefox is unusual in keeping the *blocking*
+   webRequest API available under Manifest V3 — Chrome dropped it — and
+   LLL uses it to rewrite the Referer and Origin on just these requests before
+   they leave the machine, to what a real YouTube page would have sent.
 3. **Read the captions off the screen as they play**, timing each line by
    watching it appear and disappear. This is what the simplest subtitle tools
    do, and it always works, because it is only reading what is already there.

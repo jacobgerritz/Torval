@@ -11,7 +11,9 @@
   },
   "permissions": [
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "webRequest",
+    "webRequestBlocking"
   ],
   "background": {
     "scripts": [

@@ -32,6 +32,53 @@ let tagsPromise = null;
 let status = { state: 'starting', progress: 0 };
 
 // ---------------------------------------------------------------------------
+// Correcting the headers YouTube's endpoints get
+// ---------------------------------------------------------------------------
+
+/**
+ * Every one of LLL's requests to YouTube's own internal endpoints has come
+ * back with a technically valid 200 and nothing in it, on every video and
+ * every endpoint tried — a pattern that fits a missing header better than it
+ * fits YouTube deciding, individually, to refuse each one.
+ *
+ * A real page navigating to youtube.com always carries a Referer pointing at
+ * the page making the request. `Referer` is a forbidden header name — no
+ * fetch() call, not even from a background script, is allowed to set it —
+ * so an extension's own request either carries none at all or one pointing at
+ * the extension's own address instead. If YouTube's internal endpoints read
+ * that as a signal, it would explain a request that is otherwise entirely
+ * well-formed still coming back empty.
+ *
+ * Firefox is unusual among browsers in keeping the *blocking* webRequest API
+ * available under Manifest V3 — Chrome dropped it — and blocking is what lets
+ * an extension rewrite a header before the request leaves the machine, rather
+ * than only observe it afterward. This is scoped to only the endpoints LLL
+ * itself calls; it does not touch any other traffic on the page.
+ */
+if (api.webRequest && api.webRequest.onBeforeSendHeaders) {
+  api.webRequest.onBeforeSendHeaders.addListener(
+    (details) => {
+      const headers = details.requestHeaders.filter((h) => {
+        const name = h.name.toLowerCase();
+        return name !== 'referer' && name !== 'origin';
+      });
+      headers.push({ name: 'Referer', value: 'https://www.youtube.com/' });
+      headers.push({ name: 'Origin', value: 'https://www.youtube.com' });
+      return { requestHeaders: headers };
+    },
+    {
+      urls: [
+        'https://www.youtube.com/api/timedtext*',
+        'https://www.youtube.com/youtubei/v1/player*',
+        'https://www.youtube.com/youtubei/v1/next*',
+        'https://www.youtube.com/youtubei/v1/get_transcript*'
+      ]
+    },
+    ['blocking', 'requestHeaders']
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Messages
 // ---------------------------------------------------------------------------
 
