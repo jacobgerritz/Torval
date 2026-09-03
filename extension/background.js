@@ -111,8 +111,13 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     case 'extractWords': return guard(() => extractWords(message.text));
+    case 'comprehension': return guard(() => comprehension(message.text));
     case 'knownWords':   return guard(() => knownWords());
+    case 'knownList':    return guard(() => knownList());
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
+    case 'setKnown':     return guard(() => setKnown(message.word, message.known));
+    case 'forgetWords':  return guard(() => forgetWords(message.words));
+    case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
     default:       return undefined;
   }
 });
@@ -160,6 +165,7 @@ async function handleLookup(text) {
   try {
     await ready;
     const groups = await LLLLookup.search(text, { getEntries });
+    const known = await knownSet();
     // The accent is one number per word and the table is already in memory, so
     // it costs nothing to answer it here along with the definitions.
     for (const group of groups) {
@@ -168,6 +174,7 @@ async function handleLookup(text) {
         hit.band = LLLLookup.frequencyBand(hit.entry.q);
         hit.shared = LLLLookup.sharedTags(hit.entry);
         hit.sharedPos = LLLLookup.sharedPos(hit.entry);
+        hit.known = known.has(hit.word);
       }
     }
     return { status, groups };
@@ -177,30 +184,139 @@ async function handleLookup(text) {
   }
 }
 
+/**
+ * A reader that only ever asks the database for a word once.
+ *
+ * Reading a single hover asks about a few dozen terms; reading a whole page
+ * asks about the same few thousand terms over and over, because that is what
+ * a language is — は and する and こと turn up on nearly every line. Holding
+ * on to the answers for the length of one passage turns almost all of that
+ * into no work at all, and is the difference between reading a page in under
+ * a second and reading it in a minute.
+ */
+function cachingReader() {
+  const cache = new Map();
+  return {
+    async getEntries(terms) {
+      const missing = terms.filter((term) => !cache.has(term));
+      if (missing.length) {
+        const found = await getEntries(missing);
+        for (const term of missing) cache.set(term, found.get(term) || null);
+      }
+      const out = new Map();
+      for (const term of terms) {
+        const entries = cache.get(term);
+        if (entries) out.set(term, entries);
+      }
+      return out;
+    }
+  };
+}
+
+function requireDictionary() {
+  if (status.state !== 'ready') {
+    throw new Error('The dictionary is still loading — try again in a moment.');
+  }
+  return ready;
+}
+
 /** Every dictionary word in a passage of text — see LLLLookup.extractWords. */
 async function extractWords(text) {
-  if (status.state !== 'ready') throw new Error('The dictionary is still loading — try again in a moment.');
-  await ready;
-  return LLLLookup.extractWords(text, { getEntries });
+  await requireDictionary();
+  return LLLLookup.extractWords(text, cachingReader());
+}
+
+/**
+ * How much of this passage is made of words already known.
+ *
+ * `counts` is handed back along with the score so that marking one more word
+ * known can move the number straight away — a word's count is exactly how much
+ * the total shifts — rather than needing the whole page read again.
+ */
+async function comprehension(text) {
+  await requireDictionary();
+  const tokens = await LLLLookup.extractTokens(text, cachingReader());
+  return LLLLookup.coverage(tokens, await knownSet());
+}
+
+// ---------------------------------------------------------------------------
+// Known words
+// ---------------------------------------------------------------------------
+
+// Stored as word -> when it was first marked known. Kept as an object rather
+// than a list because the question asked of it is almost always "is this one
+// in there", and because the date is what makes the list browsable in any
+// order more useful than alphabetical.
+let knownCache = null;   // Set of words, or null when it needs reading again
+
+// Read once and held, because a lookup asks about it on every single hover.
+// Any write clears it — including one made from the settings page, which
+// storage.onChanged is what catches.
+async function knownSet() {
+  if (!knownCache) {
+    const stored = await api.storage.local.get('knownWords');
+    knownCache = new Set(Object.keys(stored.knownWords || {}));
+  }
+  return knownCache;
+}
+
+if (api.storage.onChanged) {
+  api.storage.onChanged.addListener((changes) => {
+    if (changes.knownWords) knownCache = null;
+  });
+}
+
+async function knownMap() {
+  const stored = await api.storage.local.get('knownWords');
+  return stored.knownWords || {};
+}
+
+async function saveKnown(map) {
+  await api.storage.local.set({ knownWords: map });
+  knownCache = new Set(Object.keys(map));
+  return Object.keys(map).length;
 }
 
 /** Every known word, and how many there are. */
 async function knownWords() {
-  const { knownWords } = await api.storage.local.get('knownWords');
-  const map = knownWords || {};
-  return { words: Object.keys(map), count: Object.keys(map).length };
+  const words = Array.from(await knownSet());
+  return { words, count: words.length };
+}
+
+/** The same list with the date each was learned, newest first, for browsing. */
+async function knownList() {
+  const map = await knownMap();
+  return Object.keys(map)
+    .map((word) => ({ word, added: map[word] }))
+    .sort((a, b) => b.added - a.added);
 }
 
 /** Add words to the known set. Already-known ones are left alone. */
 async function addKnownWords(words) {
-  const { knownWords } = await api.storage.local.get('knownWords');
-  const map = knownWords || {};
+  const map = await knownMap();
   let added = 0;
   for (const word of words) {
     if (!map[word]) { map[word] = Date.now(); added++; }
   }
-  await api.storage.local.set({ knownWords: map });
-  return { added, total: Object.keys(map).length };
+  return { added, total: await saveKnown(map) };
+}
+
+/** Mark one word known, or unmark it — what the popup's tick does. */
+async function setKnown(word, isKnown) {
+  const map = await knownMap();
+  if (isKnown) { if (!map[word]) map[word] = Date.now(); }
+  else delete map[word];
+  return { word, known: !!isKnown, total: await saveKnown(map) };
+}
+
+/** Take words back out of the known set. */
+async function forgetWords(words) {
+  const map = await knownMap();
+  let removed = 0;
+  for (const word of words) {
+    if (map[word]) { delete map[word]; removed++; }
+  }
+  return { removed, total: await saveKnown(map) };
 }
 
 function loadTags() {

@@ -271,34 +271,80 @@ var LLLLookup = (function () {
   var JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
 
   /**
-   * Read every Japanese word out of a passage of text and hand back the
-   * dictionary form each one resolves to, once each.
+   * Read a passage from end to end and hand back the dictionary form of every
+   * word in it, in order, the same word repeated as often as it is said.
    *
    * This is not a separate piece of machinery — it is `search` itself, run
    * forward across a whole passage instead of stopping at the first word. At
    * each position it takes the longest match, deinflects it the same way a
    * hover would, and moves past however many characters that consumed, so
    * 走っていました is recorded as 走る — the same dictionary form a hover on it
-   * would have shown. This is what "known words" is built on: reading a
-   * passage once teaches the word regardless of which sentence it turned up
-   * conjugated in.
+   * would have shown. Reading a passage once therefore teaches the word
+   * regardless of which sentence it turned up conjugated in.
+   *
+   * Repeats are kept rather than folded away, because the two questions built
+   * on this want different things. "Which words does this teach me" wants each
+   * word once; "how much of this will I understand" has to count every time a
+   * word is said, or a page that says 私 forty times and one word you have
+   * never seen would score the same as one that says forty words you have
+   * never seen.
    */
-  async function extractWords(text, db) {
-    var seen = new Set();
-    var words = [];
+  async function extractTokens(text, db) {
+    var tokens = [];
     var i = 0;
+    var steps = 0;
     while (i < text.length) {
       if (!JAPANESE.test(text[i])) { i++; continue; }
       var groups = await search(text.slice(i, i + MAX_SCAN), db);
       if (groups.length && groups[0].hits.length) {
-        var word = groups[0].hits[0].word;
-        if (!seen.has(word)) { seen.add(word); words.push(word); }
+        tokens.push(groups[0].hits[0].word);
         i += groups[0].length;
       } else {
         i++;
       }
+      // A whole page is thousands of searches in a row. Standing aside every so
+      // often lets whatever else is waiting — a hover being looked up, above
+      // all — get a turn, rather than being stuck behind the whole passage.
+      if ((++steps % 256) === 0) await pause();
+    }
+    return tokens;
+  }
+
+  function pause() {
+    return new Promise(function (resolve) { setTimeout(resolve, 0); });
+  }
+
+  /** Every dictionary word in a passage, once each, in the order first met. */
+  async function extractWords(text, db) {
+    var seen = new Set();
+    var words = [];
+    var tokens = await extractTokens(text, db);
+    for (var i = 0; i < tokens.length; i++) {
+      if (seen.has(tokens[i])) continue;
+      seen.add(tokens[i]);
+      words.push(tokens[i]);
     }
     return words;
+  }
+
+  /**
+   * How much of a passage is made of words already known.
+   *
+   * Counted per word said, not per distinct word: what "I understand 80% of
+   * this" means is that four times in five, the next word is one you know.
+   * `counts` comes back too, so that marking one word known afterwards can be
+   * reflected immediately — its count is exactly how much the total moves —
+   * without reading the whole passage a second time.
+   */
+  function coverage(tokens, known) {
+    var counts = {};
+    var hits = 0;
+    for (var i = 0; i < tokens.length; i++) {
+      var word = tokens[i];
+      counts[word] = (counts[word] || 0) + 1;
+      if (known.has(word)) hits++;
+    }
+    return { total: tokens.length, known: hits, counts: counts };
   }
 
   return {
@@ -308,6 +354,8 @@ var LLLLookup = (function () {
     sharedTags: sharedTags,
     sharedPos: sharedPos,
     extractWords: extractWords,
+    extractTokens: extractTokens,
+    coverage: coverage,
     MAX_SCAN: MAX_SCAN
   };
 })();

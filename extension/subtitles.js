@@ -834,7 +834,25 @@ var LLLSubtitles = (function () {
     return String(s).replace(/<[^>]*>/g, '').replace(/\s+/g, '');
   }
 
+  /**
+   * Every line of the video as one passage, for working out how much of it you
+   * would understand. This is what the whole fight to get the transcript up
+   * front was for: with the on-screen fallback, only the lines already watched
+   * are in here, and the answer can only ever describe what has been seen so
+   * far rather than what is coming.
+   */
+  function allText() {
+    return cues.map(function (cue) { return cue.text; }).join('\n');
+  }
+
+  /** Enough to tell whether the transcript has changed since last asked. */
+  function count() {
+    return cues.length;
+  }
+
   return {
+    allText: allText,
+    count: count,
     enable: enable,
     cueAt: cueAt,
     cueFor: cueFor,

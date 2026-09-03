@@ -6,44 +6,101 @@
 <main>
   <h1>LLL</h1>
 
-  <section>
-    <h2>Anki</h2>
-    <p class="note">
-      Cards are added through AnkiConnect, which listens on your own machine.
-      Anki has to be open.
+  <nav class="tabs">
+    <button class="tab" data-panel="anki">Anki</button>
+    <button class="tab" data-panel="known">Known words</button>
+  </nav>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-anki">
+    <section>
+      <h2>Where cards go</h2>
+      <p class="note">
+        Cards are added through AnkiConnect, which listens on your own machine.
+        Anki has to be open.
+      </p>
+
+      <label>
+        <span>Deck</span>
+        <select id="deck"></select>
+      </label>
+
+      <label>
+        <span>Note type</span>
+        <select id="model"></select>
+      </label>
+
+      <label>
+        <span>Tags</span>
+        <input id="tags" type="text" placeholder="lll" spellcheck="false">
+      </label>
+    </section>
+
+    <section id="mapping-section" hidden>
+      <h2>What goes in each field</h2>
+      <p class="note">
+        One row per field on your note type. Anything left blank stays empty.
+      </p>
+      <div id="mapping"></div>
+    </section>
+
+    <p class="actions">
+      <button id="save" class="primary">Save</button>
+      <span id="status" role="status"></span>
+    </p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-known" hidden>
+    <div class="count" id="count">…</div>
+    <p class="note count-note">
+      What LLL measures a page against to say how much of it you would
+      understand. Press ✓ on any word in the popup to add it here.
     </p>
 
-    <label>
-      <span>Deck</span>
-      <select id="deck"></select>
-    </label>
+    <section>
+      <h2>Add from a text</h2>
+      <p class="note">
+        Paste a text below, or load a plain text file into it. Every Japanese
+        word in it is deinflected the same way a hover looks one up —
+        たべました becomes 食べる — and whichever are not already here get
+        added. Running the same text through twice adds nothing the second time.
+      </p>
 
-    <label>
-      <span>Note type</span>
-      <select id="model"></select>
-    </label>
+      <textarea id="text" rows="8" spellcheck="false"
+        placeholder="日本語のテキストをここに貼り付けてください…"></textarea>
 
-    <label>
-      <span>Tags</span>
-      <input id="tags" type="text" placeholder="lll" spellcheck="false">
-    </label>
-  </section>
+      <p class="row">
+        <input type="file" id="file" accept=".txt,text/plain">
+        <span class="spacer"></span>
+        <button id="add" class="primary">Add words from this text</button>
+      </p>
 
-  <section id="mapping-section" hidden>
-    <h2>Fields</h2>
-    <p class="note">
-      What goes where on the card. Anything left blank stays empty.
-    </p>
-    <div id="mapping"></div>
-  </section>
+      <p id="result" class="note"></p>
+    </section>
 
-  <p class="actions">
-    <button id="save">Save</button>
-    <span id="status" role="status"></span>
-  </p>
+    <section>
+      <h2>Browse</h2>
+      <p class="note">
+        Newest first. × takes a word back out — useful when one was added by
+        mistake, or turned out not to be as known as it looked.
+      </p>
 
-  <p class="footer-link"><a href="known.html" target="_blank">Known words →</a></p>
+      <label class="search">
+        <span>Search</span>
+        <input id="search" type="search" placeholder="食べる" spellcheck="false">
+      </label>
+
+      <div id="list" class="words"></div>
+      <p class="row">
+        <button id="more" hidden>Show more</button>
+      </p>
+    </section>
+  </div>
 </main>
 
 <script src="anki.js"></script>
 <script src="options.js"></script>
+<script src="known.js"></script>

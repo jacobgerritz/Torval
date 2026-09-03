@@ -96,6 +96,11 @@ const TAGS = {
   pref: 'prefix', uk: 'word usually written using kana alone'
 };
 
+// The known words the extension keeps in browser storage. A couple are marked
+// known up front so the comprehension bar starts on a real number rather than
+// zero, and so the popup has both states of the ✓ to show.
+const known = new Set(['本', '人']);
+
 // --- stand in for the extension's messaging ---------------------------------
 window.browser = {
   runtime: {
@@ -105,6 +110,15 @@ window.browser = {
       if (msg.type === 'tags') return TAGS;
       if (msg.type === 'status') return { status: { state: 'ready' } };
       if (msg.type === 'ankiAdd') { window.__lastNote = msg.note; return { ok: true, result: 1 }; }
+      if (msg.type === 'openOptions') { console.log('preview: would open the settings page'); return { ok: true }; }
+      if (msg.type === 'setKnown') {
+        if (msg.known) known.add(msg.word); else known.delete(msg.word);
+        return { ok: true, result: { word: msg.word, known: msg.known, total: known.size } };
+      }
+      if (msg.type === 'comprehension') {
+        const tokens = await LLLLookup.extractTokens(msg.text, db);
+        return { ok: true, result: LLLLookup.coverage(tokens, known) };
+      }
       if (msg.type === 'lookup') {
         const groups = await LLLLookup.search(msg.text, db);
         // The real background script attaches the accent from the pitch data;
@@ -115,6 +129,7 @@ window.browser = {
           h.band = LLLLookup.frequencyBand(h.entry.q);
           h.shared = LLLLookup.sharedTags(h.entry);
           h.sharedPos = LLLLookup.sharedPos(h.entry);
+          h.known = known.has(h.word);
         }
         return { status: { state: 'ready' }, groups };
       }
@@ -122,4 +137,5 @@ window.browser = {
   }
 };
 </script>
+<script src="../extension/bar.js"></script>
 <script src="../extension/content.js"></script>

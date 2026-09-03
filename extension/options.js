@@ -1,14 +1,46 @@
 /*
  * LLL — settings
  *
+ * Two things live here and they have nothing to do with each other: where
+ * cards go, and which words you already know. They are tabs rather than one
+ * long page because scrolling past the whole of Anki's field mapping to reach
+ * your word list is not a way to find anything.
+ *
  * Deck and note type are read live from Anki rather than typed, so a name can
  * never be slightly wrong. The field mapping is offered pre-filled by guessing
  * from the field names; anything guessed wrongly is one dropdown away.
+ *
+ * The known words tab is known.js; only the switching between them is here.
  */
 
 'use strict';
 
 const api = globalThis.browser || globalThis.chrome;
+
+// -------------------------------------------------------------------------
+// Tabs
+// -------------------------------------------------------------------------
+
+for (const tab of document.querySelectorAll('.tab')) {
+  tab.addEventListener('click', () => showPanel(tab.dataset.panel));
+}
+
+function showPanel(name) {
+  for (const tab of document.querySelectorAll('.tab')) {
+    tab.classList.toggle('current', tab.dataset.panel === name);
+  }
+  for (const panel of document.querySelectorAll('.panel')) {
+    panel.hidden = panel.id !== 'panel-' + name;
+  }
+}
+
+// Opened with #known — what the bar's ⚙ could later point straight at, and what
+// makes the word list linkable rather than only reachable by clicking.
+showPanel(location.hash === '#known' ? 'known' : 'anki');
+
+// -------------------------------------------------------------------------
+// Anki
+// -------------------------------------------------------------------------
 
 const SOURCE_LABELS = [
   ['', '—'],

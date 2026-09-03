@@ -258,11 +258,18 @@ Subtitles are YouTube-only for now.
 
 ## Known words
 
-A running count of words you already know, reachable from a link at the bottom
-of LLL's settings. Paste text into it, or load a plain text file, and press
-**Add words from this text**.
+The list of words you already know, kept under **Known words** in LLL's
+settings. Words get there two ways.
 
-Nothing new is built to read the text: it runs through `extractWords`, the
+**One at a time.** Every word in the popup has a **✓** beside its **+**. They
+are different questions: **+** means *teach me this*, **✓** means *I already
+have this*. The tick toggles, because the commonest mistake to make with it is
+pressing it on the wrong word.
+
+**In bulk.** Paste in something you have already read, or load a plain text
+file, and press **Add words from this text**.
+
+Nothing new is built to read that text: it runs through `extractWords`, the
 exact longest-match search a Shift-hover already uses, moved forward across a
 whole passage instead of stopping at the first word. 走っていました is recorded
 as 走る — the same dictionary form a hover on it would show — so reading a
@@ -270,16 +277,42 @@ passage once teaches the word regardless of which sentence it turned up
 conjugated in, and running the same text through a second time adds nothing,
 since it is already known.
 
-This exists for what comes next: comparing a video's vocabulary against this
-list for a comprehension score. That needs the whole transcript before a
-single second has played, which is exactly what the first of the three
-subtitle methods above supplies when it works.
+The same page browses the list, newest first, with a search box and an **×**
+per word for the ones added by mistake.
+
+---
+
+## Comprehension
+
+A slim bar across the top of any page says how much of what is in front of you
+is made of words you already know.
+
+```
+LLL   87%   1,204 of 1,383 words known                        ⟳  ⚙  ×
+```
+
+On a video that is measured against the **whole transcript**, not the part
+already watched — which is the entire point of the fight to get the transcript
+up front. Knowing a video is 87% words you know *before* starting it is what
+decides whether it is worth watching; reading it afterwards answers nothing.
+Everywhere else it is the page's own text.
+
+It counts every word said, not every distinct word. A page that says 私 forty
+times and one word you have never met is not as hard as one with forty
+different unknown words in it, and a score that could not tell those apart
+would not be worth reading.
+
+Pressing **✓** in the popup moves the number immediately — a word's count is
+exactly how far the bar shifts, so nothing has to be read a second time. **⟳**
+reads the page again, **⚙** opens the settings, **×** hides the bar until the
+page is reloaded. It hides itself while a video is full screen, and never
+appears at all on a page with no Japanese on it.
 
 ---
 
 ## How it is put together
 
-Five files do the work. None of them is long.
+A handful of files do the work. None of them is long.
 
 **`extension/deinflect.js`** — the grammar. A table of about 470 small rules,
 each saying "a word ending in X might really be a word ending in Y". Applied
@@ -309,22 +342,30 @@ looks the same everywhere.
 
 **`extension/video.js`** — replaying a line to record it, and grabbing the frame.
 
-**`extension/options.js`** — the settings page.
+**`extension/bar.js`** — the comprehension bar across the top of the page.
 
-**`extension/known.js`** — the known-words page.
+**`extension/options.js`** — the settings page, and switching between its tabs.
+
+**`extension/known.js`** — the known-words tab: adding, browsing, forgetting.
 
 **`extension/popup.css`** — how it looks. The only file that decides that.
 
 ### Working on the appearance
 
-Reloading the extension to see a colour change is tedious, so there is a preview
-page that runs the real popup code against a dozen sample words:
+Reloading the extension to see a colour change is tedious, so there are preview
+pages that run the real code against a handful of sample words:
 
 ```bash
 node tools/serve.mjs
 ```
 
-Then open <http://localhost:8137/tools/preview.html>. Edit `popup.css`, refresh.
+- <http://localhost:8137/tools/preview.html> — the popup and the bar.
+- <http://localhost:8137/tools/options-preview.html> — the settings page. It
+  fetches `extension/options.html` rather than copying it, so it cannot drift
+  out of step with what ships.
+- <http://localhost:8137/tools/video-preview.html> — subtitles and recording.
+
+Edit the CSS, refresh.
 
 ### Tests
 
@@ -342,10 +383,9 @@ would otherwise invent words that do not exist.
 
 In rough order of intent:
 
-- **Known and unknown words.** Colour every word on the page by whether you have
-  met it, the way Migaku does.
-- **Subtitle mining.** Cards that carry the audio and the frame they came from.
-  The note type already has fields waiting for them.
+- **Colouring the words themselves.** The bar says how much of a page you know;
+  it does not say *which* words. Marking the unknown ones on the page, the way
+  Migaku does, is the obvious next step from here.
 - **Packaging.** Sign it, so it survives a Firefox restart.
 
 ---

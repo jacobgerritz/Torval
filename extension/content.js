@@ -90,6 +90,11 @@
   // whether or not anything is being mined. Recording only happens on demand.
   if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.enable();
 
+  // Only the page itself gets a bar. This script runs in every frame, and an
+  // advert in an iframe reporting its own comprehension across the top of
+  // somebody else's article is not a thing anyone asked for.
+  if (window === window.top && typeof LLLBar !== 'undefined') watchComprehension();
+
   // Fetched now rather than linked from the shadow root, because a <link> loads
   // asynchronously: the first popup would be measured and positioned while it
   // was still unstyled and full-page-width, and land in the wrong place.
@@ -331,6 +336,69 @@
   }
 
   // -------------------------------------------------------------------------
+  // How much of this page you already know
+  // -------------------------------------------------------------------------
+
+  // Reading a page end to end is not free, so it is done once and then only
+  // again when what is on the page has genuinely changed. On a video that is
+  // the transcript arriving, which turns up seconds after the page does and is
+  // worth waiting for; everywhere else the ⟳ on the bar is the way to ask
+  // again, since a page whose text keeps changing under you is rare enough not
+  // to be worth watching for constantly.
+  const MAX_READ = 100000;   // characters — about an hour of speech, or a long article
+  let lastRead = '';
+  let readingPage = false;
+
+  function watchComprehension() {
+    LLLBar.onRefresh(() => { lastRead = ''; readPage(); });
+    setTimeout(readPage, 1500);   // let the page finish putting itself together
+
+    // Subtitles arrive well after the page does, and replace it as the thing
+    // worth measuring the moment they do.
+    if (typeof LLLSubtitles !== 'undefined') {
+      let seen = -1;
+      setInterval(() => {
+        const now = LLLSubtitles.count();
+        if (now === seen) return;
+        seen = now;
+        if (now) readPage();
+      }, 2000);
+    }
+  }
+
+  /**
+   * The text this page is actually made of. A video's subtitles are the text
+   * of a video — the surrounding page is comments and titles and menus, none of
+   * which is what you came to watch.
+   */
+  function pageText() {
+    if (typeof LLLSubtitles !== 'undefined') {
+      const lines = LLLSubtitles.allText();
+      if (lines) return lines;
+    }
+    return document.body ? document.body.innerText : '';
+  }
+
+  async function readPage() {
+    if (readingPage || !isCurrent()) return;
+    const text = pageText().slice(0, MAX_READ);
+    if (!text || text === lastRead) return;
+    lastRead = text;
+
+    readingPage = true;
+    LLLBar.working();
+    try {
+      const reply = await api.runtime.sendMessage({ type: 'comprehension', text });
+      if (reply && reply.ok) LLLBar.show(reply.result);
+      else lastRead = '';   // the dictionary was still loading; try again later
+    } catch (err) {
+      lastRead = '';
+    } finally {
+      readingPage = false;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Asking the background script
   // -------------------------------------------------------------------------
 
@@ -498,7 +566,18 @@
         senses: chosenSenses(list)
       });
     });
-    head.appendChild(add);
+
+    // Two different things you might want to do with a word you have just
+    // looked up, and they are not the same thing: + means "teach me this",
+    // ✓ means "I already have this". The tick is what the comprehension
+    // percentage is built out of, so marking one moves the bar at the top of
+    // the page immediately.
+    const know = knownButton(hit);
+
+    const buttons = document.createElement('span');
+    buttons.className = 'buttons';
+    buttons.append(know, add);
+    head.appendChild(buttons);
     el.appendChild(head);
 
     const meta = [];
@@ -566,6 +645,44 @@
 
     el.appendChild(list);
     return el;
+  }
+
+  /**
+   * The tick that says "I already know this word".
+   *
+   * It toggles, because the commonest mistake to make with it is pressing it
+   * on the wrong word, and a list you can only add to is one that slowly fills
+   * with things that are not true.
+   */
+  function knownButton(hit) {
+    const button = document.createElement('button');
+    button.className = 'know';
+    button.textContent = '✓';
+    let known = !!hit.known;
+    paint();
+
+    button.addEventListener('click', async () => {
+      const wanted = !known;
+      button.disabled = true;
+      let reply;
+      try {
+        reply = await api.runtime.sendMessage({ type: 'setKnown', word: hit.word, known: wanted });
+      } catch (err) {
+        reply = null;
+      }
+      button.disabled = false;
+      if (!reply || !reply.ok) return;
+      known = wanted;
+      hit.known = wanted;
+      paint();
+      if (typeof LLLBar !== 'undefined') LLLBar.adjust(hit.word, wanted);
+    });
+
+    function paint() {
+      button.classList.toggle('on', known);
+      button.title = known ? 'Known — click to unmark' : 'Mark as already known';
+    }
+    return button;
   }
 
   /** Which senses were picked, or all of them when none were. */

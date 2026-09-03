@@ -1,0 +1,89 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LLL settings preview</title>
+<!--
+  A page for working on how the settings look, without reloading the extension
+  in Firefox every time.
+
+      node tools/serve.mjs   ->  http://localhost:8137/tools/options-preview.html
+
+  It runs the real options.html, options.js and known.js. The markup is not
+  copied here — it is fetched from the extension itself, so this can never
+  drift out of step with what actually ships. The only fake parts are Anki,
+  which is not running, and the stored word list, which lives in memory.
+-->
+
+<script>
+// --- stand in for Anki and for browser storage ------------------------------
+const DECKS = ['Default', '日本語::Mining', 'Core 2k'];
+const MODELS = ['LLL', 'Basic'];
+const FIELDS = { LLL: ['Word', 'Reading', 'Sentence', 'Definition', 'Audio', 'Pitch', 'Image'], Basic: ['Front', 'Back'] };
+
+// A word list big enough to show what browsing a real one is like, including
+// the paging and the search.
+const known = new Map();
+const SAMPLE = ['本', '人', '車', '食べる', '読む', '図書館', '日本語', '勉強', '新しい', '親切', '料理', '上手', '買う'];
+SAMPLE.forEach((word, i) => known.set(word, Date.now() - i * 86400000));
+for (let i = 0; i < 400; i++) known.set('見本' + i, Date.now() - (i + 20) * 3600000);
+
+let stored = { ankiConfig: { deck: '日本語::Mining', model: 'LLL', tags: ['lll'], fields: {} } };
+
+window.browser = {
+  storage: {
+    local: {
+      async get(key) { return key in stored ? { [key]: stored[key] } : {}; },
+      async set(values) { Object.assign(stored, values); }
+    }
+  },
+  runtime: {
+    id: 'preview',
+    openOptionsPage() {},
+    async sendMessage(msg) {
+      switch (msg.type) {
+        case 'ankiDescribe': return { ok: true, result: { decks: DECKS, models: MODELS } };
+        case 'ankiFields':   return { ok: true, result: FIELDS[msg.model] || [] };
+        case 'knownList':
+          return { ok: true, result: [...known].map(([word, added]) => ({ word, added }))
+            .sort((a, b) => b.added - a.added) };
+        case 'extractWords':
+          return { ok: true, result: [...new Set(msg.text.match(/[一-鿿ぁ-ヿ]+/g) || [])] };
+        case 'addKnownWords': {
+          let added = 0;
+          for (const word of msg.words) if (!known.has(word)) { known.set(word, Date.now()); added++; }
+          return { ok: true, result: { added, total: known.size } };
+        }
+        case 'forgetWords': {
+          let removed = 0;
+          for (const word of msg.words) if (known.delete(word)) removed++;
+          return { ok: true, result: { removed, total: known.size } };
+        }
+      }
+    }
+  }
+};
+
+// The real page, markup and all, pulled in rather than copied — then its own
+// scripts run on top of it exactly as they do in the extension.
+(async () => {
+  const html = await (await fetch('../extension/options.html')).text();
+  const page = new DOMParser().parseFromString(html, 'text/html');
+
+  for (const link of page.querySelectorAll('link[rel="stylesheet"]')) {
+    const clone = document.createElement('link');
+    clone.rel = 'stylesheet';
+    clone.href = '../extension/' + link.getAttribute('href');
+    document.head.appendChild(clone);
+  }
+  document.body.appendChild(page.querySelector('main'));
+
+  for (const script of page.querySelectorAll('script')) {
+    await new Promise((resolve, reject) => {
+      const clone = document.createElement('script');
+      clone.src = '../extension/' + script.getAttribute('src');
+      clone.onload = resolve;
+      clone.onerror = reject;
+      document.body.appendChild(clone);
+    });
+  }
+})();
+</script>

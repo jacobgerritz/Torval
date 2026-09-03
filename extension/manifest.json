@@ -32,6 +32,7 @@
       "js": [
         "subtitles.js",
         "video.js",
+        "bar.js",
         "content.js"
       ],
       "run_at": "document_idle",

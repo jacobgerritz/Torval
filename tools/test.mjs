@@ -563,6 +563,39 @@ const run = async () => {
     (await Lookup.extractWords('本、車、人', db)).length === 3,
     JSON.stringify(await Lookup.extractWords('本、車、人', db)));
 
+  // --- comprehension ------------------------------------------------------
+  // The percentage counts every word said, not every distinct word: a page
+  // that says one unknown word forty times is not as hard as one with forty
+  // different unknown words in it, and the score has to be able to tell them
+  // apart.
+  const twice = await Lookup.extractTokens('食べました。食べました。', db);
+  check('a word said twice is counted twice',
+    twice.filter((w) => w === '食べる').length === 2, JSON.stringify(twice));
+  check('the unique list is the token list with the repeats folded away',
+    (await Lookup.extractWords('食べました。食べました。', db)).filter((w) => w === '食べる').length === 1);
+
+  const cover = Lookup.coverage(['本', '本', '車', '人'], new Set(['本']));
+  check('coverage counts repeats, not distinct words',
+    cover.total === 4 && cover.known === 2, JSON.stringify(cover));
+  check('coverage reports how often each word was said, so one more known word moves it',
+    cover.counts['本'] === 2 && cover.counts['車'] === 1, JSON.stringify(cover.counts));
+  check('knowing nothing scores nothing, and is not an error',
+    Lookup.coverage(['本'], new Set()).known === 0);
+  check('an empty passage has nothing to score',
+    Lookup.coverage([], new Set(['本'])).total === 0);
+  check('knowing every word scores all of them',
+    Lookup.coverage(['本', '車'], new Set(['本', '車'])).known === 2);
+
+  // The count a word carries is exactly how far the bar moves when it is
+  // marked known, which is what lets the popup's ✓ answer immediately instead
+  // of reading the whole page again.
+  const passageTokens = await Lookup.extractTokens(passage, db);
+  const before = Lookup.coverage(passageTokens, new Set());
+  const after = Lookup.coverage(passageTokens, new Set(['本']));
+  check('marking one word known moves the score by exactly that word’s count',
+    after.known - before.known === before.counts['本'],
+    `${after.known - before.known} vs ${before.counts['本']}`);
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',

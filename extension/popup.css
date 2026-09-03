@@ -134,8 +134,20 @@
 
 /* --- controls ---------------------------------------------------------- */
 
-.add {
+/*
+ * The two things you can do with a word, kept together at the end of its line:
+ * ✓ for "I already know this", + for "put this on a card". Deliberately quiet
+ * until pointed at — the word and its meaning are what the popup is for.
+ */
+.buttons {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   margin-left: auto;
+}
+
+.add,
+.know {
   padding: 0 2px;
   border: 0;
   background: none;
@@ -146,9 +158,21 @@
   cursor: pointer;
 }
 
-.add:hover:not(:disabled) { color: #cfd3da; }
-.add:disabled { cursor: default; }
+.add:hover:not(:disabled),
+.know:hover:not(:disabled) { color: #cfd3da; }
+.add:disabled,
+.know:disabled { cursor: default; }
 .add.done { color: #6f9e78; }
+
+.know {
+  font-size: 13px;
+  color: #3d4148;
+}
+
+/* Known words stay lit, so a popup says at a glance which of its matches are
+   already accounted for. */
+.know.on { color: #6f9e78; }
+.know.on:hover:not(:disabled) { color: #8fbe98; }
 
 .toggle {
   margin-top: 7px;
