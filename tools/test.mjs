@@ -24,6 +24,7 @@ const Anki = require(join(ROOT, 'extension', 'anki.js'));
 const Pitch = require(join(ROOT, 'extension', 'pitch.js'));
 const Video = require(join(ROOT, 'extension', 'video.js'));
 const Subs = require(join(ROOT, 'extension', 'subtitles.js'));
+const Highlight = require(join(ROOT, 'extension', 'highlight.js'));
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
@@ -586,6 +587,32 @@ const run = async () => {
   check('knowing every word scores all of them',
     Lookup.coverage(['本', '車'], new Set(['本', '車'])).known === 2);
 
+  // --- where each word was, for colouring it -------------------------------
+  // The positions have to land on exactly the characters the word covers, or
+  // the mark on the page sits beside the word instead of on it.
+  const located = await Lookup.locateTokens('本を読む', db);
+  check('every located word points at the characters it was read from',
+    located.every((t) => {
+      const surface = '本を読む'.slice(t.start, t.start + t.length);
+      return surface.length === t.length && surface.length > 0;
+    }), JSON.stringify(located));
+  check('the words come back in the order they were written',
+    located.map((t) => t.start).join() === [...located].sort((a, b) => a.start - b.start)
+      .map((t) => t.start).join(), JSON.stringify(located.map((t) => t.start)));
+  check('a word is located at the position it actually occupies',
+    located.some((t) => t.word === '読む' && '本を読む'.slice(t.start, t.start + t.length) === '読む'),
+    JSON.stringify(located));
+
+  // Positions are into the text as handed over, so leading text has to shift
+  // them — this is what lets a page offset be mapped back to a text node.
+  const offset = await Lookup.locateTokens('Hello 本', db);
+  check('positions count from the start of the whole passage, not the Japanese',
+    offset.length === 1 && offset[0].start === 6, JSON.stringify(offset));
+
+  check('locating and listing agree on what is there',
+    (await Lookup.locateTokens(passage, db)).map((t) => t.word).join() ===
+    (await Lookup.extractTokens(passage, db)).join());
+
   // The count a word carries is exactly how far the bar moves when it is
   // marked known, which is what lets the popup's ✓ answer immediately instead
   // of reading the whole page again.
@@ -801,6 +828,32 @@ const run = async () => {
     Video.name('図書館で本を読んでいました。', 'jpg') !== name1);
   check('filenames survive any filesystem', /^lll-[a-z0-9]+\.jpg$/.test(name1), name1);
   check('the extension is kept', Video.name('x', 'webm').endsWith('.webm'));
+
+  // --- putting a mark back on the page -----------------------------------
+  // A page's text is gathered from many text nodes into one string; a word
+  // found at some position in that string has to be traced back to the node it
+  // came from. Getting this off by one puts the colour beside the word.
+  //
+  // Three nodes, as a page would give them: 「本を」「読んで」「いました」.
+  const pieces = [
+    { node: 'a', start: 0, end: 2 },
+    { node: 'b', start: 2, end: 5 },
+    { node: 'c', start: 6, end: 10 }   // a block boundary left a gap at 5
+  ];
+  const at = (i) => Highlight._locate(pieces, i);
+
+  check('the first character of the first node',
+    JSON.stringify(at(0)) === '{"node":"a","offset":0}', JSON.stringify(at(0)));
+  check('the last character of a node belongs to that node, not the next',
+    JSON.stringify(at(1)) === '{"node":"a","offset":1}', JSON.stringify(at(1)));
+  check('the first character of the next node starts it over at nothing',
+    JSON.stringify(at(2)) === '{"node":"b","offset":0}', JSON.stringify(at(2)));
+  check('a position in the middle of a later node',
+    JSON.stringify(at(8)) === '{"node":"c","offset":2}', JSON.stringify(at(8)));
+  check('the joint between two blocks belongs to neither', at(5) === null, JSON.stringify(at(5)));
+  check('a position past the end of everything is refused', at(10) === null, JSON.stringify(at(10)));
+  check('every position inside a node is found, whichever it is',
+    [0, 1, 2, 3, 4, 6, 7, 8, 9].every((i) => at(i) !== null));
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',

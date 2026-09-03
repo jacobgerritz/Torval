@@ -175,6 +175,12 @@ input[type="file"] {
 
 .words .note { margin: 0; padding: 14px; }
 
+.more {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #5f646c;
+}
+
 .word-row {
   display: flex;
   align-items: center;

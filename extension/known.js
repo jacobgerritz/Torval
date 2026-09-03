@@ -35,7 +35,7 @@
   const resultEl = document.getElementById('result');
   const searchEl = document.getElementById('search');
   const listEl = document.getElementById('list');
-  const moreButton = document.getElementById('more');
+  const moreEl = document.getElementById('more');
 
   let all = [];        // [{ word, added }], newest first
   let shown = PAGE;
@@ -87,7 +87,16 @@
   // -------------------------------------------------------------------------
 
   searchEl.addEventListener('input', () => { shown = PAGE; draw(); });
-  moreButton.addEventListener('click', () => { shown += PAGE; draw(); });
+
+  // More rows arrive by scrolling to them rather than by pressing a button.
+  // A list of two thousand words is eleven presses of "show more", which is
+  // ten more decisions than anybody wants to make about a word list.
+  listEl.addEventListener('scroll', () => {
+    if (listEl.scrollTop + listEl.clientHeight < listEl.scrollHeight - 200) return;
+    if (shown >= matching().length) return;
+    shown += PAGE;
+    draw({ keepScroll: true });
+  });
 
   async function refresh() {
     const reply = await api.runtime.sendMessage({ type: 'knownList' });
@@ -103,8 +112,9 @@
     return all.filter((row) => row.word.indexOf(query) !== -1);
   }
 
-  function draw() {
+  function draw(options) {
     const rows = matching();
+    const at = listEl.scrollTop;
     listEl.textContent = '';
 
     if (!rows.length) {
@@ -114,18 +124,16 @@
         ? 'No known word matches that.'
         : 'Nothing here yet — press ✓ on a word in the popup, or paste a text above.';
       listEl.appendChild(empty);
-      moreButton.hidden = true;
+      moreEl.hidden = true;
       return;
     }
 
     for (const row of rows.slice(0, shown)) listEl.appendChild(wordRow(row));
+    if (options && options.keepScroll) listEl.scrollTop = at;
 
     const left = rows.length - shown;
-    moreButton.hidden = left <= 0;
-    if (left > 0) {
-      moreButton.textContent = `Show ${Math.min(left, PAGE)} more — ` +
-        `${left.toLocaleString('en-US')} still below`;
-    }
+    moreEl.hidden = left <= 0;
+    if (left > 0) moreEl.textContent = `${left.toLocaleString('en-US')} more — keep scrolling.`;
   }
 
   function wordRow({ word, added }) {

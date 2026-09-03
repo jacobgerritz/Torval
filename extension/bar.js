@@ -25,6 +25,8 @@ var LLLBar = (function () {
   var data = null;        // the last reading: { total, known, counts }
   var dismissed = false;
   var onRefresh = null;
+  var onColour = null;
+  var colourOn = true;
 
   /**
    * Show a fresh reading. `counts` is how many times each word was said, kept
@@ -96,6 +98,15 @@ var LLLBar = (function () {
     var spacer = document.createElement('span');
     spacer.className = 'spacer';
 
+    // Marking the unknown words is the loudest thing LLL does to a page, so
+    // the switch for it belongs where the number is rather than buried in the
+    // settings — a page you only want to read is one press away.
+    els.colour = button('あ', '', function () {
+      if (onColour) onColour();
+    });
+    els.colour.className = 'colour';
+    paintColourButton();
+
     var refresh = button('⟳', 'Read this page again', function () {
       if (onRefresh) onRefresh();
     });
@@ -107,7 +118,7 @@ var LLLBar = (function () {
       host.style.display = 'none';
     });
 
-    bar.append(mark, els.score, els.detail, spacer, refresh, settings, close);
+    bar.append(mark, els.score, els.detail, spacer, els.colour, refresh, settings, close);
     root.append(style, bar);
     (document.body || document.documentElement).appendChild(host);
 
@@ -125,6 +136,24 @@ var LLLBar = (function () {
     el.title = title;
     el.addEventListener('click', onClick);
     return el;
+  }
+
+  /** Say whether the unknown words are being marked, and offer the opposite. */
+  function colour(isOn) {
+    colourOn = isOn;
+    if (els.colour) paintColourButton();
+  }
+
+  function paintColourButton() {
+    els.colour.classList.toggle('on', colourOn);
+    els.colour.title = colourOn
+      ? 'Marking the words you do not know — click to stop'
+      : 'Not marking unknown words — click to start';
+  }
+
+  /** Hide the switch entirely where the browser cannot do the marking at all. */
+  function noColour() {
+    if (els.colour) els.colour.remove();
   }
 
   // Same palette as the popup and the subtitles: one dark card colour, one
@@ -149,14 +178,26 @@ var LLLBar = (function () {
     '  padding: 2px 5px; background: none; border: 0; border-radius: 3px;',
     '  font: inherit; font-size: 13px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
-    'button:hover { background: #24262b; color: #dfe1e5; }'
+    'button:hover { background: #24262b; color: #dfe1e5; }',
+    // The switch wears the same underline it puts on the page, so what it does
+    // needs no explaining.
+    '.colour { font-size: 12px; }',
+    '.colour.on {',
+    '  color: #dba35f;',
+    '  text-decoration: underline;',
+    '  text-decoration-thickness: 2px;',
+    '  text-underline-offset: 2px;',
+    '}'
   ].join('\n');
 
   return {
     show: show,
     working: working,
     adjust: adjust,
-    onRefresh: function (fn) { onRefresh = fn; }
+    colour: colour,
+    noColour: noColour,
+    onRefresh: function (fn) { onRefresh = fn; },
+    onColour: function (fn) { onColour = fn; }
   };
 })();
 

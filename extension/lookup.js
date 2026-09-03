@@ -16,10 +16,13 @@
  * Map, so both exercise exactly this code.
  */
 
-// In the extension deinflect.js is loaded first and this is already a global;
-// under Node (the test suite) we pull it in ourselves.
+// In the extension these are loaded first and are already globals; under Node
+// (the test suite) we pull them in ourselves.
 if (typeof LLLDeinflect === 'undefined' && typeof require !== 'undefined') {
   var LLLDeinflect = require('./deinflect.js');
+}
+if (typeof LLLJapanese === 'undefined' && typeof require !== 'undefined') {
+  var LLLJapanese = require('./japanese.js');
 }
 
 var LLLLookup = (function () {
@@ -266,10 +269,6 @@ var LLLLookup = (function () {
     return false;
   }
 
-  // Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana — the
-  // same set content.js uses to decide where a word could start.
-  var JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
-
   /**
    * Read a passage from end to end and hand back the dictionary form of every
    * word in it, in order, the same word repeated as often as it is said.
@@ -290,14 +289,28 @@ var LLLLookup = (function () {
    * never seen.
    */
   async function extractTokens(text, db) {
+    var located = await locateTokens(text, db);
+    return located.map(function (token) { return token.word; });
+  }
+
+  /**
+   * The same reading, but saying where in the text each word was found.
+   *
+   * Colouring the words on a page needs to know not just which words are
+   * there but exactly which characters each one covers, so that the mark can
+   * be put back on the page in the right place. The positions are into the
+   * text as given, so whoever assembled that text can map them back to
+   * wherever it came from.
+   */
+  async function locateTokens(text, db) {
     var tokens = [];
     var i = 0;
     var steps = 0;
     while (i < text.length) {
-      if (!JAPANESE.test(text[i])) { i++; continue; }
+      if (!LLLJapanese.test(text[i])) { i++; continue; }
       var groups = await search(text.slice(i, i + MAX_SCAN), db);
       if (groups.length && groups[0].hits.length) {
-        tokens.push(groups[0].hits[0].word);
+        tokens.push({ word: groups[0].hits[0].word, start: i, length: groups[0].length });
         i += groups[0].length;
       } else {
         i++;
@@ -355,6 +368,7 @@ var LLLLookup = (function () {
     sharedPos: sharedPos,
     extractWords: extractWords,
     extractTokens: extractTokens,
+    locateTokens: locateTokens,
     coverage: coverage,
     MAX_SCAN: MAX_SCAN
   };

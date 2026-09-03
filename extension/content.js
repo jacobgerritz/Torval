@@ -41,8 +41,10 @@
     return false;
   }
 
-  // Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana.
-  const JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
+  // Hiragana, katakana, kanji, the repeat mark and halfwidth katakana — written
+  // down once, in japanese.js, because the hover, the reading of a whole passage
+  // and the marking of a page all have to agree on what counts.
+  const JAPANESE = LLLJapanese;
   const MAX_SCAN = 16;
   const SENTENCE_END = /[。．.！!？?…\n\r\t]/;
   const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'SELECT', 'TEXTAREA', 'OPTION']);
@@ -345,12 +347,19 @@
   // worth waiting for; everywhere else the ⟳ on the bar is the way to ask
   // again, since a page whose text keeps changing under you is rare enough not
   // to be worth watching for constantly.
-  const MAX_READ = 100000;   // characters — about an hour of speech, or a long article
-  let lastRead = '';
+  let lastTranscript = '';
   let readingPage = false;
 
-  function watchComprehension() {
-    LLLBar.onRefresh(() => { lastRead = ''; readPage(); });
+  async function watchComprehension() {
+    const canColour = typeof LLLHighlight !== 'undefined' && await LLLHighlight.start();
+    if (canColour) {
+      LLLBar.colour(LLLHighlight.isOn());
+      LLLBar.onColour(async () => LLLBar.colour(await LLLHighlight.toggle()));
+    } else {
+      LLLBar.noColour();
+    }
+
+    LLLBar.onRefresh(() => { lastTranscript = ''; readPage(); });
     setTimeout(readPage, 1500);   // let the page finish putting itself together
 
     // Subtitles arrive well after the page does, and replace it as the thing
@@ -367,32 +376,32 @@
   }
 
   /**
-   * The text this page is actually made of. A video's subtitles are the text
-   * of a video — the surrounding page is comments and titles and menus, none of
-   * which is what you came to watch.
+   * Read the page: what the bar says, and which words get marked.
+   *
+   * A video is measured against its transcript rather than against what is on
+   * screen — the point of the score is to say what is coming, and the page
+   * around the player is comments and menus, not the thing being watched. The
+   * marking still goes on the page, because that is where the words are.
+   *
+   * Everywhere else there is only the page, and reading it answers both
+   * questions at once, so it is read once.
    */
-  function pageText() {
-    if (typeof LLLSubtitles !== 'undefined') {
-      const lines = LLLSubtitles.allText();
-      if (lines) return lines;
-    }
-    return document.body ? document.body.innerText : '';
-  }
-
   async function readPage() {
     if (readingPage || !isCurrent()) return;
-    const text = pageText().slice(0, MAX_READ);
-    if (!text || text === lastRead) return;
-    lastRead = text;
-
     readingPage = true;
     LLLBar.working();
     try {
-      const reply = await api.runtime.sendMessage({ type: 'comprehension', text });
-      if (reply && reply.ok) LLLBar.show(reply.result);
-      else lastRead = '';   // the dictionary was still loading; try again later
+      const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
+      const score = typeof LLLHighlight !== 'undefined' ? await LLLHighlight.read() : null;
+
+      if (transcript && transcript !== lastTranscript) {
+        lastTranscript = transcript;
+        const reply = await api.runtime.sendMessage({ type: 'comprehension', text: transcript });
+        if (reply && reply.ok) return LLLBar.show(reply.result);
+      }
+      if (!transcript && score) LLLBar.show(score);
     } catch (err) {
-      lastRead = '';
+      lastTranscript = '';   // the dictionary was still loading; the next try may do better
     } finally {
       readingPage = false;
     }
@@ -675,7 +684,9 @@
       known = wanted;
       hit.known = wanted;
       paint();
+      // The score and every mark of that word on the page both answer at once.
       if (typeof LLLBar !== 'undefined') LLLBar.adjust(hit.word, wanted);
+      if (typeof LLLHighlight !== 'undefined') LLLHighlight.mark(hit.word, wanted);
     });
 
     function paint() {

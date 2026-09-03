@@ -41,6 +41,7 @@
   <p class="hint">English text should never trigger a lookup.</p>
 </main>
 
+<script src="../extension/japanese.js"></script>
 <script src="../extension/deinflect.js"></script>
 <script src="../extension/lookup.js"></script>
 <script>
@@ -102,7 +103,14 @@ const TAGS = {
 const known = new Set(['本', '人']);
 
 // --- stand in for the extension's messaging ---------------------------------
+let settings = {};
 window.browser = {
+  storage: {
+    local: {
+      async get(key) { return key in settings ? { [key]: settings[key] } : {}; },
+      async set(values) { Object.assign(settings, values); }
+    }
+  },
   runtime: {
     id: 'preview',
     getURL: (p) => '../extension/' + p,
@@ -118,6 +126,20 @@ window.browser = {
       if (msg.type === 'comprehension') {
         const tokens = await LLLLookup.extractTokens(msg.text, db);
         return { ok: true, result: LLLLookup.coverage(tokens, known) };
+      }
+      if (msg.type === 'wordPlaces') {
+        const tokens = await LLLLookup.locateTokens(msg.text, db);
+        const places = {};
+        const knownHere = [];
+        for (const t of tokens) {
+          if (!places[t.word]) {
+            places[t.word] = [];
+            if (known.has(t.word)) knownHere.push(t.word);
+          }
+          places[t.word].push(t.start, t.length);
+        }
+        const score = LLLLookup.coverage(tokens.map((t) => t.word), known);
+        return { ok: true, result: { ...score, places, knownHere } };
       }
       if (msg.type === 'lookup') {
         const groups = await LLLLookup.search(msg.text, db);
@@ -138,4 +160,5 @@ window.browser = {
 };
 </script>
 <script src="../extension/bar.js"></script>
+<script src="../extension/highlight.js"></script>
 <script src="../extension/content.js"></script>

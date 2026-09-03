@@ -239,6 +239,39 @@ async function comprehension(text) {
   return LLLLookup.coverage(tokens, await knownSet());
 }
 
+/**
+ * The same reading, plus exactly where on the page each word was — what
+ * colouring the unknown words needs.
+ *
+ * Positions are grouped by word rather than listed one after another, because
+ * every question asked of them afterwards is asked about a word: which places
+ * to mark, and which places stop being marked the moment that word is ticked
+ * as known. Each word's positions are a flat run of start, length, start,
+ * length — a list of pairs, without an object per pair, because a dense page
+ * has thousands of them and they are only ever read in order.
+ */
+async function wordPlaces(text) {
+  await requireDictionary();
+  const tokens = await LLLLookup.locateTokens(text, cachingReader());
+  const known = await knownSet();
+
+  const places = {};
+  const knownHere = [];
+  for (const token of tokens) {
+    if (!places[token.word]) {
+      places[token.word] = [];
+      if (known.has(token.word)) knownHere.push(token.word);
+    }
+    places[token.word].push(token.start, token.length);
+  }
+
+  // The score comes back too. This is the same passage the bar is asking
+  // about, and reading a page twice over to answer two questions about it
+  // would be silly.
+  const score = LLLLookup.coverage(tokens.map((t) => t.word), known);
+  return { total: score.total, known: score.known, counts: score.counts, places, knownHere };
+}
+
 // ---------------------------------------------------------------------------
 // Known words
 // ---------------------------------------------------------------------------

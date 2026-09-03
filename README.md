@@ -303,10 +303,40 @@ different unknown words in it, and a score that could not tell those apart
 would not be worth reading.
 
 Pressing **✓** in the popup moves the number immediately — a word's count is
-exactly how far the bar shifts, so nothing has to be read a second time. **⟳**
-reads the page again, **⚙** opens the settings, **×** hides the bar until the
-page is reloaded. It hides itself while a video is full screen, and never
-appears at all on a page with no Japanese on it.
+exactly how far the bar shifts, so nothing has to be read a second time. **あ**
+turns the marking below on and off, **⟳** reads the page again, **⚙** opens the
+settings, **×** hides the bar until the page is reloaded. It hides itself while
+a video is full screen, and never appears at all on a page with no Japanese on
+it.
+
+---
+
+## Marking the words you do not know
+
+The bar says how much of a page you know. The page itself says which parts you
+do not: every word not in your list gets a soft underline where it stands, and
+a video's subtitle line is re-marked as each line arrives.
+
+**Nothing on the page is altered to do it.** The obvious way to colour a word
+is to wrap it in a `<span>`, and that is how this has always been done — but a
+page's own scripts own that DOM, and quietly inserting thousands of elements
+into it breaks sites in ways that are miserable to track down: React re-renders,
+`:first-child` rules start matching something else, and a click handler bound to
+a node that no longer exists silently stops working.
+
+The browser has a way to paint text without owning it. A `Range` describes a
+stretch of characters without being part of the document, a `Highlight` is a set
+of them, and `::highlight()` styles the lot. One `<style>` element is added and
+that is the whole of LLL's footprint on the page, so there is nothing for a site
+to trip over and turning it off is one line rather than an unpicking job.
+
+Firefox has had this since **version 140**. On anything older the marking is
+skipped, the **あ** switch does not appear, and everything else works as before —
+rewriting a page's DOM is not something to fall back on quietly.
+
+Pressing **✓** on a word clears its mark everywhere on the page at once, which
+is why the reading keeps *where* each word was rather than only how many there
+were.
 
 ---
 
@@ -343,6 +373,12 @@ looks the same everywhere.
 **`extension/video.js`** — replaying a line to record it, and grabbing the frame.
 
 **`extension/bar.js`** — the comprehension bar across the top of the page.
+
+**`extension/highlight.js`** — marking the unknown words, without touching the
+page's own DOM.
+
+**`extension/japanese.js`** — what counts as a Japanese character. One line, in
+a file of its own, because four separate parts of LLL have to agree on it.
 
 **`extension/options.js`** — the settings page, and switching between its tabs.
 
@@ -383,9 +419,6 @@ would otherwise invent words that do not exist.
 
 In rough order of intent:
 
-- **Colouring the words themselves.** The bar says how much of a page you know;
-  it does not say *which* words. Marking the unknown ones on the page, the way
-  Migaku does, is the obvious next step from here.
 - **Packaging.** Sign it, so it survives a Firefox restart.
 
 ---

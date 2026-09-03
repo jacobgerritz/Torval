@@ -17,6 +17,7 @@
   ],
   "background": {
     "scripts": [
+      "japanese.js",
       "deinflect.js",
       "lookup.js",
       "anki.js",
@@ -30,9 +31,11 @@
         "<all_urls>"
       ],
       "js": [
+        "japanese.js",
         "subtitles.js",
         "video.js",
         "bar.js",
+        "highlight.js",
         "content.js"
       ],
       "run_at": "document_idle",
