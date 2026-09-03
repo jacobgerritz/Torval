@@ -41,7 +41,6 @@ api.runtime.onMessage.addListener((message) => {
     case 'status': return Promise.resolve({ status });
     case 'tags':   return loadTags();
     case 'ankiAdd':      return ankiAdd(message.note);
-    case 'wantsMedia':   return wantsMedia();
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     default:       return undefined;
@@ -57,16 +56,6 @@ if (api.action && api.action.onClicked) {
 async function guard(fn) {
   try { return { ok: true, result: await fn() }; }
   catch (err) { return { ok: false, error: err.message }; }
-}
-
-/**
- * Whether any card field is pointed at a video frame or the line's audio.
- * Recording is not free, so a page only starts doing it when it would be used.
- */
-async function wantsMedia() {
-  const { ankiConfig } = await api.storage.local.get('ankiConfig');
-  const fields = (ankiConfig && ankiConfig.fields) || {};
-  return Object.keys(fields).some((f) => fields[f] === 'image' || fields[f] === 'sentenceAudio');
 }
 
 async function ankiAdd(note) {

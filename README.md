@@ -144,27 +144,37 @@ rather than making a second card.
 
 ---
 
-## Mining from video
+## Subtitles, and mining from video
 
-Point at a word in a subtitle and press **+**, and the card also gets the frame
-you were looking at and the audio of the line being said.
+On YouTube, LLL fetches the Japanese subtitle track and draws it itself. **Turn
+YouTube's own captions off**; these replace them. They are ordinary text, so
+Shift-hovering them works exactly like hovering anything else.
 
-The audio is the awkward half. By the time you have hovered a word and decided
-to mine it, the line has already been spoken, and you cannot record the past. So
-LLL records ahead of you: when a subtitle appears it starts recording, and when
-the subtitle changes it stops and keeps the clip. Pressing **+** hands over a
-recording made before you asked for it. Only the current line and the one before
-are kept, and none of it runs unless a card field is actually pointed at it.
+The point is not the look of them, it is that LLL then knows precisely when each
+line runs from and to. That is what makes the audio clean.
 
-Pausing to read is the normal way to do this and it works: the clip is matched
-to the line by its text, so mining a line the video has already moved past still
-gets that line's audio rather than whatever is on screen now.
+Pressing **+** on a word in a subtitle also puts on the card the frame you were
+looking at and the audio of that line. The frame is taken the instant you press
+it, before anything moves. The audio is taken by replaying the line: the video
+is sent back to the start of it, recorded to the end of it, and put back exactly
+as it was — same moment, same speed, same paused or playing.
+
+It happens in silence. Muting the video does not mute what is captured from it,
+because the stream is taken before the speakers, so the line is replayed at full
+volume into the recording and at no volume into the room. It takes as long as
+the line does — a couple of seconds — and what comes out is exactly the line.
+
+Playback speed is forced to normal while it records, since a line captured at
+1.5× is a line spoken at 1.5×.
 
 **Content-protected video cannot be captured.** Netflix, Prime Video and Disney+
 hand their video to the browser's DRM layer, and both the frame and the audio
 come back empty — that is what the protection is for, not a limitation to be
-worked around. YouTube and ordinary video elements are fine. Where capture is
-refused the card is still made, just without the media.
+worked around. Where capture is refused the card is still made, without media.
+
+Two smaller limits: subtitles are YouTube-only for now, and a line beginning in
+the first half-second of a video gets a little silence in front of it, because
+there is no room to get playback going before the line starts.
 
 ---
 
@@ -196,7 +206,9 @@ looks the same everywhere.
 
 **`extension/pitch.js`** — pitch accents, and drawing them.
 
-**`extension/video.js`** — recording the subtitle line and grabbing the frame.
+**`extension/subtitles.js`** — fetching YouTube's subtitle track and drawing it.
+
+**`extension/video.js`** — replaying a line to record it, and grabbing the frame.
 
 **`extension/options.js`** — the settings page.
 

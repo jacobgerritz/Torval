@@ -84,9 +84,11 @@
 
   // Recording ahead of the user costs something, so ask first whether any card
   // field is pointed at a video frame or the line's audio.
-  api.runtime.sendMessage({ type: 'wantsMedia' })
-    .then((yes) => { if (yes && typeof LLLVideo !== 'undefined') LLLVideo.enable(); })
-    .catch(() => {});
+  // LLL draws its own subtitles, so it knows exactly when each line runs from
+  // and to — which is what lets it record the line itself rather than an
+  // approximation of it. They are meant to replace YouTube's, so they are drawn
+  // whether or not anything is being mined. Recording only happens on demand.
+  if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.enable();
 
   // Fetched now rather than linked from the shadow root, because a <link> loads
   // asynchronously: the first popup would be measured and positioned while it
@@ -593,8 +595,12 @@
     const old = entryEl.querySelector('.error');
     if (old) old.remove();
 
+    // The line's exact timing comes from LLL's own subtitles; the video is sent
+    // back over it to record it, so this takes as long as the line does.
+    const sentence = context ? context.text : '';
+    const cue = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.cueFor(sentence) : null;
     const media = typeof LLLVideo !== 'undefined'
-      ? await LLLVideo.capture(context ? context.text : '')
+      ? await LLLVideo.capture(sentence, cue)
       : {};
 
     const note = {

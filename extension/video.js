@@ -1,24 +1,28 @@
 /*
  * LLL — capturing from video
  *
- * Mining a line from a video needs two things a dictionary lookup does not: the
- * frame you were looking at, and the audio of the line being spoken.
+ * Two things come off the screen when you mine a line: the frame you were
+ * looking at, and the line being spoken.
  *
- * The frame is easy — draw the video onto a canvas at the moment you press "+".
+ * The frame is taken the instant you press "+", before anything else moves.
  *
- * The audio is the awkward one, because by the time you have hovered a word and
- * decided to mine it, the line has already been said. You cannot record the past.
- * So LLL records ahead of you: whenever a subtitle appears it starts recording,
- * and when the subtitle changes it stops and keeps that clip in memory. Pressing
- * "+" hands over a recording that was made before you asked for it.
+ * The audio is taken by replaying the line. Knowing exactly when the line runs
+ * from and to — which is why LLL fetches the subtitles itself — the video is
+ * sent back to the start of it, recorded to the end of it, and put back where it
+ * was: same moment, same speed, same paused or playing.
  *
- * Only the current line and the one before it are kept, and recording only runs
- * at all when a card field is actually pointed at the audio.
+ * It happens in silence. Muting the element does not mute what is captured from
+ * it, because the stream is taken before the speakers — so the line is replayed
+ * at full volume into the recording and at no volume into the room. It takes as
+ * long as the line does, and what comes out is exactly the line, with no
+ * guessing about where the speech began.
+ *
+ * The earlier design recorded continuously in case you might mine something.
+ * This one records only what you asked for.
  *
  * DRM is a hard limit. Netflix, Prime Video and Disney+ hand the video to the
- * browser's content protection layer, and everything here — canvas and audio
- * alike — comes back empty. That is what the protection is for. Ordinary video
- * elements, YouTube included, are fine.
+ * browser's content protection layer, and both the canvas and the audio come
+ * back empty. That is what the protection is for. YouTube is fine.
  */
 
 var LLLVideo = (function () {
@@ -26,16 +30,15 @@ var LLLVideo = (function () {
 
   var MAX_WIDTH = 1280;         // frames are scaled down to this before saving
   var JPEG_QUALITY = 0.82;
-  var MAX_CLIP_MS = 20000;      // a subtitle that never changes is not a line
+  var MAX_CLIP_SECONDS = 20;    // no subtitle line is longer than this
+  // Seeking then playing does not start the sound instantly, and a recorder
+  // started before it does captures the silence. So playback is resumed a
+  // moment early and recording begins once the video has actually reached the
+  // line — the run-up is played, not recorded.
+  var PREROLL_SECONDS = 0.6;
 
-  var enabled = false;
-  var video = null;
   var stream = null;
-  var recorder = null;
-  var recording = null;         // { text, startedAt }
-  var finished = [];            // the last couple of completed clips
-  var observer = null;
-  var lastCaption = '';
+  var streamFor = null;
 
   function mimeType() {
     var types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
@@ -45,28 +48,7 @@ var LLLVideo = (function () {
     return '';
   }
 
-  /** Begin watching this page. Safe to call on pages with no video at all. */
-  function enable() {
-    if (enabled) return;
-    enabled = true;
-    look();
-    // Videos and their subtitles arrive long after the page does, and survive
-    // navigation within a single-page site like YouTube, so keep looking.
-    setInterval(look, 2000);
-  }
-
-  function look() {
-    if (!enabled) return;
-    var found = biggestVideo();
-    if (found !== video) {
-      teardown();
-      video = found;
-    }
-    if (video && !observer) watchCaptions();
-    pollCaption();
-  }
-
-  function biggestVideo() {
+  function currentVideo() {
     var best = null;
     var bestArea = 0;
     var videos = document.querySelectorAll('video');
@@ -78,142 +60,48 @@ var LLLVideo = (function () {
     return best;
   }
 
-  // -------------------------------------------------------------------------
-  // Following the subtitles
-  // -------------------------------------------------------------------------
-
   /**
-   * Where the current subtitle line is. Sites that use a real <track> expose
-   * their cues properly; YouTube draws its own captions into the page, so those
-   * have to be read off the screen.
+   * The video's audio as a stream. Kept between captures: asking an element for
+   * its stream repeatedly is wasteful, and on some pages disruptive.
    */
-  function captionText() {
-    if (video && video.textTracks) {
-      for (var i = 0; i < video.textTracks.length; i++) {
-        var track = video.textTracks[i];
-        if (track.mode === 'disabled' || !track.activeCues) continue;
-        var parts = [];
-        for (var c = 0; c < track.activeCues.length; c++) {
-          parts.push(track.activeCues[c].text);
-        }
-        if (parts.length) return parts.join(' ').replace(/\s+/g, ' ').trim();
-      }
-    }
-    var drawn = document.querySelector('.ytp-caption-window-container, .captions-text');
-    return drawn ? drawn.textContent.replace(/\s+/g, ' ').trim() : '';
-  }
-
-  function watchCaptions() {
-    var container = document.querySelector('.ytp-caption-window-container, .captions-text');
-    if (!container) return;
-    observer = new MutationObserver(pollCaption);
-    observer.observe(container, { childList: true, subtree: true, characterData: true });
-  }
-
-  function pollCaption() {
-    if (!enabled || !video) return;
-    var text = captionText();
-    if (text === lastCaption) {
-      // A line that has been up for an implausibly long time is a stuck caption,
-      // not speech; cut it off rather than recording minutes of audio.
-      if (recording && Date.now() - recording.startedAt > MAX_CLIP_MS) stopRecording();
-      return;
-    }
-    lastCaption = text;
-    stopRecording();
-    if (text) startRecording(text);
-  }
-
-  // -------------------------------------------------------------------------
-  // Recording
-  // -------------------------------------------------------------------------
-
-  function audioStream() {
-    if (stream) return stream;
-    if (!video) return null;
+  function audioStream(video) {
+    if (stream && streamFor === video) return stream;
     try {
       var capture = video.captureStream ? video.captureStream() : video.mozCaptureStream();
       var tracks = capture.getAudioTracks();
       if (!tracks.length) return null;
       stream = new MediaStream(tracks);
+      streamFor = video;
       return stream;
     } catch (err) {
-      // Content-protected video refuses to be captured. Nothing to be done.
-      return null;
+      return null;   // content-protected video refuses to be captured
     }
   }
 
-  function startRecording(text) {
-    var type = mimeType();
-    var source = audioStream();
-    if (!type || !source) return;
-
-    var rec;
-    try {
-      rec = new MediaRecorder(source, { mimeType: type });
-    } catch (err) {
-      return;
-    }
-
-    // Each recorder keeps its own chunks. Sharing them was a real bug: stopping
-    // a recorder fires its onstop *later*, and by then the next line had already
-    // started and cleared the list — so a finished clip was assembled out of the
-    // next clip's fragments, with no file header, and came out unplayable.
-    var collected = [];
-    var info = { text: text, startedAt: Date.now() };
-
-    rec.ondataavailable = function (e) { if (e.data && e.data.size) collected.push(e.data); };
-    rec.onstop = function () {
-      if (!collected.length) return;
-      finished.unshift({ text: info.text, blob: new Blob(collected, { type: type }) });
-      finished = finished.slice(0, 2);
-    };
-
-    recorder = rec;
-    recording = info;
-    // No timeslice: one blob delivered whole at the end, rather than a series of
-    // fragments that only mean anything if every one of them survives.
-    try { rec.start(); } catch (err) { recorder = null; recording = null; }
-  }
-
-  function stopRecording() {
-    if (recorder && recorder.state !== 'inactive') {
-      try { recorder.stop(); } catch (err) { /* already gone */ }
-    }
-    recorder = null;
-    recording = null;
-  }
-
-  function teardown() {
-    stopRecording();
-    if (observer) { observer.disconnect(); observer = null; }
-    stream = null;
-    finished = [];
-    lastCaption = '';
-  }
-
-  // -------------------------------------------------------------------------
-  // Handing it over
   // -------------------------------------------------------------------------
 
   /**
-   * The frame and the audio for `sentence`, as far as either can be had.
-   * Returns {} when there is no video, or when the video refuses to be read.
+   * The frame and the audio for a line. `cue` carries its start and end in
+   * seconds; without one there is no audio, only the frame.
+   * Returns {} where there is no video, or where the video refuses to be read.
    */
-  async function capture(sentence) {
-    if (!enabled || !video) return {};
+  async function capture(sentence, cue) {
+    var video = currentVideo();
+    if (!video) return {};
     var out = {};
 
-    var frame = grabFrame();
+    // Before anything moves: the picture you were actually looking at.
+    var frame = grabFrame(video);
     if (frame) out.image = { filename: name(sentence, 'jpg'), data: frame };
 
-    var clip = await grabAudio(sentence);
-    if (clip) out.sentenceAudio = { filename: name(sentence, 'webm'), data: clip };
-
+    if (cue && cue.end > cue.start) {
+      var clip = await record(video, cue.start, cue.end);
+      if (clip) out.sentenceAudio = { filename: name(sentence, 'webm'), data: await toBase64(clip) };
+    }
     return out;
   }
 
-  function grabFrame() {
+  function grabFrame(video) {
     if (!video.videoWidth) return null;
     var scale = Math.min(1, MAX_WIDTH / video.videoWidth);
     var canvas = document.createElement('canvas');
@@ -228,45 +116,90 @@ var LLLVideo = (function () {
   }
 
   /**
-   * The clip for this line. Prefers one whose subtitle matches the sentence
-   * being mined, so pausing, reading, and mining a moment later still gets the
-   * right audio rather than whatever is on screen now.
+   * Replay `start` to `end` and record it, then put the video back exactly as
+   * it was — same moment, same speed, same paused or playing.
+   *
+   * Speed is forced to normal for the duration: a line captured at 1.5x is a
+   * line spoken at 1.5x, which is not what you want on a card.
    */
-  async function grabAudio(sentence) {
-    // Mining a line that is still on screen: stop recording it now, and wait for
-    // the file to actually be finished rather than guessing at how long that
-    // takes. MediaRecorder hands the blob over on its own schedule.
-    if (recording && overlaps(recording.text, sentence)) {
-      var wanted = recording.text;
-      stopRecording();
-      await until(function () {
-        return finished.some(function (clip) { return clip.text === wanted; });
-      });
+  async function record(video, start, end) {
+    var type = mimeType();
+    var source = audioStream(video);
+    if (!type || !source) return null;
+
+    var wasPaused = video.paused;
+    var wasTime = video.currentTime;
+    var wasRate = video.playbackRate;
+    var wasMuted = video.muted;
+    var length = Math.min(end - start, MAX_CLIP_SECONDS);
+
+    var recorder;
+    try {
+      recorder = new MediaRecorder(source, { mimeType: type });
+    } catch (err) {
+      return null;
     }
-    var match = finished.find(function (clip) { return overlaps(clip.text, sentence); });
-    var clip = match || finished[0];
-    return clip ? blobToBase64(clip.blob) : null;
+
+    var chunks = [];
+    recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    var finished = new Promise(function (resolve) { recorder.onstop = resolve; });
+
+    try {
+      // Muting the element does not mute what is captured from it — the stream
+      // is taken before the speakers. So the line is replayed in silence: the
+      // recording is full volume, and you hear nothing.
+      video.muted = true;
+      video.playbackRate = 1;
+      video.currentTime = Math.max(0, start - PREROLL_SECONDS);
+      await seeked(video);
+      await video.play();
+
+      // Watch the clock rather than trusting a timer: buffering, or a frame
+      // dropped, would otherwise cut the line short at either end.
+      await until(function () { return video.currentTime >= start; }, 5000);
+      recorder.start();
+      await until(function () { return video.currentTime >= start + length; },
+        length * 1000 + 5000);
+      recorder.stop();
+      await finished;
+    } catch (err) {
+      try { recorder.stop(); } catch (ignored) { /* already stopped */ }
+      return null;
+    } finally {
+      restore(video, wasTime, wasRate, wasPaused, wasMuted);
+    }
+
+    return chunks.length ? new Blob(chunks, { type: type }) : null;
+  }
+
+  function restore(video, time, rate, paused, muted) {
+    try {
+      video.playbackRate = rate;
+      video.muted = muted;
+      video.currentTime = time;
+      if (paused) video.pause(); else video.play();
+    } catch (err) { /* the page took the video away mid-capture */ }
+  }
+
+  function seeked(video) {
+    return new Promise(function (resolve) {
+      var done = function () { video.removeEventListener('seeked', done); resolve(); };
+      video.addEventListener('seeked', done);
+      setTimeout(done, 3000);
+    });
   }
 
   function until(done, limit) {
-    var deadline = Date.now() + (limit || 800);
+    var deadline = Date.now() + limit;
     return new Promise(function (resolve) {
       (function poll() {
         if (done() || Date.now() > deadline) return resolve();
-        setTimeout(poll, 20);
+        setTimeout(poll, 40);
       })();
     });
   }
 
-  /** Subtitles and page text disagree about spacing and line breaks; ignore both. */
-  function overlaps(caption, sentence) {
-    if (!caption || !sentence) return false;
-    var a = caption.replace(/\s+/g, '');
-    var b = sentence.replace(/[\s​]+/g, '').replace(/<[^>]*>/g, '');
-    return a.indexOf(b) !== -1 || b.indexOf(a) !== -1;
-  }
-
-  function blobToBase64(blob) {
+  function toBase64(blob) {
     return new Promise(function (resolve) {
       var reader = new FileReader();
       reader.onloadend = function () { resolve(String(reader.result).split(',')[1] || null); };
@@ -285,7 +218,7 @@ var LLLVideo = (function () {
     return 'lll-' + (hash >>> 0).toString(36) + '.' + extension;
   }
 
-  return { enable: enable, capture: capture, overlaps: overlaps, name: name };
+  return { capture: capture, record: record, currentVideo: currentVideo, name: name };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = LLLVideo;

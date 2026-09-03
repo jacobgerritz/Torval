@@ -2,80 +2,86 @@
 <meta charset="utf-8">
 <title>LLL video capture test</title>
 <!--
-  Exercises extension/video.js against a real video element, without needing
-  YouTube or a video file.
+  Exercises extension/video.js against a real, seekable video, without needing
+  YouTube or a video file on disk.
 
       node tools/serve.mjs   ->  http://localhost:8137/tools/video-preview.html
 
-  The video is a canvas being drawn to, and its audio is a tone; both are real
-  MediaStreams, so captureStream and MediaRecorder do exactly what they would do
-  on a real page. The captions are a div that changes text on a timer, named the
-  way YouTube names its caption container.
+  A few seconds of canvas and tone are recorded once, up front, into an actual
+  webm — so the <video> below has a duration and can be seeked, which a live
+  canvas stream cannot. The tone changes pitch every second, so a clip taken
+  from 4s to 6s can be told apart from one taken from 1s to 3s by listening, or
+  by looking at its frequencies.
 
   What this cannot test is content-protected video, where capture is refused by
-  design. Nothing can test that except trying it on Netflix and seeing black.
+  design, and YouTube's own subtitle data, which only answers to youtube.com.
 -->
 <style>
   body { margin: 0; padding: 24px; background: #0f1012; color: #d9dade;
          font: 13px/1.6 -apple-system, "Segoe UI", sans-serif; }
-  video { width: 320px; background: #000; border-radius: 4px; }
-  .ytp-caption-window-container { margin: 12px 0; font-size: 18px; }
+  video { width: 300px; background: #000; border-radius: 4px; }
   pre { background: #17181b; padding: 12px; border-radius: 4px; white-space: pre-wrap; }
-  button { padding: 6px 14px; background: #24262b; color: #e7e8ea;
-           border: 1px solid #34373d; border-radius: 4px; font: inherit; cursor: pointer; }
 </style>
 
 <h3>LLL video capture</h3>
-<video id="v" muted autoplay playsinline></video>
-<div class="ytp-caption-window-container"></div>
-<p><button id="go">capture the current line</button></p>
-<pre id="out">…</pre>
+<video id="v" controls playsinline muted></video>
+<pre id="out">building a test video…</pre>
 
 <script src="../extension/video.js"></script>
 <script>
-const LINES = ['日本語を勉強しています。', '図書館で本を読んでいました。', '食べなかったので、お腹が空いた。'];
+const SECONDS = 8;
+const out = document.getElementById('out');
+const video = document.getElementById('v');
 
-// A moving picture and a tone, as real media streams.
-const canvas = Object.assign(document.createElement('canvas'), { width: 320, height: 180 });
-const ctx = canvas.getContext('2d');
-let frame = 0;
-setInterval(() => {
-  ctx.fillStyle = `hsl(${(frame * 4) % 360} 40% 25%)`;
-  ctx.fillRect(0, 0, 320, 180);
-  ctx.fillStyle = '#fff';
-  ctx.font = '24px sans-serif';
-  ctx.fillText('frame ' + frame++, 20, 100);
-}, 40);
+// --- make a real webm, so the video has a timeline that can be seeked --------
+window.ready = (async () => {
+  video.muted = true;   // this page must never make a sound; capture is unaffected
+  const canvas = Object.assign(document.createElement('canvas'), { width: 240, height: 135 });
+  const ctx = canvas.getContext('2d');
+  const audio = new AudioContext();
+  const tone = audio.createOscillator();
+  const dest = audio.createMediaStreamDestination();
+  tone.connect(dest);     // to the recording only, never to the speakers
+  tone.start();
 
-const audio = new AudioContext();
-const tone = audio.createOscillator();
-const dest = audio.createMediaStreamDestination();
-tone.frequency.value = 220;
-tone.connect(dest);
-tone.start();
+  const stream = canvas.captureStream(20);
+  dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
 
-const stream = canvas.captureStream(25);
-dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
-document.getElementById('v').srcObject = stream;
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+  const chunks = [];
+  recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+  const done = new Promise((r) => { recorder.onstop = r; });
+  recorder.start();
 
-// Captions that change on a timer, the way subtitles do.
-const captions = document.querySelector('.ytp-caption-window-container');
-let line = 0;
-const next = () => { captions.textContent = LINES[line++ % LINES.length]; };
-next();
-setInterval(next, 3000);
+  const started = performance.now();
+  // A timer, not requestAnimationFrame: rAF does not fire when the pane showing
+  // this page is hidden, and the build would simply never finish.
+  await new Promise((resolve) => {
+    const timer = setInterval(() => {
+      const t = (performance.now() - started) / 1000;
+      if (t >= SECONDS) { clearInterval(timer); return resolve(); }
+      // A different pitch each second, so a clip can be identified by its sound.
+      tone.frequency.setValueAtTime(200 + Math.floor(t) * 150, audio.currentTime);
+      ctx.fillStyle = `hsl(${Math.floor(t) * 40} 45% 22%)`;
+      ctx.fillRect(0, 0, 240, 135);
+      ctx.fillStyle = '#fff';
+      ctx.font = '28px sans-serif';
+      ctx.fillText(t.toFixed(1) + 's', 20, 78);
+    }, 40);
+  });
 
-LLLVideo.enable();
+  recorder.stop();
+  await done;
+  tone.stop();
 
-document.getElementById('go').addEventListener('click', async () => {
-  const out = document.getElementById('out');
-  const sentence = captions.textContent;
-  out.textContent = 'capturing "' + sentence + '" …';
-  const media = await LLLVideo.capture(sentence);
-  out.textContent = JSON.stringify({
-    sentence,
-    image: media.image && { filename: media.image.filename, bytes: Math.round(media.image.data.length * 0.75) },
-    audio: media.sentenceAudio && { filename: media.sentenceAudio.filename, bytes: Math.round(media.sentenceAudio.data.length * 0.75) }
-  }, null, 2);
-});
+  video.src = URL.createObjectURL(new Blob(chunks, { type: 'video/webm' }));
+  await new Promise((r) => { video.onloadeddata = r; });
+  // Firefox and Chromium both report Infinity for a recorded webm's duration
+  // until it is seeked past the end at least once.
+  video.currentTime = 1e6;
+  await new Promise((r) => { video.onseeked = r; });
+  video.currentTime = 0;
+  out.textContent = 'ready — ' + SECONDS + 's of video, seekable';
+  return true;
+})();
 </script>

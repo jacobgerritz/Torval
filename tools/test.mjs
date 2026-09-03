@@ -23,6 +23,7 @@ const Deinflect = require(join(ROOT, 'extension', 'deinflect.js'));
 const Anki = require(join(ROOT, 'extension', 'anki.js'));
 const Pitch = require(join(ROOT, 'extension', 'pitch.js'));
 const Video = require(join(ROOT, 'extension', 'video.js'));
+const Subs = require(join(ROOT, 'extension', 'subtitles.js'));
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
@@ -503,31 +504,58 @@ const run = async () => {
   check('Pitch is guessed from the field name',
     Anki.guessMapping(['Pitch'])['Pitch'] === 'pitch');
 
-  // --- video capture -----------------------------------------------------
-  // Pausing to read, then mining a moment later, must still get the audio of
-  // the line you were reading — so a clip is matched to the sentence by text.
-  // Subtitles and page text disagree about spacing, so spacing is ignored.
-  check('a clip is matched to the line it belongs to',
-    Video.overlaps('食べなかったので、お腹が空いた。', '食べなかったので、お腹が空いた。'));
-  check('spacing differences do not break the match',
-    Video.overlaps('食べなかったので、 お腹が空いた。', '食べなかったので、お腹が空いた。'));
-  check('a sentence cut short by a block boundary still matches its caption',
-    Video.overlaps('食べなかったので、お腹が空いた。', '食べなかったので'));
-  check('a different line does not match',
-    !Video.overlaps('図書館で本を読んでいました。', '食べなかったので、お腹が空いた。'));
-  check('an empty caption matches nothing',
-    !Video.overlaps('', '食べなかった') && !Video.overlaps('食べなかった', ''));
+  // --- subtitles ---------------------------------------------------------
+  // YouTube's json3: events with a start, a length and the text in pieces.
+  const parsed = Subs.parse({ events: [
+    { tStartMs: 1000, dDurationMs: 2000, segs: [{ utf8: '日本語を' }, { utf8: '勉強しています。' }] },
+    { tStartMs: 3000, dDurationMs: 2500, segs: [{ utf8: '図書館で' }, { utf8: '本を読んでいました。' }] },
+    { tStartMs: 9000, dDurationMs: 1000, segs: [{ utf8: '  ' }] },              // blank
+    { tStartMs: 12000, dDurationMs: 2000, segs: [{ utf8: '食べなかった' }] },
+    { tStartMs: 20000 }                                                         // no text at all
+  ] });
+  check('subtitle pieces are joined into whole lines',
+    parsed.length === 3 && parsed[0].text === '日本語を勉強しています。',
+    JSON.stringify(parsed.map((c) => c.text)));
+  check('blank and empty events are dropped',
+    !parsed.some((c) => !c.text.trim()), JSON.stringify(parsed.map((c) => c.text)));
+  check('times are seconds, not milliseconds',
+    parsed[0].start === 1 && parsed[0].end === 3, JSON.stringify(parsed[0]));
 
+  // Overlapping events would make a recording run into the following line.
+  const overlapping = Subs.parse({ events: [
+    { tStartMs: 0, dDurationMs: 5000, segs: [{ utf8: 'まず' }] },
+    { tStartMs: 3000, dDurationMs: 2000, segs: [{ utf8: 'つぎ' }] }
+  ] });
+  check('a line ends where the next begins',
+    overlapping[0].end === 3, JSON.stringify(overlapping));
+
+  Subs._setCues(parsed);
+  check('the line playing at a given moment is found',
+    Subs.cueAt(1.5).text === '日本語を勉強しています。' && Subs.cueAt(4).text.startsWith('図書館'),
+    JSON.stringify([Subs.cueAt(1.5), Subs.cueAt(4)]));
+  check('a gap between lines is a gap', Subs.cueAt(7) === null);
+  check('scanning backwards works as well as forwards',
+    Subs.cueAt(13).text === '食べなかった' && Subs.cueAt(1.5).text.startsWith('日本語'));
+
+  // Mining happens after pausing to read, so the line is found by its text.
+  check('a sentence is matched back to its line',
+    Subs.cueFor('図書館で本を読んでいました。').start === 3,
+    JSON.stringify(Subs.cueFor('図書館で本を読んでいました。')));
+  check('a sentence cut short by a block boundary still matches',
+    Subs.cueFor('図書館で本を').start === 3);
+  check('the bolded sentence from a card still matches',
+    Subs.cueFor('<b>食べなかった</b>').start === 12);
+
+  // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its
   // files instead of filling the collection with copies.
   const name1 = Video.name('食べなかったので、お腹が空いた。', 'jpg');
-  const name2 = Video.name('食べなかったので、お腹が空いた。', 'jpg');
-  check('the same line gets the same filename', name1 === name2, name1 + ' vs ' + name2);
+  check('the same line gets the same filename',
+    name1 === Video.name('食べなかったので、お腹が空いた。', 'jpg'));
   check('a different line gets a different one',
     Video.name('図書館で本を読んでいました。', 'jpg') !== name1);
   check('filenames survive any filesystem', /^lll-[a-z0-9]+\.jpg$/.test(name1), name1);
-  check('the extension is kept',
-    Video.name('x', 'webm').endsWith('.webm'));
+  check('the extension is kept', Video.name('x', 'webm').endsWith('.webm'));
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',
