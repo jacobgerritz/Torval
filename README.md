@@ -21,9 +21,15 @@ node tools/build-dict.mjs
 **2. Load it into Firefox.** Go to `about:debugging` → *This Firefox* → *Load
 Temporary Add-on…* and pick `extension/manifest.json`.
 
-The first time it runs, the extension spends a minute copying the dictionary
-into the browser's own storage. A percentage shows on the toolbar button while
-it does. That happens once, not once per session.
+The first time it runs, the extension spends a minute or so copying the
+dictionary into the browser's own storage — 218,000 entries and 465,000
+searchable forms. A percentage shows on the toolbar button while it does, and
+until it reaches the end, hovering a word says so rather than answering.
+
+This happens once, not once per session. It happens again only when the
+dictionary format changes, which the version number in `meta.json` decides.
+Progress is written down as it goes, so if it is interrupted it carries on from
+where it stopped rather than starting over.
 
 Temporary add-ons are removed when Firefox restarts, so you will need to load it
 again each time until it is packaged and signed. That is a step for later.

@@ -22,7 +22,10 @@ const DB_VERSION = 1;
 const ENTRIES = 'entries';
 const INDEX = 'index';
 const STATE = 'state';
-const BATCH = 20000;   // rows per write; keeps memory flat during the import
+// Rows per write. Smaller batches mean shorter transactions and a percentage
+// that actually moves, which matters: the import used to jump in whole-chunk
+// steps and sat on one number long enough to look frozen.
+const BATCH = 5000;
 
 let ready = null;              // promise for the open, populated database
 let tagsPromise = null;
@@ -147,48 +150,77 @@ async function start() {
   return db;
 }
 
+/**
+ * Copy the dictionary into IndexedDB.
+ *
+ * This has to survive being killed half way. Firefox shuts a background script
+ * down when it looks idle, and grinding through a six megabyte chunk without
+ * calling any browser API looks exactly like idling — so an import that had to
+ * run start to finish in one go could simply stop, with nothing to show for the
+ * work already done.
+ *
+ * So progress is written down as it happens: after every chunk, a record says
+ * how far we got. Being killed then costs one chunk, not the whole import, and
+ * the next start picks up where this one left off. Each batch also nudges the
+ * badge, which is a browser API call, which is what tells Firefox we are alive.
+ */
 async function importDictionary(db, meta) {
-  status = { state: 'loading', progress: 0 };
-  setBadge('0%');
-
-  // Clear the marker first. If the import is interrupted half way, the next
-  // start sees no marker and simply does it again rather than serving a
-  // half-built dictionary.
-  await run(db, STATE, 'readwrite', (store) => store.delete('meta'));
-  await run(db, ENTRIES, 'readwrite', (store) => store.clear());
-  await run(db, INDEX, 'readwrite', (store) => store.clear());
-
   const total = meta.entryChunks + meta.indexChunks;
-  let done = 0;
-  const advance = () => {
-    done++;
-    status = { state: 'loading', progress: done / total };
-    setBadge(Math.round((done / total) * 100) + '%');
-  };
+  let progress = await get(db, STATE, 'import');
 
-  // Entry ids are simply positions in the build output, so the counter has to
-  // run unbroken across the chunks and they have to be read in order.
-  let nextId = 0;
-  for (let i = 0; i < meta.entryChunks; i++) {
+  if (!progress || progress.version !== meta.version) {
+    // Nothing usable to resume: clear out and start again. The 'meta' marker
+    // goes first, so an interrupted import is never mistaken for a finished one.
+    await run(db, STATE, 'readwrite', (store) => store.delete('meta'));
+    await run(db, ENTRIES, 'readwrite', (store) => store.clear());
+    await run(db, INDEX, 'readwrite', (store) => store.clear());
+    progress = { version: meta.version, entries: 0, index: 0, nextId: 0 };
+    await save();
+    console.log('LLL: building the dictionary');
+  } else {
+    console.log(`LLL: resuming — ${progress.entries}/${meta.entryChunks} entry chunks,` +
+      ` ${progress.index}/${meta.indexChunks} index chunks already in`);
+  }
+
+  report(0);
+
+  // Entry ids are positions in the build output, so the counter has to run
+  // unbroken across chunks — which is why it is part of the saved progress.
+  for (let i = progress.entries; i < meta.entryChunks; i++) {
     const rows = await fetchJson(`data/entries-${pad(i)}.json`);
+    let nextId = progress.nextId;
     const pairs = rows.map((entry) => {
       entry.id = nextId;
       return [nextId++, entry];
     });
-    await putAll(db, ENTRIES, pairs);
-    advance();
+    await putAll(db, ENTRIES, pairs, (fraction) => report(fraction));
+    progress = { ...progress, entries: i + 1, nextId };
+    await save();
   }
 
-  for (let i = 0; i < meta.indexChunks; i++) {
+  for (let i = progress.index; i < meta.indexChunks; i++) {
     const rows = await fetchJson(`data/index-${pad(i)}.json`);   // [term, ids][]
-    await putAll(db, INDEX, rows);
-    advance();
+    await putAll(db, INDEX, rows, (fraction) => report(fraction));
+    progress = { ...progress, index: i + 1 };
+    await save();
   }
 
   await run(db, STATE, 'readwrite', (store) => store.put(meta, 'meta'));
+  await run(db, STATE, 'readwrite', (store) => store.delete('import'));
   status = { state: 'ready', progress: 1 };
   setBadge('');
   console.log(`LLL: dictionary ready — ${meta.entries} entries, ${meta.terms} forms`);
+
+  function save() {
+    return run(db, STATE, 'readwrite', (store) => store.put(progress, 'import'));
+  }
+
+  /** `within` is how far through the chunk currently being written we are. */
+  function report(within) {
+    const done = progress.entries + progress.index + within;
+    status = { state: 'loading', progress: done / total };
+    setBadge(Math.round((done / total) * 100) + '%');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -229,12 +261,13 @@ function get(db, storeName, key) {
   });
 }
 
-async function putAll(db, storeName, pairs) {
+async function putAll(db, storeName, pairs, onProgress) {
   for (let i = 0; i < pairs.length; i += BATCH) {
     const batch = pairs.slice(i, i + BATCH);
     await run(db, storeName, 'readwrite', (store) => {
       for (const [key, value] of batch) store.put(value, key);
     });
+    if (onProgress) onProgress(Math.min(1, (i + BATCH) / pairs.length));
   }
 }
 
