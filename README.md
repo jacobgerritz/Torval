@@ -157,11 +157,12 @@ are what LLL reads.
 
 There are two ways it gets the timing, tried in that order:
 
-1. **Ask YouTube for the subtitle file directly.** When this works it is exact
-   and knows about lines the video has not reached yet. It does not always
-   work — YouTube can answer with a 200 and an empty body, apparently by
-   choice, per video. There is no code fix for that; it is a decision made on
-   YouTube's side.
+1. **Ask YouTube for the subtitle file directly.** LLL requests the player
+   data fresh, immediately before asking for a caption file, rather than
+   reusing whatever the page already had sitting in it — a stale copy is one
+   plausible reason a request can look entirely valid and still come back with
+   nothing. Even with that, YouTube can still decline, apparently by choice,
+   per video; there is no code fix for a server choosing not to answer.
 2. **Read the captions off the screen as they play**, timing each line by
    watching it appear and disappear. This is what most subtitle tools actually
    do, and it always works, because it is only reading what is already there.

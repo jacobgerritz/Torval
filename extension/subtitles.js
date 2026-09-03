@@ -128,7 +128,7 @@ var LLLSubtitles = (function () {
 
     var tracks = null;
     try {
-      tracks = captionTracks();
+      tracks = await captionTracks(id);
     } catch (err) {
       console.warn('LLL: could not read the track list —', err && err.message);
     }
@@ -282,27 +282,28 @@ var LLLSubtitles = (function () {
     return null;
   }
 
-  function captionTracks() {
+  /**
+   * The list of subtitle tracks, tried in order of how likely each is to
+   * actually work.
+   *
+   * The fresh request goes first on purpose. Every reliable transcript tool
+   * checked while chasing down why YouTube would answer with a 200 and nothing
+   * in it — including the source of a long-established, actively maintained
+   * library for exactly this — asks YouTube for the player data again, right
+   * before fetching a caption file, rather than reusing whatever the page
+   * already had sitting in it. The page's own copy was produced whenever the
+   * player first loaded; if a caption URL is only valid for the request that
+   * generated it, reusing an old one would look exactly like what happened
+   * here: a clean 200, and nothing behind it.
+   */
+  async function captionTracks(id) {
+    var fresh = await freshCaptionTracks(id);
+    if (fresh) return fresh;
+
     var found = playerResponse();
     if (found) {
-      try {
-        var list = found.data.captions &&
-          found.data.captions.playerCaptionsTracklistRenderer &&
-          found.data.captions.playerCaptionsTracklistRenderer.captionTracks;
-        if (list && list.length) {
-          var out = [];
-          for (var i = 0; i < list.length; i++) {
-            out.push({
-              languageCode: String(list[i].languageCode),
-              baseUrl: String(list[i].baseUrl)
-            });
-          }
-          console.log('LLL: found', out.length, 'subtitle tracks via', found.from);
-          return out;
-        }
-      } catch (err) {
-        console.warn('LLL: could not read the track list —', err && err.message);
-      }
+      var tracks = tracksFrom(found.data, found.from);
+      if (tracks) return tracks;
     }
 
     var match = document.documentElement.innerHTML.match(
@@ -312,6 +313,64 @@ var LLLSubtitles = (function () {
       var fromHtml = JSON.parse(match[1]);   // JSON.parse handles the escapes itself
       console.log('LLL: found', fromHtml.length, 'subtitle tracks in the page source');
       return fromHtml;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
+   * Ask YouTube for this video's player data right now, the same call the page
+   * itself makes on load, rather than reading a copy that could be minutes
+   * old. `ytcfg` is the page's own configuration object — the API key and
+   * client context every request on the page already uses — read the same way
+   * the player object is: through `wrappedJSObject`.
+   */
+  async function freshCaptionTracks(id) {
+    var cfg = ytConfig();
+    if (!cfg) return null;
+    try {
+      var res = await fetch('https://www.youtube.com/youtubei/v1/player?key=' + encodeURIComponent(cfg.key), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          context: cfg.context || { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } },
+          videoId: id
+        })
+      });
+      if (!res.ok) {
+        console.warn('LLL: the fresh player request came back', res.status);
+        return null;
+      }
+      return tracksFrom(await res.json(), 'a fresh request');
+    } catch (err) {
+      console.warn('LLL: the fresh player request failed —', err && err.message);
+      return null;
+    }
+  }
+
+  function ytConfig() {
+    try {
+      var cfg = window.wrappedJSObject && window.wrappedJSObject.ytcfg;
+      var key = cfg && typeof cfg.get === 'function' && cfg.get('INNERTUBE_API_KEY');
+      return key ? { key: key, context: cfg.get('INNERTUBE_CONTEXT') } : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function tracksFrom(data, from) {
+    try {
+      var list = data && data.captions &&
+        data.captions.playerCaptionsTracklistRenderer &&
+        data.captions.playerCaptionsTracklistRenderer.captionTracks;
+      if (!list || !list.length) return null;
+      var out = [];
+      for (var i = 0; i < list.length; i++) {
+        out.push({ languageCode: String(list[i].languageCode), baseUrl: String(list[i].baseUrl) });
+      }
+      console.log('LLL: found', out.length, 'subtitle tracks via', from);
+      return out;
     } catch (err) {
       return null;
     }
