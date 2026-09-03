@@ -66,7 +66,9 @@ var LLLLookup = (function () {
           // Prefer the explanation that needed the fewest steps — 食べた is
           // "past", not "past of the potential form of a verb that also exists".
           if (!existing || info.reasons.length < existing.reasons.length) {
-            group.set(entry.id, { entry: entry, reasons: info.reasons, matched: term });
+            group.set(entry.id, Object.assign(
+              { entry: entry, reasons: info.reasons, matched: term },
+              displayForm(entry, term)));
           }
         }
       }
@@ -107,6 +109,32 @@ var LLLLookup = (function () {
       }
     }
     return false;
+  }
+
+  /**
+   * How this entry should be named on screen: the spelling and the reading.
+   *
+   * Worked out here rather than in the popup so that everything downstream —
+   * what you read, what the pitch accent is looked up under, what lands on the
+   * card — agrees on what the word is.
+   *
+   * An entry lists all its spellings, and printing the first is misleading: 本
+   * also reads もと, and that entry leads with 元, so pointing at 本 would put a
+   * kanji on screen you were not looking at. Only the first `kv` spellings are
+   * fit to show at all — JMdict files some purely so searches find them, like
+   * ます under 〼 — and where none is, the kana is the word.
+   */
+  function displayForm(entry, matched) {
+    // kv absent means data built before the field existed; showing every
+    // spelling is what it used to do, and is far better than the alternative
+    // reading of "kv is 0, so this word has no spelling and no reading".
+    var limit = typeof entry.kv === 'number' ? entry.kv : entry.k.length;
+    var showable = entry.k.slice(0, limit);
+    var isKanji = showable.indexOf(matched) !== -1;
+    return {
+      word: isKanji ? matched : (showable[0] || matched),
+      reading: isKanji ? entry.r[0] : (showable.length ? matched : '')
+    };
   }
 
   function byRelevance(a, b) {
@@ -177,7 +205,7 @@ var LLLLookup = (function () {
     return false;
   }
 
-  return { search: search, MAX_SCAN: MAX_SCAN };
+  return { search: search, displayForm: displayForm, MAX_SCAN: MAX_SCAN };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = LLLLookup;

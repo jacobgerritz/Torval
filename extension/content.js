@@ -427,29 +427,30 @@
 
     const head = document.createElement('div');
     head.className = 'head';
-    // Show the spelling that is actually on the page. An entry lists all its
-    // spellings, and printing the first one is misleading: 本 also reads もと,
-    // and that entry happens to lead with 元 — so pointing at 本 would put a
-    // kanji on screen that you were not looking at.
-    //
-    // Only the first `kv` spellings are fit to show. JMdict files some purely
-    // so that searches find them: ます is listed under 〼, which no one writes
-    // and no one should be shown. Where none is fit to show, the kana is the
-    // word.
-    const showable = entry.k.slice(0, entry.kv || 0);
-    const matchedKanji = showable.indexOf(hit.matched) !== -1;
-
+    // Which spelling and reading to show is decided in lookup.js, so the
+    // popup, the pitch accent and the card all name the word the same way.
     const word = document.createElement('span');
     word.className = 'word';
-    word.textContent = matchedKanji ? hit.matched : (showable[0] || hit.matched);
+    word.textContent = hit.word;
     head.appendChild(word);
 
-    const reading = matchedKanji ? entry.r[0] : (showable.length ? hit.matched : null);
-    if (reading) {
-      const el = document.createElement('span');
-      el.className = 'reading';
-      el.textContent = reading;
-      head.appendChild(el);
+    if (hit.reading) {
+      const reading = document.createElement('span');
+      reading.className = 'reading';
+      reading.textContent = hit.reading;
+      head.appendChild(reading);
+    }
+
+    // The accent as its number: 0 is flat, otherwise the mora the pitch drops
+    // after. Brief enough to sit inline; the diagram is left for the card.
+    if (typeof hit.pitch === 'number') {
+      const pitch = document.createElement('span');
+      pitch.className = 'pitch';
+      pitch.textContent = '[' + hit.pitch + ']';
+      pitch.title = hit.pitch === 0
+        ? 'flat — the pitch never drops'
+        : 'the pitch drops after mora ' + hit.pitch;
+      head.appendChild(pitch);
     }
 
     const add = document.createElement('button');
@@ -457,7 +458,7 @@
     add.textContent = '+';
     add.title = 'Add to Anki';
     add.addEventListener('click', () => {
-      mine(add, el, { word: word.textContent, reading: reading || '', entry, surface });
+      mine(add, el, { word: hit.word, reading: hit.reading || '', entry, surface });
     });
     head.appendChild(add);
     el.appendChild(head);

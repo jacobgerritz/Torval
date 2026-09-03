@@ -334,6 +334,32 @@ const run = async () => {
       (await Lookup.search('ます', db))[0].hits[0].entry.s.some((sn) => sn.p.includes('aux-v')));
   }
 
+  // --- how a word is named ---------------------------------------------
+  // One place decides this, so the popup, the pitch lookup and the card agree.
+  const masuEntry = (await db.getEntries(['ます'])).get('ます')
+    .find((e) => e.s.some((sn) => sn.p.includes('aux-v')));
+  const masuShown = Lookup.displayForm(masuEntry, 'ます');
+  check('a word with only a search-only spelling is named by its kana',
+    masuShown.word === 'ます' && masuShown.reading === '',
+    JSON.stringify(masuShown));
+
+  const honEntry = (await db.getEntries(['本'])).get('本')
+    .find((e) => e.r[0] === 'ほん' && e.k[0] === '本');
+  check('a word is named by the spelling that was matched',
+    JSON.stringify(Lookup.displayForm(honEntry, '本')) === '{"word":"本","reading":"ほん"}',
+    JSON.stringify(Lookup.displayForm(honEntry, '本')));
+
+  const haEntry = (await db.getEntries(['は'])).get('は').find((e) => e.k[0] === '葉');
+  check('a word matched by its reading is still named by its kanji',
+    JSON.stringify(Lookup.displayForm(haEntry, 'は')) === '{"word":"葉","reading":"は"}',
+    JSON.stringify(Lookup.displayForm(haEntry, 'は')));
+
+  check('data built before kv existed shows its spellings rather than none',
+    Lookup.displayForm({ k: ['本'], r: ['ほん'], s: [] }, '本').reading === 'ほん');
+
+  check('every hit is named, ready for the popup and the card',
+    (await Lookup.search('日本語', db))[0].hits.every((h) => h.word && h.reading));
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',
@@ -364,12 +390,22 @@ const run = async () => {
       'got ' + (await Pitch.accentFor(word, reading)));
   }
 
+  const P0 = Pitch;
   const graph = await Pitch.graphFor('食べる', 'たべる');
   check('the graph is an svg with a dot per mora plus the particle',
     graph.startsWith('<svg') && (graph.match(/<circle/g) || []).length === 4,
     (graph.match(/<circle/g) || []).length + ' circles');
   check('the graph follows the card colour rather than fixing its own',
     graph.includes('currentColor') && !/#[0-9a-f]{3,6}/i.test(graph));
+  // The line has to stop at the edge of the final dot, not its centre: that dot
+  // is hollow, and a line reaching the middle shows through the ring.
+  const flat = P0.svg('にほんご', 0);
+  const lastPoint = flat.match(/points="([^"]+)"/)[1].split(' ').pop();
+  const lastCircle = [...flat.matchAll(/<circle cx="([\d.]+)"/g)].pop()[1];
+  check('the line stops short of the hollow dot',
+    Math.abs(Number(lastPoint.split(',')[0]) - Number(lastCircle)) > 4,
+    'line ends at ' + lastPoint + ', dot at ' + lastCircle);
+
   check('an unknown word gets no graph at all, not an empty one',
     (await Pitch.graphFor('ぬわあああ', 'ぬわあああ')) === '');
   check('Pitch is guessed from the field name',

@@ -77,6 +77,13 @@ async function handleLookup(text) {
   try {
     await ready;
     const groups = await LLLLookup.search(text, { getEntries });
+    // The accent is one number per word and the table is already in memory, so
+    // it costs nothing to answer it here along with the definitions.
+    for (const group of groups) {
+      for (const hit of group.hits) {
+        hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
+      }
+    }
     return { status, groups };
   } catch (err) {
     console.error('LLL lookup failed', err);

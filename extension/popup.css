@@ -169,3 +169,9 @@
   font-size: 11px;
   color: #d08a7a;
 }
+
+/* The pitch accent, as a number: 0 flat, otherwise where the pitch drops. */
+.pitch {
+  font-size: 11px;
+  color: #7f8f7f;
+}

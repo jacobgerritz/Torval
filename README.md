@@ -50,6 +50,10 @@ again each time until it is packaged and signed. That is a step for later.
 | **Shift** with text selected | look up the selection |
 | **Esc**, a click, a scroll | close |
 | **shorter matches** | other words that start at the same place |
+
+The number in brackets after the reading is the pitch accent: 0 means the pitch
+never drops, otherwise it is the mora it drops after. The diagram of it goes on
+the card rather than in the popup.
 | **+** | add the word to Anki |
 
 While Shift is held the popup follows whatever you point at, and closes if you

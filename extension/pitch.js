@@ -85,7 +85,17 @@ var LLLPitch = (function () {
     var y = function (i) { return high_[i] ? high : low; };
 
     var points = [];
-    for (var i = 0; i <= m.length; i++) points.push(x(i) + ',' + y(i));
+    for (var i = 0; i < m.length; i++) points.push(x(i) + ',' + y(i));
+
+    // Stop the line at the edge of the final dot rather than at its centre.
+    // That dot is drawn hollow, so a line running to the middle of it shows
+    // through and spoils the ring.
+    var last = m.length;
+    var dx = x(last) - x(last - 1);
+    var dy = y(last) - y(last - 1);
+    var span = Math.sqrt(dx * dx + dy * dy) || 1;
+    var trim = 4.75;                       // the dot's radius plus its stroke
+    points.push(round(x(last) - dx / span * trim) + ',' + round(y(last) - dy / span * trim));
 
     var dots = '';
     for (var j = 0; j <= m.length; j++) {
@@ -116,6 +126,8 @@ var LLLPitch = (function () {
     if (accent === null) return '';
     return svg(reading || word, accent);
   }
+
+  function round(n) { return Math.round(n * 100) / 100; }
 
   function escapeXml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
