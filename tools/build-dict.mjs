@@ -80,7 +80,7 @@ async function main() {
   writeFileSync(join(OUT, 'tags.json'), JSON.stringify(tags));
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({
     // Bumping this number makes the extension rebuild its database on next start.
-    version: 1,
+    version: 2,
     built: new Date().toISOString().slice(0, 10),
     entries: entries.length,
     terms: index.size,
@@ -105,10 +105,25 @@ function parseEntry(xml, byDescription) {
   const r = [];
   let score = 0;
 
+  // JMdict marks some spellings as not really for reading. The auxiliary verb
+  // ます, for instance, carries the kanji 〼 tagged "sK" — a search-only form,
+  // meaning "match this, but never show it to anyone". Honour that: keep every
+  // spelling for matching, but sort the showable ones to the front and record
+  // how many there are, so the popup can display a word the way it is written.
+  const spellings = [];
   for (const m of xml.matchAll(/<k_ele>([\s\S]*?)<\/k_ele>/g)) {
     const keb = pick(m[1], 'keb');
-    if (keb) { k.push(keb); score = Math.max(score, priorityOf(m[1])); }
+    if (!keb) continue;
+    const info = m[1];
+    const rank = /&sK;|search-only kanji/.test(info) ? 2
+      : /&rK;|&iK;|&oK;|&ateji;/.test(info) ? 1
+      : 0;
+    spellings.push({ keb, rank });
+    score = Math.max(score, priorityOf(info));
   }
+  spellings.sort((a, b) => a.rank - b.rank);
+  for (const s of spellings) k.push(s.keb);
+  const showable = spellings.filter((s) => s.rank < 2).length;
   for (const m of xml.matchAll(/<r_ele>([\s\S]*?)<\/r_ele>/g)) {
     const reb = pick(m[1], 'reb');
     if (reb) { r.push(reb); score = Math.max(score, priorityOf(m[1])); }
@@ -137,7 +152,8 @@ function parseEntry(xml, byDescription) {
   }
   if (!senses.length) return null;
 
-  return { k, r, s: senses, f: score };
+  // kv: how many of the spellings in `k` are fit to display.
+  return { k, r, s: senses, f: score, kv: showable };
 }
 
 function pick(xml, tag) {

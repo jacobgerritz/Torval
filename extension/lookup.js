@@ -140,7 +140,9 @@ var LLLLookup = (function () {
    */
   function spellingRank(hit) {
     var entry = hit.entry;
-    if (!entry.k.length || entry.k[0] === hit.matched) return 0;
+    // entry.kv counts the spellings fit to display; a word whose only kanji is
+    // a search-only form (ます, written 〼) is a kana word for our purposes.
+    if (!entry.kv || entry.k[0] === hit.matched) return 0;
     if (entry.k.indexOf(hit.matched) !== -1) return 1;
     // Words normally written in kana anyway (JMdict tags them "uk") are not
     // being misread when they turn up spelled in kana.

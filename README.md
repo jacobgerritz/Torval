@@ -75,6 +75,13 @@ Four things can be put on a card:
 | **Reading** | the kana |
 | **Sentence** | the whole sentence, with the word in bold |
 | **Definition** | every sense, numbered |
+| **Word audio** | a recording of the word, if one can be found |
+
+Audio comes from JapanesePod101's dictionary. It answers every request with an
+mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
+recording instead — so LLL hashes what comes back and discards that one, leaving
+the field empty rather than filling your collection with identical clips. Anki
+downloads and stores nothing itself; LLL passes it the file.
 
 The bold marks the word **as the page wrote it**, so a conjugated form is
 highlighted in full — 「<b>食べなかった</b>ので、お腹が空いた。」 — while the Target

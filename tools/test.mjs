@@ -260,6 +260,74 @@ const run = async () => {
   await Anki.addNote(null, { word: 'x' }).catch((e) => { refused = e.message; });
   check('no deck chosen yet is refused with an explanation', /deck/.test(refused), refused);
 
+  // --- audio ------------------------------------------------------------
+  // JapanesePod101 hands back a fixed "no audio available" recording rather
+  // than a 404, so the only way to tell is to look at the bytes.
+  const realAudio = new Uint8Array(4096).fill(7);
+
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => realAudio.buffer });
+  check('real audio comes back as base64', typeof (await Anki.fetchAudio('食べる', 'たべる')) === 'string');
+
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(300).buffer });
+  check('a suspiciously tiny file is not treated as audio',
+    (await Anki.fetchAudio('食べる', 'たべる')) === null);
+
+  globalThis.fetch = async () => { throw new Error('offline'); };
+  check('an unreachable audio host does not throw', (await Anki.fetchAudio('食べる')) === null);
+
+  check('media filenames survive any filesystem',
+    /^lll-[\p{L}\p{N}-]+\.mp3$/u.test(Anki.audioFilename('食べる', 'たべる')),
+    Anki.audioFilename('食べる', 'たべる'));
+
+  // A card must still be made when there is no audio to be had.
+  let calls = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('languagepod101')) return { ok: true, arrayBuffer: async () => new Uint8Array(10).buffer };
+    calls.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({ result: 1, error: null }) };
+  };
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: { 'Target Word': 'word', 'Word Audio': 'audio' } },
+    { word: '食べる', reading: 'たべる' });
+  check('no audio still makes the card, with the audio field left off',
+    calls.length === 1 && calls[0].action === 'addNote' &&
+    !('Word Audio' in calls[0].params.note.fields),
+    JSON.stringify(calls.map((c) => c.action)));
+
+  // And when there is audio, it is stored and referenced.
+  calls = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).includes('languagepod101')) return { ok: true, arrayBuffer: async () => realAudio.buffer };
+    calls.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({ result: 1, error: null }) };
+  };
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: { 'Target Word': 'word', 'Word Audio': 'audio' } },
+    { word: '食べる', reading: 'たべる' });
+  check('audio is stored in Anki and referenced by a sound tag',
+    calls.length === 2 && calls[0].action === 'storeMediaFile' &&
+    /^\[sound:lll-.+\.mp3\]$/.test(calls[1].params.note.fields['Word Audio']),
+    JSON.stringify(calls.map((c) => c.action)) + ' ' +
+    JSON.stringify(calls[1] && calls[1].params.note.fields));
+
+  check('Word Audio is guessed from the field name',
+    Anki.guessMapping(['Word Audio'])['Word Audio'] === 'audio');
+  delete globalThis.fetch;
+
+  // --- search-only spellings -------------------------------------------
+  // ます is filed under the kanji 〼, which JMdict tags "sK" — findable, but
+  // never to be shown. The entry must report no showable spelling at all.
+  const masu = (await Lookup.search('ます', db))[0].hits
+    .find((h) => h.entry.s.some((sn) => sn.p.includes('aux-v')));
+  check('the ます entry is found', !!masu);
+  if (masu) {
+    check('ます has no spelling fit to display, so the kana is the word',
+      masu.entry.kv === 0 && masu.entry.k.includes('〼'),
+      'kv=' + masu.entry.kv + ' k=' + JSON.stringify(masu.entry.k));
+    check('ます is still ranked as a kana word',
+      (await Lookup.search('ます', db))[0].hits[0].entry.s.some((sn) => sn.p.includes('aux-v')));
+  }
+
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',
     Deinflect.deinflect('食べる')[0].term === '食べる');

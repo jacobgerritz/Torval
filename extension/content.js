@@ -431,13 +431,20 @@
     // spellings, and printing the first one is misleading: 本 also reads もと,
     // and that entry happens to lead with 元 — so pointing at 本 would put a
     // kanji on screen that you were not looking at.
-    const matchedKanji = entry.k.indexOf(hit.matched) !== -1;
+    //
+    // Only the first `kv` spellings are fit to show. JMdict files some purely
+    // so that searches find them: ます is listed under 〼, which no one writes
+    // and no one should be shown. Where none is fit to show, the kana is the
+    // word.
+    const showable = entry.k.slice(0, entry.kv || 0);
+    const matchedKanji = showable.indexOf(hit.matched) !== -1;
+
     const word = document.createElement('span');
     word.className = 'word';
-    word.textContent = matchedKanji ? hit.matched : (entry.k[0] || hit.matched);
+    word.textContent = matchedKanji ? hit.matched : (showable[0] || hit.matched);
     head.appendChild(word);
 
-    const reading = matchedKanji ? entry.r[0] : (entry.k.length ? hit.matched : null);
+    const reading = matchedKanji ? entry.r[0] : (showable.length ? hit.matched : null);
     if (reading) {
       const el = document.createElement('span');
       el.className = 'reading';

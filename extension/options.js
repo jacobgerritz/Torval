@@ -15,7 +15,8 @@ const SOURCE_LABELS = [
   ['word', 'Target word'],
   ['reading', 'Reading'],
   ['sentence', 'Sentence'],
-  ['definition', 'Definition']
+  ['definition', 'Definition'],
+  ['audio', 'Word audio']
 ];
 
 const deckSelect = document.getElementById('deck');
