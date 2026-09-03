@@ -22,6 +22,7 @@ const Lookup = require(join(ROOT, 'extension', 'lookup.js'));
 const Deinflect = require(join(ROOT, 'extension', 'deinflect.js'));
 const Anki = require(join(ROOT, 'extension', 'anki.js'));
 const Pitch = require(join(ROOT, 'extension', 'pitch.js'));
+const Video = require(join(ROOT, 'extension', 'video.js'));
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
@@ -229,13 +230,50 @@ const run = async () => {
     guessed['Target Word'] === 'word' && guessed['Reading'] === 'reading' &&
     guessed['Sentence'] === 'sentence' && guessed['Definitions'] === 'definition',
     JSON.stringify(guessed));
-  check('audio and pitch fields are recognised too',
-    guessed['Word Audio'] === 'audio' && guessed['Pitch'] === 'pitch',
+  check('audio, pitch, frame and sentence audio are recognised too',
+    guessed['Word Audio'] === 'audio' && guessed['Pitch'] === 'pitch' &&
+    guessed['Images'] === 'image' && guessed['Sentence Audio'] === 'sentenceAudio',
     JSON.stringify(guessed));
   check('fields it cannot place are left blank rather than guessed at',
-    guessed['Sentence Audio'] === '' && guessed['Images'] === '' &&
     guessed['Source'] === '' && guessed['Sentence English'] === '',
     JSON.stringify(guessed));
+
+  // Captured media is stored in Anki and referenced, not pasted into the field.
+  let mediaCalls = [];
+  globalThis.fetch = async (url, init) => {
+    mediaCalls.push(JSON.parse(init.body));
+    return { ok: true, json: async () => ({ result: 1, error: null }) };
+  };
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: { Images: 'image', 'Sentence Audio': 'sentenceAudio' } },
+    { word: '食べる', media: {
+      image: { filename: 'lll-abc.jpg', data: 'AAAA' },
+      sentenceAudio: { filename: 'lll-abc.webm', data: 'BBBB' } } });
+  const added = mediaCalls[mediaCalls.length - 1].params.note.fields;
+  check('a frame is stored and referenced as an image',
+    mediaCalls.filter((c) => c.action === 'storeMediaFile').length === 2 &&
+    added['Images'] === '<img src="lll-abc.jpg">',
+    JSON.stringify(added));
+  check('the line’s audio is stored and referenced as a sound',
+    added['Sentence Audio'] === '[sound:lll-abc.webm]', JSON.stringify(added));
+
+  // A page with no video, or one that refuses to be captured, still makes cards.
+  mediaCalls = [];
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: { 'Target Word': 'word', Images: 'image' } },
+    { word: '食べる', media: {} });
+  check('no video still makes the card, with the frame left off',
+    mediaCalls.length === 1 && !('Images' in mediaCalls[0].params.note.fields),
+    JSON.stringify(mediaCalls.map((c) => c.action)));
+
+  // Nothing is captured for a card that has nowhere to put it.
+  mediaCalls = [];
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: { 'Target Word': 'word' } },
+    { word: '食べる', media: { image: { filename: 'x.jpg', data: 'AAAA' } } });
+  check('media is not stored when no field is pointed at it',
+    mediaCalls.filter((c) => c.action === 'storeMediaFile').length === 0,
+    JSON.stringify(mediaCalls.map((c) => c.action)));
   check('a source is claimed by one field only',
     guessed['Dictionary Definitions'] === '', JSON.stringify(guessed));
 
@@ -464,6 +502,32 @@ const run = async () => {
     (await Pitch.graphFor('ぬわあああ', 'ぬわあああ')) === '');
   check('Pitch is guessed from the field name',
     Anki.guessMapping(['Pitch'])['Pitch'] === 'pitch');
+
+  // --- video capture -----------------------------------------------------
+  // Pausing to read, then mining a moment later, must still get the audio of
+  // the line you were reading — so a clip is matched to the sentence by text.
+  // Subtitles and page text disagree about spacing, so spacing is ignored.
+  check('a clip is matched to the line it belongs to',
+    Video.overlaps('食べなかったので、お腹が空いた。', '食べなかったので、お腹が空いた。'));
+  check('spacing differences do not break the match',
+    Video.overlaps('食べなかったので、 お腹が空いた。', '食べなかったので、お腹が空いた。'));
+  check('a sentence cut short by a block boundary still matches its caption',
+    Video.overlaps('食べなかったので、お腹が空いた。', '食べなかったので'));
+  check('a different line does not match',
+    !Video.overlaps('図書館で本を読んでいました。', '食べなかったので、お腹が空いた。'));
+  check('an empty caption matches nothing',
+    !Video.overlaps('', '食べなかった') && !Video.overlaps('食べなかった', ''));
+
+  // Media filenames come from the sentence, so re-mining a line reuses its
+  // files instead of filling the collection with copies.
+  const name1 = Video.name('食べなかったので、お腹が空いた。', 'jpg');
+  const name2 = Video.name('食べなかったので、お腹が空いた。', 'jpg');
+  check('the same line gets the same filename', name1 === name2, name1 + ' vs ' + name2);
+  check('a different line gets a different one',
+    Video.name('図書館で本を読んでいました。', 'jpg') !== name1);
+  check('filenames survive any filesystem', /^lll-[a-z0-9]+\.jpg$/.test(name1), name1);
+  check('the extension is kept',
+    Video.name('x', 'webm').endsWith('.webm'));
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',

@@ -82,6 +82,12 @@
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 
+  // Recording ahead of the user costs something, so ask first whether any card
+  // field is pointed at a video frame or the line's audio.
+  api.runtime.sendMessage({ type: 'wantsMedia' })
+    .then((yes) => { if (yes && typeof LLLVideo !== 'undefined') LLLVideo.enable(); })
+    .catch(() => {});
+
   // Fetched now rather than linked from the shadow root, because a <link> loads
   // asynchronously: the first popup would be measured and positioned while it
   // was still unstyled and full-page-width, and land in the wrong place.
@@ -587,7 +593,12 @@
     const old = entryEl.querySelector('.error');
     if (old) old.remove();
 
+    const media = typeof LLLVideo !== 'undefined'
+      ? await LLLVideo.capture(context ? context.text : '')
+      : {};
+
     const note = {
+      media,
       word,
       reading,
       // The bold marks the word exactly as the page wrote it, inflection and

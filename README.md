@@ -109,6 +109,8 @@ Four things can be put on a card:
 | **Definition** | every sense, numbered |
 | **Word audio** | a recording of the word, if one can be found |
 | **Pitch accent** | the accent diagram, drawn as an SVG |
+| **Video frame** | the frame on screen when you pressed + |
+| **Sentence audio** | the subtitle line, spoken |
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
 mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
@@ -142,6 +144,30 @@ rather than making a second card.
 
 ---
 
+## Mining from video
+
+Point at a word in a subtitle and press **+**, and the card also gets the frame
+you were looking at and the audio of the line being said.
+
+The audio is the awkward half. By the time you have hovered a word and decided
+to mine it, the line has already been spoken, and you cannot record the past. So
+LLL records ahead of you: when a subtitle appears it starts recording, and when
+the subtitle changes it stops and keeps the clip. Pressing **+** hands over a
+recording made before you asked for it. Only the current line and the one before
+are kept, and none of it runs unless a card field is actually pointed at it.
+
+Pausing to read is the normal way to do this and it works: the clip is matched
+to the line by its text, so mining a line the video has already moved past still
+gets that line's audio rather than whatever is on screen now.
+
+**Content-protected video cannot be captured.** Netflix, Prime Video and Disney+
+hand their video to the browser's DRM layer, and both the frame and the audio
+come back empty — that is what the protection is for, not a limitation to be
+worked around. YouTube and ordinary video elements are fine. Where capture is
+refused the card is still made, just without the media.
+
+---
+
 ## How it is put together
 
 Five files do the work. None of them is long.
@@ -169,6 +195,8 @@ looks the same everywhere.
 **`extension/anki.js`** — the Anki side. One HTTP request to your own machine.
 
 **`extension/pitch.js`** — pitch accents, and drawing them.
+
+**`extension/video.js`** — recording the subtitle line and grabbing the frame.
 
 **`extension/options.js`** — the settings page.
 

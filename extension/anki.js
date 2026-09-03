@@ -17,7 +17,8 @@ var LLLAnki = (function () {
 
   // What LLL can put on a card. The options page lets you point each field of
   // your note type at one of these.
-  var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio', 'pitch'];
+  var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio', 'pitch',
+    'image', 'sentenceAudio'];
 
   // JapanesePod101's dictionary endpoint. It answers every request with an mp3
   // and a 200, whether or not it actually has the word: when it does not, you
@@ -40,7 +41,9 @@ var LLLAnki = (function () {
     [/^(sentence|example|context|sentence japanese)$/i, 'sentence'],
     [/^(definitions?|dictionary definitions?|meaning|gloss(es)?|back|english)$/i, 'definition'],
     [/^(word ?audio|audio|term ?audio)$/i, 'audio'],
-    [/^(pitch|pitch ?accent|accent)$/i, 'pitch']
+    [/^(pitch|pitch ?accent|accent)$/i, 'pitch'],
+    [/^(images?|screenshot|picture|photo)$/i, 'image'],
+    [/^(sentence ?audio|expression ?audio|context ?audio)$/i, 'sentenceAudio']
   ];
 
   async function invoke(url, action, params) {
@@ -129,6 +132,12 @@ var LLLAnki = (function () {
     return 'lll-' + (word + '-' + (reading || '')).replace(/[^\p{L}\p{N}-]/gu, '') + '.mp3';
   }
 
+  /** Does the card have a field pointed at this? */
+  function wants(config, source) {
+    var fields = (config && config.fields) || {};
+    return Object.keys(fields).some(function (f) { return fields[f] === source; });
+  }
+
   /**
    * Turn a lookup into a card. `note` carries the pieces (word, reading,
    * sentence, definition); `config` says which field each piece belongs in.
@@ -139,15 +148,25 @@ var LLLAnki = (function () {
     }
 
     // Only go looking for audio if somewhere on the card wants it.
-    var wantsAudio = Object.keys(config.fields || {})
-      .some(function (f) { return config.fields[f] === 'audio'; });
-    if (wantsAudio && note.word) {
+    if (wants(config, 'audio') && note.word) {
       var data = await fetchAudio(note.word, note.reading);
       if (data) {
         var filename = audioFilename(note.word, note.reading);
         await invoke(config.url, 'storeMediaFile', { filename: filename, data: data });
         note = Object.assign({}, note, { audio: '[sound:' + filename + ']' });
       }
+    }
+
+    // Anything captured from a video arrives as a file rather than as text, so
+    // it goes into Anki's media folder first and the field gets a reference.
+    for (var key in note.media || {}) {
+      if (!wants(config, key)) continue;
+      var file = note.media[key];
+      if (!file || !file.data) continue;
+      await invoke(config.url, 'storeMediaFile', { filename: file.filename, data: file.data });
+      note[key] = key === 'image'
+        ? '<img src="' + file.filename + '">'
+        : '[sound:' + file.filename + ']';
     }
 
     var fields = {};

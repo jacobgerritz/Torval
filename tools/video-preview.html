@@ -1,0 +1,81 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LLL video capture test</title>
+<!--
+  Exercises extension/video.js against a real video element, without needing
+  YouTube or a video file.
+
+      node tools/serve.mjs   ->  http://localhost:8137/tools/video-preview.html
+
+  The video is a canvas being drawn to, and its audio is a tone; both are real
+  MediaStreams, so captureStream and MediaRecorder do exactly what they would do
+  on a real page. The captions are a div that changes text on a timer, named the
+  way YouTube names its caption container.
+
+  What this cannot test is content-protected video, where capture is refused by
+  design. Nothing can test that except trying it on Netflix and seeing black.
+-->
+<style>
+  body { margin: 0; padding: 24px; background: #0f1012; color: #d9dade;
+         font: 13px/1.6 -apple-system, "Segoe UI", sans-serif; }
+  video { width: 320px; background: #000; border-radius: 4px; }
+  .ytp-caption-window-container { margin: 12px 0; font-size: 18px; }
+  pre { background: #17181b; padding: 12px; border-radius: 4px; white-space: pre-wrap; }
+  button { padding: 6px 14px; background: #24262b; color: #e7e8ea;
+           border: 1px solid #34373d; border-radius: 4px; font: inherit; cursor: pointer; }
+</style>
+
+<h3>LLL video capture</h3>
+<video id="v" muted autoplay playsinline></video>
+<div class="ytp-caption-window-container"></div>
+<p><button id="go">capture the current line</button></p>
+<pre id="out">…</pre>
+
+<script src="../extension/video.js"></script>
+<script>
+const LINES = ['日本語を勉強しています。', '図書館で本を読んでいました。', '食べなかったので、お腹が空いた。'];
+
+// A moving picture and a tone, as real media streams.
+const canvas = Object.assign(document.createElement('canvas'), { width: 320, height: 180 });
+const ctx = canvas.getContext('2d');
+let frame = 0;
+setInterval(() => {
+  ctx.fillStyle = `hsl(${(frame * 4) % 360} 40% 25%)`;
+  ctx.fillRect(0, 0, 320, 180);
+  ctx.fillStyle = '#fff';
+  ctx.font = '24px sans-serif';
+  ctx.fillText('frame ' + frame++, 20, 100);
+}, 40);
+
+const audio = new AudioContext();
+const tone = audio.createOscillator();
+const dest = audio.createMediaStreamDestination();
+tone.frequency.value = 220;
+tone.connect(dest);
+tone.start();
+
+const stream = canvas.captureStream(25);
+dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
+document.getElementById('v').srcObject = stream;
+
+// Captions that change on a timer, the way subtitles do.
+const captions = document.querySelector('.ytp-caption-window-container');
+let line = 0;
+const next = () => { captions.textContent = LINES[line++ % LINES.length]; };
+next();
+setInterval(next, 3000);
+
+LLLVideo.enable();
+
+document.getElementById('go').addEventListener('click', async () => {
+  const out = document.getElementById('out');
+  const sentence = captions.textContent;
+  out.textContent = 'capturing "' + sentence + '" …';
+  const media = await LLLVideo.capture(sentence);
+  out.textContent = JSON.stringify({
+    sentence,
+    image: media.image && { filename: media.image.filename, bytes: Math.round(media.image.data.length * 0.75) },
+    audio: media.sentenceAudio && { filename: media.sentenceAudio.filename, bytes: Math.round(media.sentenceAudio.data.length * 0.75) }
+  }, null, 2);
+});
+</script>
