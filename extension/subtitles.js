@@ -31,6 +31,7 @@ var LLLSubtitles = (function () {
   var video = null;
   var overlay = null;
   var state = 'idle';        // idle | loading | ready | unavailable
+  var attempts = 0;
 
   function enable() {
     if (enabled) return;
@@ -86,15 +87,26 @@ var LLLSubtitles = (function () {
 
   function watch() {
     if (!enabled) return;
+
     var id = new URLSearchParams(location.search).get('v');
     if (id !== videoId) {
       videoId = id;
       cues = [];
       index = 0;
       state = 'idle';
+      attempts = 0;
       removeOverlay();
-      if (id) load(id);
+      console.log('LLL: video is now', id || '(none — not a watch page)');
     }
+
+    // Keep trying for a while. This script starts before YouTube's player
+    // exists, so the first look almost always finds nothing; giving up on that
+    // would mean never loading subtitles at all.
+    if (id && state !== 'loading' && state !== 'ready' && attempts < 12) {
+      attempts++;
+      load(id);
+    }
+
     video = document.querySelector('video');
     if (video && cues.length) show();
   }
@@ -108,7 +120,9 @@ var LLLSubtitles = (function () {
     try {
       var tracks = captionTracks();
       if (!tracks || !tracks.length) {
-        console.warn('LLL: no subtitle tracks found in this page’s player data.');
+        if (attempts >= 12) {
+          console.warn('LLL: gave up looking for subtitle tracks in this page’s player data.');
+        }
         state = 'unavailable';
         return;
       }
@@ -164,31 +178,65 @@ var LLLSubtitles = (function () {
   }
 
   /**
-   * The list of subtitle tracks, out of the page's own player data.
-   * `wrappedJSObject` is Firefox's way of letting a content script see the
-   * page's variables; falling back to the HTML covers a first page load, where
-   * the same data is still sitting in a script tag.
+   * YouTube's player data for this video, wherever it can be found.
+   *
+   * Three places, in order of how much they can be trusted. The player element
+   * will hand it over on request and keeps working when YouTube swaps videos
+   * without reloading the page. The page global is set on a fresh load but goes
+   * stale afterwards. The HTML is the last resort, and only holds on a first
+   * load.
+   *
+   * `wrappedJSObject` is Firefox's way of letting a content script reach the
+   * page's own variables and functions, which is what all of this needs.
    */
-  function captionTracks() {
+  function playerResponse() {
     try {
-      var page = window.wrappedJSObject && window.wrappedJSObject.ytInitialPlayerResponse;
-      var list = page && page.captions &&
-        page.captions.playerCaptionsTracklistRenderer &&
-        page.captions.playerCaptionsTracklistRenderer.captionTracks;
-      if (list && list.length) {
-        var out = [];
-        for (var i = 0; i < list.length; i++) {
-          out.push({ languageCode: String(list[i].languageCode), baseUrl: String(list[i].baseUrl) });
-        }
-        return out;
+      var el = document.getElementById('movie_player');
+      var api = el && el.wrappedJSObject;
+      if (api && typeof api.getPlayerResponse === 'function') {
+        var live = api.getPlayerResponse();
+        if (live) return { from: 'the player', data: live };
       }
-    } catch (err) { /* fall through to the HTML */ }
+    } catch (err) { /* try the next place */ }
+
+    try {
+      var global = window.wrappedJSObject && window.wrappedJSObject.ytInitialPlayerResponse;
+      if (global) return { from: 'the page', data: global };
+    } catch (err) { /* try the next place */ }
+
+    return null;
+  }
+
+  function captionTracks() {
+    var found = playerResponse();
+    if (found) {
+      try {
+        var list = found.data.captions &&
+          found.data.captions.playerCaptionsTracklistRenderer &&
+          found.data.captions.playerCaptionsTracklistRenderer.captionTracks;
+        if (list && list.length) {
+          var out = [];
+          for (var i = 0; i < list.length; i++) {
+            out.push({
+              languageCode: String(list[i].languageCode),
+              baseUrl: String(list[i].baseUrl)
+            });
+          }
+          console.log('LLL: found', out.length, 'subtitle tracks via', found.from);
+          return out;
+        }
+      } catch (err) {
+        console.warn('LLL: could not read the track list —', err && err.message);
+      }
+    }
 
     var match = document.documentElement.innerHTML.match(
       /"captionTracks":(\[.*?\])\s*,\s*"(?:audioTracks|translationLanguages|defaultAudioTrackIndex)"/);
     if (!match) return null;
     try {
-      return JSON.parse(match[1].replace(/\\u0026/g, '&'));
+      var fromHtml = JSON.parse(match[1]);   // JSON.parse handles the escapes itself
+      console.log('LLL: found', fromHtml.length, 'subtitle tracks in the page source');
+      return fromHtml;
     } catch (err) {
       return null;
     }
