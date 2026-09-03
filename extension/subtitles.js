@@ -61,8 +61,43 @@ var LLLSubtitles = (function () {
     window.addEventListener('keydown', keys, true);
     setInterval(watch, 1000);
     setInterval(renderCue, 200);
+    if (api.runtime.onMessage) api.runtime.onMessage.addListener(onBackgroundMessage);
     watch();
     console.log('LLL: watching for subtitles');
+  }
+
+  /**
+   * The address YouTube's own player just genuinely requested, caught by the
+   * background script and handed over rather than built here. See the
+   * comment beside where it is caught, in background.js, for why this is the
+   * one address worth trying that everything else so far was not.
+   *
+   * This can arrive at any time and supersede whatever tier is currently in
+   * charge — including replacing the on-screen fallback outright, since a
+   * genuine transcript beats one assembled a line at a time regardless of how
+   * it was found.
+   */
+  function onBackgroundMessage(message) {
+    if (!message || message.type !== 'timedtextSeen') return;
+    if (!videoId || message.url.indexOf('v=' + videoId) === -1) return;   // an ad, or a different tab's video
+    loadSeenTrack(message.url);
+  }
+
+  async function loadSeenTrack(url) {
+    var id = videoId;
+    console.log('LLL: caught YouTube’s own subtitle request — trying it directly');
+    // Tagged so the background script's own listener recognises this as LLL's
+    // re-fetch of the address rather than a second genuine request, and does
+    // not forward it straight back here again.
+    var loaded = await fetchTrack({ baseUrl: url + '&lll=1', languageCode: 'seen' });
+    if (videoId !== id) return;   // moved to a different video while fetching
+    if (loaded && loaded.length) {
+      cues = loaded;
+      state = 'ready';
+      console.log('LLL:', cues.length, 'subtitle lines ready — YouTube’s own request, reused directly');
+    } else {
+      console.warn('LLL: YouTube’s own subtitle address did not answer either — something deeper is blocking it.');
+    }
   }
 
   /**

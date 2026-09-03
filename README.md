@@ -156,43 +156,37 @@ them, so the ordinary case needs no clicks.
 LLL times YouTube's Japanese subtitles so it knows exactly when each line
 starts and ends — that timing is what lets a line be replayed and recorded
 precisely, and what lets **A** and **D** jump between lines. **Keep YouTube's
-own captions turned on**; LLL needs them as a source of text to read. What you
-actually see is drawn by LLL itself, in the same look as the popup — YouTube's
-own caption box is hidden underneath it, so a line always reads as LLL's.
+own captions turned on**; LLL needs a genuine one active to work at its best,
+for reasons covered below, and as a source of text to read either way. What
+you actually see is drawn by LLL itself, in the same look as the popup —
+YouTube's own caption box is hidden underneath it, so a line always reads as
+LLL's.
 
-There are three ways it gets the timing, tried in that order — each a
-fallback for the one before it, not a choice between them:
+There are four ways it gets the timing, tried in the order below — each a
+fallback for the one before it, not a choice between them. The first three all
+build a caption web address themselves, out of data YouTube's own page
+publishes; none of them ever produced anything, on any video tried, no matter
+how the request was made — a background-script fetch, a content-script fetch,
+a rewritten request header, an injected response header. What finally worked
+was not sending a better-formed request at all: it was not building the
+address in the first place.
 
-1. **Ask for the transcript the way "Show transcript" does.** Not the
+1. **Catch the address YouTube's own player already uses.** The address
+   published in the page's own data is not, evidently, the one YouTube's own
+   player actually requests when it genuinely fetches a caption track — so no
+   amount of asking more carefully for *that* address was ever going to work.
+   What does: LLL watches the page's own network traffic for the real request,
+   which happens the moment a caption track is genuinely active in the native
+   player, and reuses that exact address, fetched with nothing done to it — no
+   special headers, no routing trick. This needs a real caption track active
+   at least once, which is exactly why YouTube's own captions should stay on.
+2. **Ask for the transcript the way "Show transcript" does.** Not the
    closed-caption file — the separate panel YouTube's own player offers,
-   reached through a one-time token buried in the page's own data. This is
-   what real people click, so YouTube has more reason to keep it working than
-   an old download link almost nobody uses by hand — and it is the only one of
-   the three that has the whole video's lines ready before a single second has
-   played, which is what makes something like a comprehension score against
-   known words possible at all: the other two only ever know about the video
-   one line at a time, as it is watched.
-2. **Ask YouTube for the closed-caption file directly.** LLL requests the
-   player data fresh, immediately before asking, rather than reusing whatever
-   the page already had sitting in it.
-
-   A content script's own fetch looks like it runs as the page, but Firefox
-   does not treat it that way for network purposes: the request is attributed
-   to the extension, which YouTube's internal endpoints do not grant CORS to,
-   and the browser withholds the response body itself — a 200 with nothing in
-   it, visible in the console as "blocked by OpaqueResponseBlocking".
-
-   The fix lives on the *response* side. LLL uses Firefox's `webRequest` API
-   — kept available for blocking use under Manifest V3, unlike Chrome — to add
-   the CORS permission YouTube's response never grants, before the browser
-   decides whether the read is allowed. This has to run from the content
-   script rather than the background script: Firefox does not fire
-   `webRequest` for a background script's own requests at all, a documented,
-   deliberate limitation (Chrome's does) that cost one earlier attempt —
-   rewriting the request's own headers from the background script — before it
-   was found and corrected. It is scoped to only the four endpoints LLL itself
-   calls; nothing else on the page is touched.
-3. **Read the captions off the screen as they play**, timing each line by
+   reached through a one-time token buried in the page's own data.
+3. **Ask YouTube for the closed-caption file directly.** The address LLL
+   builds itself from the page's published data, tried as a fallback in case
+   a future change makes it work again.
+4. **Read the captions off the screen as they play**, timing each line by
    watching it appear and disappear. This is what the simplest subtitle tools
    do, and it always works, because it is only reading what is already there.
    The real cost: a line is known only once it has actually been shown, so
@@ -201,6 +195,11 @@ fallback for the one before it, not a choice between them:
    video will I understand" before you have already watched it. Rewatching a
    line does not duplicate it; seeing the same text again near where it was
    last seen just refreshes its timing.
+
+Method 1 can arrive at any moment and supersede whichever of the others is
+currently in charge — including the on-screen fallback — since a genuine
+transcript beats one assembled a line at a time regardless of when it turns
+up.
 
 Whichever way found the timing, **A** steps back a line and **D** forward.
 Part-way through a line, A restarts it; pressing it again goes to the line

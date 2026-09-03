@@ -7,3 +7,7 @@ extension/data/
 
 node_modules/
 *.log
+
+# A third-party extension's source, kept locally for reference only — never
+# to be committed or redistributed as part of this repository.
+Seek Subtitles for YouTube/

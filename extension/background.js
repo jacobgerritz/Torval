@@ -32,42 +32,42 @@ let tagsPromise = null;
 let status = { state: 'starting', progress: 0 };
 
 // ---------------------------------------------------------------------------
-// Granting these responses the CORS permission YouTube never sends
+// Catching the caption request YouTube's own player already makes
 // ---------------------------------------------------------------------------
 
 /**
- * A 200 with nothing in it, from the content script, on every video and every
- * endpoint tried, is "blocked by OpaqueResponseBlocking" — a browser-level
- * read block on a cross-origin response that never granted the reader CORS
- * permission. Rewriting the *request*'s headers, tried previously, could
- * never have fixed that: it turned out not to even run, because Firefox does
- * not fire webRequest for a background script's own requests — a documented,
- * deliberate limitation (Mozilla bug 1273138) that does not apply to Chrome.
- * The fetches are back in the content script for that reason, where
- * webRequest does see them.
+ * Every attempt at building this URL ourselves — from the page's own player
+ * object, from a freshly re-requested one, from the transcript panel's own
+ * endpoint — came back with a 200 and nothing in it. All of them shared one
+ * thing: they used the `baseUrl` published in YouTube's own JSON data. The
+ * one thing none of them tried was the actual address YouTube's own player
+ * uses when it makes a genuine request for the track — which is not
+ * guaranteed to be the same string, and evidently is not one.
  *
- * Fixed at the layer the block actually happens on: the response. Before the
- * browser evaluates whether the read is allowed, this adds the header that
- * says it is — the same technique CORS-unblocking extensions use generally,
- * here scoped to only the four endpoints LLL itself calls.
+ * That real address only exists at the moment the player asks for it, so
+ * rather than build it, this waits for it: `onBeforeRequest` sees every
+ * request the page itself makes, YouTube's own included, and a real one for
+ * captions turns up the moment the video actually has a caption track
+ * active — which is exactly the state LLL already asks for. Once one is
+ * seen, it is handed to that tab's content script to fetch, plainly, with
+ * nothing done to it — no special headers, no routing trick. If the address
+ * itself was always what was missing, nothing else needed to be.
+ *
+ * `&lll=1` marks LLL's own re-fetch of that address so it is not mistaken for
+ * a second genuine request and forwarded right back again.
  */
-if (api.webRequest && api.webRequest.onHeadersReceived) {
-  api.webRequest.onHeadersReceived.addListener(
+if (api.webRequest && api.webRequest.onBeforeRequest) {
+  const seenPerTab = new Map();   // tabId -> last captured URL, so as not to repeat one
+  api.webRequest.onBeforeRequest.addListener(
     (details) => {
-      const headers = (details.responseHeaders || [])
-        .filter((h) => h.name.toLowerCase() !== 'access-control-allow-origin');
-      headers.push({ name: 'Access-Control-Allow-Origin', value: '*' });
-      return { responseHeaders: headers };
+      if (details.tabId < 0) return;
+      if (details.url.indexOf('lll=1') !== -1) return;          // LLL's own re-fetch
+      if (details.url.indexOf('signature') === -1) return;       // not a genuine signed track
+      if (seenPerTab.get(details.tabId) === details.url) return; // already forwarded this one
+      seenPerTab.set(details.tabId, details.url);
+      api.tabs.sendMessage(details.tabId, { type: 'timedtextSeen', url: details.url }).catch(() => {});
     },
-    {
-      urls: [
-        'https://www.youtube.com/api/timedtext*',
-        'https://www.youtube.com/youtubei/v1/player*',
-        'https://www.youtube.com/youtubei/v1/next*',
-        'https://www.youtube.com/youtubei/v1/get_transcript*'
-      ]
-    },
-    ['blocking', 'responseHeaders']
+    { urls: ['https://www.youtube.com/api/timedtext*'] }
   );
 }
 
