@@ -268,8 +268,8 @@ const run = async () => {
   globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => realAudio.buffer });
   check('real audio comes back as base64', typeof (await Anki.fetchAudio('食べる', 'たべる')) === 'string');
 
-  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(300).buffer });
-  check('a suspiciously tiny file is not treated as audio',
+  globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Uint8Array(60).buffer });
+  check('a truncated or empty reply is not treated as audio',
     (await Anki.fetchAudio('食べる', 'たべる')) === null);
 
   globalThis.fetch = async () => { throw new Error('offline'); };
