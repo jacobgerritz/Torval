@@ -44,6 +44,7 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiDuplicate': return ankiDuplicate(message.word);
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
+    case 'ytFetch':      return ytFetch(message.url, message.init);
     default:       return undefined;
   }
 });
@@ -57,6 +58,27 @@ if (api.action && api.action.onClicked) {
 async function guard(fn) {
   try { return { ok: true, result: await fn() }; }
   catch (err) { return { ok: false, error: err.message }; }
+}
+
+/**
+ * Fetch a YouTube address on behalf of the content script.
+ *
+ * A content script's own fetch looks like it runs as the page, but for
+ * network purposes Firefox does not treat it that way: the request is
+ * attributed to the extension rather than to youtube.com, which YouTube's
+ * internal endpoints do not grant CORS to — the browser itself then withholds
+ * the response body, which shows up in the page's console as "blocked by
+ * OpaqueResponseBlocking". A background script does not have that problem:
+ * with a host permission for the target origin — already listed for YouTube —
+ * it gets a genuine cross-origin fetch, the same way word audio is already
+ * fetched from outside youtube.com elsewhere in this file.
+ */
+async function ytFetch(url, init) {
+  return guard(async () => {
+    const res = await fetch(url, init || {});
+    const text = await res.text();
+    return { ok: res.ok, status: res.status, redirected: res.redirected, url: res.url, text };
+  });
 }
 
 /**

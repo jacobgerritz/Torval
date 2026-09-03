@@ -174,9 +174,17 @@ fallback for the one before it, not a choice between them:
    one line at a time, as it is watched.
 2. **Ask YouTube for the closed-caption file directly.** LLL requests the
    player data fresh, immediately before asking, rather than reusing whatever
-   the page already had sitting in it. Even so, YouTube can decline, apparently
-   by choice, per video; there is no code fix for a server choosing not to
-   answer.
+   the page already had sitting in it.
+
+   Both of the first two go through the background script rather than
+   fetching directly from the page. A content script's own fetch looks like
+   it runs as the page, but Firefox does not treat it that way for network
+   purposes — the request is attributed to the extension, which YouTube's
+   internal endpoints do not grant CORS to, and the browser withholds the
+   response body itself (visible in the page's console as "blocked by
+   OpaqueResponseBlocking"). A background script with a host permission for
+   the target origin gets a genuine cross-origin fetch instead — the same way
+   word audio is already fetched from outside youtube.com.
 3. **Read the captions off the screen as they play**, timing each line by
    watching it appear and disappear. This is what the simplest subtitle tools
    do, and it always works, because it is only reading what is already there.

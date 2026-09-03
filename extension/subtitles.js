@@ -41,6 +41,7 @@
 var LLLSubtitles = (function () {
   'use strict';
 
+  var api = globalThis.browser || globalThis.chrome;
   var LANGUAGES = ['ja', 'ja-JP'];
   var MAX_LOOKUP_ATTEMPTS = 12;    // ~12s of retrying before giving up on the player existing
   var MIN_OBSERVED_SECONDS = 0.15; // shorter than this is a DOM flicker, not a line
@@ -261,23 +262,59 @@ var LLLSubtitles = (function () {
   }
 
   async function ytPost(endpoint, key, context, body) {
-    try {
-      var res = await fetch('https://www.youtube.com/youtubei/v1/' + endpoint +
-        '?key=' + encodeURIComponent(key), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.assign({ context: context }, body))
-      });
-      if (!res.ok) {
-        console.warn('LLL:', endpoint, 'request came back', res.status);
-        return null;
-      }
-      return await res.json();
-    } catch (err) {
-      console.warn('LLL:', endpoint, 'request failed —', err && err.message);
+    var res = await backgroundFetch('https://www.youtube.com/youtubei/v1/' + endpoint +
+      '?key=' + encodeURIComponent(key), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ context: context }, body))
+    });
+    if (!res) return null;
+    if (!res.ok) {
+      console.warn('LLL:', endpoint, 'request came back', res.status);
       return null;
     }
+    try {
+      return JSON.parse(res.text);
+    } catch (err) {
+      console.warn('LLL:', endpoint, 'response was not valid JSON —', err && err.message);
+      return null;
+    }
+  }
+
+  /**
+   * Make the request through the background script rather than from here.
+   *
+   * A content script's fetch looks like it runs as the page, but for network
+   * purposes Firefox does not treat it that way: the request is attributed to
+   * the extension, which YouTube's internal endpoints do not grant CORS to, so
+   * the browser itself withholds the response body — seen directly as "blocked
+   * by OpaqueResponseBlocking" in the console. Every earlier attempt at this
+   * failed identically regardless of which endpoint or format was asked for,
+   * which fits this explanation far better than YouTube choosing to refuse
+   * each one individually.
+   *
+   * The background script does not have this problem: it already reaches an
+   * external site successfully for word audio, because a background script
+   * with a host permission for that origin gets a real cross-origin fetch,
+   * which is what this needs too. `host_permissions` already lists YouTube.
+   */
+  async function backgroundFetch(url, init) {
+    var reply;
+    try {
+      reply = await api.runtime.sendMessage({
+        type: 'ytFetch',
+        url: url,
+        init: Object.assign({ credentials: 'include' }, init || {})
+      });
+    } catch (err) {
+      console.warn('LLL: could not reach the background script —', err && err.message);
+      return null;
+    }
+    if (!reply || !reply.ok) {
+      console.warn('LLL: the background fetch failed —', reply && reply.error);
+      return null;
+    }
+    return reply.result;   // { ok, status, redirected, url, text }
   }
 
   /** The first value found anywhere under this key, searching depth-first. */
@@ -370,28 +407,21 @@ var LLLSubtitles = (function () {
   }
 
   /**
-   * Fetch the subtitle file.
-   *
-   * A content script's fetch runs in the page's own context in Firefox, so
-   * this is already "as the page" — no special handling needed there. An empty
-   * body with a 200 status is a real possibility regardless: whether that is a
-   * blocker rewriting the response or YouTube itself withholding it is told
-   * apart by whether the response's own URL still matches what was asked for.
+   * Fetch the subtitle file, through the background script — see
+   * backgroundFetch for why a content script cannot do this reliably itself.
+   * An empty body with a 200 status is still a real possibility even from
+   * there: whether that is a blocker rewriting the response or YouTube itself
+   * withholding it is told apart by whether the response's own URL still
+   * matches what was asked for.
    */
   async function request(url) {
-    var res;
-    try {
-      res = await fetch(url, { credentials: 'include' });
-    } catch (err) {
-      console.warn('LLL: subtitle request failed —', err && err.message);
-      return '';
-    }
+    var res = await backgroundFetch(url, {});
+    if (!res) return '';
     if (!res.ok) {
       console.warn('LLL: subtitle request came back', res.status);
       return '';
     }
-    var text = await res.text();
-    if (!text) {
+    if (!res.text) {
       if (res.redirected || res.url !== url) {
         console.warn('LLL: the request was redirected to', res.url,
           '— something on this machine is very likely intercepting it, not YouTube.');
@@ -400,7 +430,7 @@ var LLLSubtitles = (function () {
           '(no redirect — this is YouTube itself, not a blocker).');
       }
     }
-    return text;
+    return res.text;
   }
 
   /**
@@ -479,25 +509,9 @@ var LLLSubtitles = (function () {
   async function freshCaptionTracks(id) {
     var cfg = ytConfig();
     if (!cfg) return null;
-    try {
-      var res = await fetch('https://www.youtube.com/youtubei/v1/player?key=' + encodeURIComponent(cfg.key), {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          context: cfg.context || { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } },
-          videoId: id
-        })
-      });
-      if (!res.ok) {
-        console.warn('LLL: the fresh player request came back', res.status);
-        return null;
-      }
-      return tracksFrom(await res.json(), 'a fresh request');
-    } catch (err) {
-      console.warn('LLL: the fresh player request failed —', err && err.message);
-      return null;
-    }
+    var context = cfg.context || { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } };
+    var data = await ytPost('player', cfg.key, context, { videoId: id });
+    return data ? tracksFrom(data, 'a fresh request') : null;
   }
 
   /**
