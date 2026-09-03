@@ -110,10 +110,69 @@ var LLLLookup = (function () {
   }
 
   function byRelevance(a, b) {
-    // Uninflected readings first, then common words, then dictionary order.
+    // Uninflected first, then words actually spelled the way the page spells
+    // them, then common words, then dictionary order.
     if (a.reasons.length !== b.reasons.length) return a.reasons.length - b.reasons.length;
+    var aw = spellingRank(a), bw = spellingRank(b);
+    if (aw !== bw) return aw - bw;
+    var af = isFunctionWord(a), bf = isFunctionWord(b);
+    if (af !== bf) return af ? -1 : 1;
     if (a.entry.f !== b.entry.f) return b.entry.f - a.entry.f;
     return a.entry.id - b.entry.id;
+  }
+
+  /**
+   * How well does this entry account for the text as it is actually written?
+   * Lower is better.
+   *
+   *   0  it is written exactly this way, or is never written any other way
+   *   1  this is one of its spellings, or it is normally written in kana
+   *   2  we only reached it through its reading
+   *
+   * Hovering は should find the topic particle first, not 葉 and 歯 and 羽 — those
+   * are merely *pronounced* は. JMdict's frequency markers do not save you here:
+   * the commonest function words often carry no marker at all, so they sink
+   * below every kanji word that happens to share their sound.
+   *
+   * The middle tier matters as much as the top one. 本 also reads もと, and the
+   * もと entry is led by a different kanji (元) — so both entries are spelled 本,
+   * but only one of them is *chiefly* spelled 本, and that is the one you meant.
+   */
+  function spellingRank(hit) {
+    var entry = hit.entry;
+    if (!entry.k.length || entry.k[0] === hit.matched) return 0;
+    if (entry.k.indexOf(hit.matched) !== -1) return 1;
+    // Words normally written in kana anyway (JMdict tags them "uk") are not
+    // being misread when they turn up spelled in kana.
+    for (var i = 0; i < entry.s.length; i++) {
+      if (entry.s[i].m && entry.s[i].m.indexOf('uk') !== -1) return 1;
+    }
+    return 2;
+  }
+
+  var KANA = /^[ぁ-ゟァ-ヿー]+$/;
+  var FUNCTION_POS = ['prt', 'conj', 'aux', 'aux-v', 'aux-adj', 'cop'];
+
+  /**
+   * Is this a particle or other piece of grammar, matched as bare kana?
+   *
+   * Frequency alone gets の wrong. The possessive particle is listed under the
+   * kanji 乃, which nobody writes, and JMdict scores it well below 野 ("field")
+   * — so the commonest word in the language loses to a rare noun that merely
+   * sounds the same. But particles are *always* written in kana, and a content
+   * word almost never is, so kana plus a grammatical part of speech is a strong
+   * enough signal to rank on. Point at the kanji 野 itself and this does not
+   * apply, so 野 still wins there.
+   */
+  function isFunctionWord(hit) {
+    if (!KANA.test(hit.matched)) return false;
+    for (var i = 0; i < hit.entry.s.length; i++) {
+      var pos = hit.entry.s[i].p;
+      for (var j = 0; j < pos.length; j++) {
+        if (FUNCTION_POS.indexOf(pos[j]) !== -1) return true;
+      }
+    }
+    return false;
   }
 
   return { search: search, MAX_SCAN: MAX_SCAN };

@@ -170,6 +170,21 @@ const run = async () => {
   check('nonsense input stays empty-ish', junk.every((g) => g.length <= 2),
     'got ' + JSON.stringify(junk.map((g) => g.surface)));
 
+  // --- ranking by how the text is actually written ---------------------
+  // Bare kana in running text is a particle far more often than it is a rare
+  // noun that happens to share the sound.
+  for (const [kana, gloss] of [['は', 'topic'], ['が', 'subject'], ['の', 'possessive'], ['を', 'direct object']]) {
+    const top = (await Lookup.search(kana, db))[0].hits[0];
+    check(`${kana} leads with the particle`,
+      top.entry.s.some((sn) => sn.p.includes('prt')) && JSON.stringify(top.entry.s[0].g).includes(gloss),
+      'got ' + JSON.stringify(top.entry.s[0].g));
+  }
+  // 本 also reads もと, and that entry is led by a different kanji (元).
+  const hon = (await Lookup.search('本語を', db))[0].hits[0];
+  check('本 leads with ほん, not the もと entry', hon.entry.r[0] === 'ほん', 'got ' + hon.entry.r[0]);
+  check('the matched spelling is reported so the popup can show it',
+    hon.matched === '本', 'got ' + hon.matched);
+
   // --- shorter matches are kept and ordered ----------------------------
   const groups = await Lookup.search('日本語', db);
   check('shorter matches are offered below the longest',

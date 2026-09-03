@@ -22,11 +22,24 @@
   if (!api || !api.runtime || !api.runtime.id) return;
 
   // Reloading the extension while pages are open leaves the previous copy of
-  // this script running, popup and all — and a flag on `window` does not catch
-  // it, because Firefox gives each injected copy its own view of the page's
-  // globals. So ask the page instead: if an older popup is sitting in the DOM,
-  // take it out. The old copy keeps its now-detached element and goes quiet.
+  // this script running in them. Both copies then answer the same Shift-hover,
+  // each with a popup of its own, which is why windows piled up. A flag on
+  // `window` cannot settle it: Firefox gives every injected copy its own view
+  // of the page's globals, so neither copy can see the other's.
+  //
+  // The page's own DOM is the one thing they genuinely share, so ownership is
+  // claimed there. Whoever loaded last wins; the older copies notice they no
+  // longer hold the claim, clear up after themselves and fall silent.
+  const OWNER = 'data-lll-owner';
+  const instance = String(Date.now()) + Math.random();
   for (const orphan of document.querySelectorAll('[data-lll-popup]')) orphan.remove();
+  document.documentElement.setAttribute(OWNER, instance);
+
+  function isCurrent() {
+    if (document.documentElement.getAttribute(OWNER) === instance) return true;
+    if (ui) { ui.host.remove(); ui = null; }
+    return false;
+  }
 
   // Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana.
   const JAPANESE = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
@@ -68,7 +81,7 @@
       hide();
       return;
     }
-    if (e.key !== 'Shift' || shiftDown) return;
+    if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
     // A selection plus Shift looks up the selection; otherwise use the cursor.
@@ -108,6 +121,7 @@
   }
 
   function scan() {
+    if (!isCurrent()) return;
     const text = textAtPoint(pointer.x, pointer.y);
     // While Shift is held the popup follows what you point at, so pointing at
     // something that is not a word closes it rather than leaving the last
@@ -345,15 +359,22 @@
 
     const head = document.createElement('div');
     head.className = 'head';
+    // Show the spelling that is actually on the page. An entry lists all its
+    // spellings, and printing the first one is misleading: 本 also reads もと,
+    // and that entry happens to lead with 元 — so pointing at 本 would put a
+    // kanji on screen that you were not looking at.
+    const matchedKanji = entry.k.indexOf(hit.matched) !== -1;
     const word = document.createElement('span');
     word.className = 'word';
-    word.textContent = entry.k[0] || entry.r[0];
+    word.textContent = matchedKanji ? hit.matched : (entry.k[0] || hit.matched);
     head.appendChild(word);
-    if (entry.k.length && entry.r.length) {
-      const reading = document.createElement('span');
-      reading.className = 'reading';
-      reading.textContent = entry.r[0];
-      head.appendChild(reading);
+
+    const reading = matchedKanji ? entry.r[0] : (entry.k.length ? hit.matched : null);
+    if (reading) {
+      const el = document.createElement('span');
+      el.className = 'reading';
+      el.textContent = reading;
+      head.appendChild(el);
     }
     el.appendChild(head);
 
