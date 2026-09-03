@@ -160,22 +160,32 @@ own captions turned on**; LLL needs them as a source of text to read. What you
 actually see is drawn by LLL itself, in the same look as the popup — YouTube's
 own caption box is hidden underneath it, so a line always reads as LLL's.
 
-There are two ways it gets the timing, tried in that order:
+There are three ways it gets the timing, tried in that order — each a
+fallback for the one before it, not a choice between them:
 
-1. **Ask YouTube for the subtitle file directly.** LLL requests the player
-   data fresh, immediately before asking for a caption file, rather than
-   reusing whatever the page already had sitting in it — a stale copy is one
-   plausible reason a request can look entirely valid and still come back with
-   nothing. Even with that, YouTube can still decline, apparently by choice,
-   per video; there is no code fix for a server choosing not to answer.
-2. **Read the captions off the screen as they play**, timing each line by
-   watching it appear and disappear. This is what most subtitle tools actually
+1. **Ask for the transcript the way "Show transcript" does.** Not the
+   closed-caption file — the separate panel YouTube's own player offers,
+   reached through a one-time token buried in the page's own data. This is
+   what real people click, so YouTube has more reason to keep it working than
+   an old download link almost nobody uses by hand — and it is the only one of
+   the three that has the whole video's lines ready before a single second has
+   played, which is what makes something like a comprehension score against
+   known words possible at all: the other two only ever know about the video
+   one line at a time, as it is watched.
+2. **Ask YouTube for the closed-caption file directly.** LLL requests the
+   player data fresh, immediately before asking, rather than reusing whatever
+   the page already had sitting in it. Even so, YouTube can decline, apparently
+   by choice, per video; there is no code fix for a server choosing not to
+   answer.
+3. **Read the captions off the screen as they play**, timing each line by
+   watching it appear and disappear. This is what the simplest subtitle tools
    do, and it always works, because it is only reading what is already there.
-   The cost: a line is known only once it has been shown at least once, so
-   **D** cannot jump ahead into a line the video has not reached yet — only
-   back through ones already seen. Rewatching a line does not duplicate it;
-   seeing the same text again near where it was last seen just refreshes its
-   timing.
+   The real cost: a line is known only once it has actually been shown, so
+   nothing about the video is known ahead of watching it — **D** cannot jump
+   ahead into an unseen line, and nothing here can answer "how much of this
+   video will I understand" before you have already watched it. Rewatching a
+   line does not duplicate it; seeing the same text again near where it was
+   last seen just refreshes its timing.
 
 Whichever way found the timing, **A** steps back a line and **D** forward.
 Part-way through a line, A restarts it; pressing it again goes to the line

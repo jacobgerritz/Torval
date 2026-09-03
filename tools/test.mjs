@@ -679,6 +679,28 @@ const run = async () => {
   check('there is nothing to continue when no line was open',
     !Subs.isContinuation('', '今回の'));
 
+  // --- searching a nested response for a key ------------------------------
+  // The transcript panel's data is reached by digging for a specific key
+  // rather than trusting one exact object path, because that path is
+  // undocumented and has moved before. These are the digging functions.
+  const nested = { a: { b: [{ c: 1 }, { wanted: 'first' }] }, d: { wanted: 'second' } };
+  check('findKey finds a key buried inside nested objects and arrays',
+    Subs.findKey(nested, 'wanted') === 'first', Subs.findKey(nested, 'wanted'));
+  check('findKey returns null for a key that is not there',
+    Subs.findKey(nested, 'missing') === null);
+  check('findAllKey finds every occurrence, not just the first',
+    JSON.stringify(Subs.findAllKey(nested, 'wanted')) === '["first","second"]',
+    JSON.stringify(Subs.findAllKey(nested, 'wanted')));
+  check('findAllKey on a key that never appears is empty, not an error',
+    JSON.stringify(Subs.findAllKey(nested, 'missing')) === '[]');
+
+  check('segment text reads a plain snippet',
+    Subs.segmentText({ snippet: { simpleText: '  日本語  ' } }) === '日本語');
+  check('segment text joins styled runs',
+    Subs.segmentText({ snippet: { runs: [{ text: '日本' }, { text: '語' }] } }) === '日本語');
+  check('a segment with neither is empty rather than throwing',
+    Subs.segmentText({}) === '' && Subs.segmentText(null) === '');
+
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its
   // files instead of filling the collection with copies.

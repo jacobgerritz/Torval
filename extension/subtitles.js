@@ -6,21 +6,31 @@
  * captions never tell anyone. That timing is what lets a line be replayed and
  * recorded precisely, and what lets A and D jump between lines.
  *
- * Two ways of getting it, tried in order:
+ * Three ways of getting it, tried in order — each is a fallback for the one
+ * before it, not an alternative to pick between:
  *
- *   1. Ask YouTube for the subtitle file directly. When this works it is
- *      immediate and exact, and it knows about lines you have not reached yet.
- *      It does not always work: YouTube can answer with a 200 and an empty
- *      body, apparently at its own discretion, per video. There is no code fix
- *      for that — it is a decision made on YouTube's side, not an error.
+ *   1. Ask for the transcript the way YouTube's own "Show transcript" button
+ *      does. Not the closed-caption file — a separate panel with its own
+ *      endpoint, reached through a one-time token buried in the page's own
+ *      data. This is what real people click, so YouTube has more reason to
+ *      keep it answering reliably than a download link almost nobody uses by
+ *      hand — and it is the only one of the three that has the whole video's
+ *      lines ready before a single second has played, which matters for
+ *      anything that needs to know the whole video up front, like comparing
+ *      it against known words.
  *
- *   2. Fall back to reading YouTube's own captions as they play, timing each
- *      line by watching it appear and disappear. This is what most "read a
- *      video's subtitles" tools actually do, and it always works, because it
- *      is just reading what is already on screen. The one cost is that a line
- *      is only known once it has been shown at least once — so pressing D
- *      cannot jump to a line the video has not reached yet, only back through
- *      ones already seen.
+ *   2. Ask YouTube for the closed-caption file directly. When this works it
+ *      is immediate and exact. It does not always work: YouTube can answer
+ *      with a 200 and an empty body, apparently at its own discretion, per
+ *      video, and there is no code fix for a server choosing not to answer.
+ *
+ *   3. Fall back to reading YouTube's own captions as they play, timing each
+ *      line by watching it appear and disappear. This is what the simplest
+ *      "read a video's subtitles" tools do, and it always works, because it
+ *      is just reading what is already on screen. The real cost: a line is
+ *      only known once it has actually been shown, so nothing about the video
+ *      is known ahead of watching it — D cannot jump to an unseen line, and
+ *      nothing here can tell you the whole video's vocabulary in advance.
  *
  * Either way, keep YouTube's own captions turned on — LLL needs a source of
  * text to read, whichever method supplies the timing. What is actually shown
@@ -143,6 +153,20 @@ var LLLSubtitles = (function () {
   async function load(id) {
     state = 'loading';
 
+    var panel = null;
+    try {
+      panel = await fetchViaTranscriptPanel(id);
+    } catch (err) {
+      console.warn('LLL: could not read the transcript panel —', err && err.message);
+    }
+    if (videoId !== id) return;         // navigated away while fetching
+    if (panel && panel.length) {
+      cues = panel;
+      state = 'ready';
+      console.log('LLL:', cues.length, 'subtitle lines ready, via the transcript panel');
+      return;
+    }
+
     var tracks = null;
     try {
       tracks = await captionTracks(id);
@@ -152,7 +176,10 @@ var LLLSubtitles = (function () {
 
     if (!tracks || !tracks.length) {
       // Likely just early — the player has not finished setting itself up yet.
-      if (attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
+      // Only worth waiting for on the very first pass, before the transcript
+      // panel has had a real chance — if that already answered with nothing,
+      // retrying this on its own would just repeat the same silence.
+      if (!panel && attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
       console.warn('LLL: gave up looking for subtitle tracks in this page’s player data.');
       return fallBackToWatching();
     }
@@ -180,6 +207,113 @@ var LLLSubtitles = (function () {
       console.warn('LLL: could not load subtitles —', err && err.message);
     }
     fallBackToWatching();
+  }
+
+  /**
+   * The whole transcript, gotten the way YouTube's own "Show transcript"
+   * button does: not the closed-caption file, but the panel behind it.
+   *
+   * Two requests. The first — the same one that loads the page below the
+   * player — carries a one-time "params" token buried somewhere in it, under
+   * a key called getTranscriptEndpoint; the second spends that token at a
+   * dedicated endpoint and gets the actual lines back. Both fields are found
+   * by searching the response for their key rather than assuming one exact
+   * path to them, because that path is undocumented and has been seen to move
+   * before now — a name search survives that better than a fixed route in.
+   *
+   * This is worth trying ahead of the caption file, not just alongside it:
+   * it is what real people actually click, so YouTube has more reason to keep
+   * it answering reliably than an old download link almost nobody uses by
+   * hand.
+   */
+  async function fetchViaTranscriptPanel(id) {
+    var cfg = ytConfig();
+    if (!cfg) return null;
+    var context = cfg.context || { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } };
+
+    var page = await ytPost('next', cfg.key, context, { videoId: id });
+    if (!page) return null;
+
+    var params = findKey(page, 'getTranscriptEndpoint');
+    params = params && params.params;
+    if (!params) {
+      console.log('LLL: this video offers no transcript panel.');
+      return null;
+    }
+
+    var data = await ytPost('get_transcript', cfg.key, context, { params: params });
+    if (!data) return null;
+
+    var segments = findAllKey(data, 'transcriptSegmentRenderer');
+    if (!segments.length) {
+      console.warn('LLL: the transcript panel answered with no lines in it.');
+      return null;
+    }
+
+    var out = [];
+    for (var i = 0; i < segments.length; i++) {
+      var seg = segments[i];
+      var text = segmentText(seg);
+      if (!text) continue;
+      out.push({ start: Number(seg.startMs) / 1000, end: Number(seg.endMs) / 1000, text: text });
+    }
+    return out;
+  }
+
+  async function ytPost(endpoint, key, context, body) {
+    try {
+      var res = await fetch('https://www.youtube.com/youtubei/v1/' + endpoint +
+        '?key=' + encodeURIComponent(key), {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(Object.assign({ context: context }, body))
+      });
+      if (!res.ok) {
+        console.warn('LLL:', endpoint, 'request came back', res.status);
+        return null;
+      }
+      return await res.json();
+    } catch (err) {
+      console.warn('LLL:', endpoint, 'request failed —', err && err.message);
+      return null;
+    }
+  }
+
+  /** The first value found anywhere under this key, searching depth-first. */
+  function findKey(obj, key) {
+    if (!obj || typeof obj !== 'object') return null;
+    if (Object.prototype.hasOwnProperty.call(obj, key)) return obj[key];
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      var found = findKey(obj[k], key);
+      if (found !== null && found !== undefined) return found;
+    }
+    return null;
+  }
+
+  /** Every value found anywhere under this key. */
+  function findAllKey(obj, key, out) {
+    out = out || [];
+    if (!obj || typeof obj !== 'object') return out;
+    if (Object.prototype.hasOwnProperty.call(obj, key)) out.push(obj[key]);
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      findAllKey(obj[k], key, out);
+    }
+    return out;
+  }
+
+  /** A transcript segment's text: plain, or built from styled runs. */
+  function segmentText(seg) {
+    var snippet = seg && seg.snippet;
+    if (!snippet) return '';
+    if (snippet.simpleText) return String(snippet.simpleText).replace(/\s+/g, ' ').trim();
+    if (snippet.runs) {
+      return snippet.runs.map(function (r) { return r.text || ''; }).join('')
+        .replace(/\s+/g, ' ').trim();
+    }
+    return '';
   }
 
   /**
@@ -657,6 +791,9 @@ var LLLSubtitles = (function () {
     cueFor: cueFor,
     parse: parse,
     parseXml: parseXml,
+    findKey: findKey,
+    findAllKey: findAllKey,
+    segmentText: segmentText,
     step: step,
     insertObserved: insertObserved,
     isContinuation: isContinuation,
