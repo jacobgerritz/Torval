@@ -453,14 +453,16 @@
       head.appendChild(pitch);
     }
 
-    // How common the word is, as its rank in a corpus of Japanese media. Absent
-    // for words the corpus never saw, which is itself worth knowing.
-    if (hit.entry.q) {
+    // How common the word is. Shown as a band rather than a bare rank, which
+    // would ask you to know the scale already. The exact number is on hover for
+    // when it matters. Nothing at all for words the corpus never saw, which is
+    // itself worth knowing.
+    if (hit.band) {
       const freq = document.createElement('span');
       freq.className = 'freq';
-      freq.textContent = '#' + hit.entry.q.toLocaleString('en-US');
-      freq.title = 'the ' + hit.entry.q.toLocaleString('en-US') +
-        'th commonest word in JPDB’s corpus';
+      freq.textContent = hit.band;
+      freq.title = 'ranked #' + hit.entry.q.toLocaleString('en-US') +
+        ' in a corpus of Japanese media';
       head.appendChild(freq);
     }
 

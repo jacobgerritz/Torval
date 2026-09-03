@@ -112,6 +112,7 @@ window.browser = {
         const ACCENTS = { 日本語: 0, 勉強: 0, 新しい: 4, 図書館: 2, 読む: 1, 食べる: 2, 本: 1, 人: 0, 車: 0, 買う: 0 };
         for (const g of groups) for (const h of g.hits) {
           if (h.word in ACCENTS) h.pitch = ACCENTS[h.word];
+          h.band = LLLLookup.frequencyBand(h.entry.q);
         }
         return { status: { state: 'ready' }, groups };
       }

@@ -379,6 +379,16 @@ const run = async () => {
     (await Lookup.search('齟齬', db))[0].hits[0].entry.q === undefined ||
     (await Lookup.search('齟齬', db))[0].hits[0].entry.q > 0);
 
+  // A rank is rounded to a band, because the gap between #100 and #400 is real
+  // and the gap between #7,261 and #7,800 is not.
+  for (const [rank, band] of [[1, 'top 1k'], [1000, 'top 1k'], [1001, 'top 2k'],
+    [4705, 'top 5k'], [7261, 'top 10k'], [20000, 'top 20k'], [50001, 'rare'], [140824, 'rare']]) {
+    check(`#${rank} reads as "${band}"`, Lookup.frequencyBand(rank) === band,
+      'got ' + Lookup.frequencyBand(rank));
+  }
+  check('a word with no rank gets no band rather than "rare"',
+    Lookup.frequencyBand(undefined) === '' && Lookup.frequencyBand(0) === '');
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',

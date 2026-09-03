@@ -53,10 +53,15 @@ again each time until it is packaged and signed. That is a step for later.
 
 Two small numbers follow the reading. The one in brackets is the **pitch
 accent**: 0 means the pitch never drops, otherwise it is the mora it drops
-after; the diagram of it goes on the card rather than in the popup. The one
-after the hash is how **common** the word is — its rank in a corpus of Japanese
-media, so 読む is #414 and 図書館 is #7,261. A word with no number is one the
-corpus never saw, which tells you something in itself.
+after; the diagram of it goes on the card rather than in the popup. The other is how **common** the word is: 読む is *top 1k*, 図書館 is *top 10k*.
+
+That is a band rather than a rank on purpose. A bare number asks you to know the
+scale already — #7,261 means nothing unless you have a feel for what #3,000 is
+like — and it claims a precision the data does not have. The gap between #100
+and #400 is real; the gap between #7,261 and #7,800 is noise. A round band says
+both of those at once and needs no legend. The exact rank is on hover for when
+it matters. A word with no band at all is one the corpus never saw, which tells
+you something in itself.
 | **+** | add the word to Anki |
 
 While Shift is held the popup follows whatever you point at, and closes if you

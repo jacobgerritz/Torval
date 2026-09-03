@@ -82,6 +82,7 @@ async function handleLookup(text) {
     for (const group of groups) {
       for (const hit of group.hits) {
         hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
+        hit.band = LLLLookup.frequencyBand(hit.entry.q);
       }
     }
     return { status, groups };

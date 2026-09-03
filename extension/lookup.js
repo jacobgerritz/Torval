@@ -137,6 +137,26 @@ var LLLLookup = (function () {
     };
   }
 
+  // How common a word is, rounded to the precision the number deserves.
+  //
+  // A bare rank asks you to know the scale already: #7,261 means nothing unless
+  // you have a feel for what #3,000 is like. And it claims a precision the data
+  // does not have — the gap between #100 and #400 is real, the gap between
+  // #7,261 and #7,800 is noise. A round band says both things at once, and needs
+  // no legend to read.
+  var BANDS = [
+    [1000, 'top 1k'], [2000, 'top 2k'], [5000, 'top 5k'],
+    [10000, 'top 10k'], [20000, 'top 20k'], [50000, 'top 50k']
+  ];
+
+  function frequencyBand(rank) {
+    if (!rank) return '';
+    for (var i = 0; i < BANDS.length; i++) {
+      if (rank <= BANDS[i][0]) return BANDS[i][1];
+    }
+    return 'rare';
+  }
+
   function byRelevance(a, b) {
     // Uninflected first, then words actually spelled the way the page spells
     // them, then common words, then dictionary order.
@@ -210,7 +230,7 @@ var LLLLookup = (function () {
     return false;
   }
 
-  return { search: search, displayForm: displayForm, MAX_SCAN: MAX_SCAN };
+  return { search: search, displayForm: displayForm, frequencyBand: frequencyBand, MAX_SCAN: MAX_SCAN };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = LLLLookup;
