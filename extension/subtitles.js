@@ -139,17 +139,14 @@ var LLLSubtitles = (function () {
       }
 
       console.log('LLL: fetching the', track.languageCode, 'subtitle track');
-      var text = await request(track.baseUrl + '&fmt=json3');
-      if (!text) {
-        // An empty body means the address was refused. Nothing here can fix
-        // that, so say so rather than failing quietly.
-        console.warn('LLL: YouTube returned no subtitle data for this video.');
+      var loaded = await fetchTrack(track);
+      if (videoId !== id) return;         // navigated away while fetching
+      if (!loaded) {
+        console.warn('LLL: YouTube would not hand over subtitle data for this video, ' +
+          'in any format this tried.');
         state = 'unavailable';
         return;
       }
-
-      var loaded = parse(JSON.parse(text));
-      if (videoId !== id) return;         // navigated away while fetching
       cues = loaded;
       state = cues.length ? 'ready' : 'unavailable';
       console.log('LLL:', cues.length, 'subtitle lines ready — turn YouTube’s captions off');
@@ -157,6 +154,60 @@ var LLLSubtitles = (function () {
       console.warn('LLL: could not load subtitles —', err && err.message);
       state = 'unavailable';
     }
+  }
+
+  /**
+   * Try more than one response format for the same track.
+   *
+   * json3 is the usual choice and what most subtitle tools ask for — but it is
+   * also the one seen going quiet before: a 200 with an empty body, as though
+   * YouTube is satisfied the address is valid but is withholding that
+   * particular format. YouTube's own default format (plain timedtext XML) is
+   * tried next on the chance that only json3 is affected.
+   */
+  async function fetchTrack(track) {
+    var formats = [
+      { label: 'json3', url: track.baseUrl + '&fmt=json3', parse: function (t) { return parse(JSON.parse(t)); } },
+      { label: 'default XML', url: track.baseUrl, parse: parseXml }
+    ];
+    for (var i = 0; i < formats.length; i++) {
+      var a = formats[i];
+      console.log('LLL: trying the', a.label, 'format');
+      var text = await request(a.url);
+      if (!text) continue;
+      try {
+        var cues = a.parse(text);
+        if (cues.length) {
+          console.log('LLL: the', a.label, 'format answered —', cues.length, 'lines');
+          return cues;
+        }
+        console.warn('LLL: the', a.label, 'format answered but had no lines in it.');
+      } catch (err) {
+        console.warn('LLL: could not read the', a.label, 'response —', err && err.message);
+      }
+    }
+    return null;
+  }
+
+  /** YouTube's default timedtext format: <text start="1.2" dur="2.3">line</text>. */
+  function parseXml(text) {
+    var doc = new DOMParser().parseFromString(text, 'text/xml');
+    if (doc.querySelector('parsererror')) return [];
+    var nodes = doc.getElementsByTagName('text');
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var start = parseFloat(node.getAttribute('start') || '0');
+      var dur = parseFloat(node.getAttribute('dur') || '0');
+      // DOMParser has already turned &amp; and friends back into real
+      // characters, which is why this needs no decoding of its own.
+      var line = (node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!line) continue;
+      var end = start + dur;
+      if (out.length && out[out.length - 1].end > start) out[out.length - 1].end = start;
+      out.push({ start: start, end: end, text: line });
+    }
+    return out;
   }
 
   /**
@@ -351,6 +402,7 @@ var LLLSubtitles = (function () {
     cueAt: cueAt,
     cueFor: cueFor,
     parse: parse,
+    parseXml: parseXml,
     step: step,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; }
