@@ -71,6 +71,32 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
   );
 }
 
+/**
+ * Catching the real address was not, on its own, enough — refetching it from
+ * the content script still came back with a 200 and nothing in it, the exact
+ * same "blocked by OpaqueResponseBlocking" symptom seen from the very first
+ * attempt in this whole saga. That means it was never about which address was
+ * being asked for: even a provably genuine one, the one YouTube's own player
+ * had just used successfully, was still refused when read from here.
+ *
+ * So both fixes are needed together, not one instead of the other. This adds
+ * the CORS permission the response never carries, before the browser decides
+ * whether the read is allowed — the same technique CORS-unblocking extensions
+ * use generally, scoped only to the address LLL itself asks for again.
+ */
+if (api.webRequest && api.webRequest.onHeadersReceived) {
+  api.webRequest.onHeadersReceived.addListener(
+    (details) => {
+      const headers = (details.responseHeaders || [])
+        .filter((h) => h.name.toLowerCase() !== 'access-control-allow-origin');
+      headers.push({ name: 'Access-Control-Allow-Origin', value: '*' });
+      return { responseHeaders: headers };
+    },
+    { urls: ['https://www.youtube.com/api/timedtext*'] },
+    ['blocking', 'responseHeaders']
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Messages
 // ---------------------------------------------------------------------------

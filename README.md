@@ -175,11 +175,21 @@ address in the first place.
    published in the page's own data is not, evidently, the one YouTube's own
    player actually requests when it genuinely fetches a caption track — so no
    amount of asking more carefully for *that* address was ever going to work.
-   What does: LLL watches the page's own network traffic for the real request,
+   LLL watches the page's own network traffic for the real request instead,
    which happens the moment a caption track is genuinely active in the native
-   player, and reuses that exact address, fetched with nothing done to it — no
-   special headers, no routing trick. This needs a real caption track active
-   at least once, which is exactly why YouTube's own captions should stay on.
+   player, and reuses that exact address. This needs a real caption track
+   active at least once, which is exactly why YouTube's own captions should
+   stay on.
+
+   Catching the right address turned out not to be enough on its own. Even
+   that address, provably the one YouTube's own player had just used
+   successfully, still came back with a 200 and nothing in it when refetched
+   from the content script — the same "blocked by OpaqueResponseBlocking"
+   symptom from the very first attempt, which meant it was never really about
+   which address was being asked for. Both fixes are needed together: LLL
+   also adds the CORS permission the response never carries, using the same
+   `webRequest` technique CORS-unblocking extensions use generally, scoped
+   only to this one address.
 2. **Ask for the transcript the way "Show transcript" does.** Not the
    closed-caption file — the separate panel YouTube's own player offers,
    reached through a one-time token buried in the page's own data.
