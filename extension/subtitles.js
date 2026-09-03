@@ -36,8 +36,52 @@ var LLLSubtitles = (function () {
     if (enabled) return;
     if (!/(^|\.)youtube\.com$/.test(location.hostname)) return;
     enabled = true;
+    window.addEventListener('keydown', keys, true);
     setInterval(watch, 1000);
     watch();
+    console.log('LLL: watching for subtitles');
+  }
+
+  /**
+   * A steps back a line, D steps forward. Rewatching a line you did not catch
+   * is the commonest thing you do while mining, and dragging the scrub bar to
+   * roughly the right place is a poor way to do it.
+   */
+  function keys(e) {
+    if (!enabled || !cues.length || !video) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+    var focused = document.activeElement;
+    if (focused && (focused.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return;
+
+    var key = (e.key || '').toLowerCase();
+    if (key !== 'a' && key !== 'd') return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    jump(key === 'a' ? -1 : 1);
+  }
+
+  function jump(direction) {
+    var target = step(video.currentTime, direction);
+    if (target) video.currentTime = target.start;
+  }
+
+  /** The line A or D should take you to from here, or null if there is none. */
+  function step(now, direction) {
+    if (direction < 0) {
+      // A little grace, so that pressing A part-way through a line takes you to
+      // the start of it — and pressing it again takes you to the line before.
+      for (var i = cues.length - 1; i >= 0; i--) {
+        if (cues[i].start < now - 0.4) return cues[i];
+      }
+      return null;
+    }
+    for (var j = 0; j < cues.length; j++) {
+      if (cues[j].start > now + 0.05) return cues[j];
+    }
+    return null;
   }
 
   function watch() {
@@ -63,28 +107,60 @@ var LLLSubtitles = (function () {
     state = 'loading';
     try {
       var tracks = captionTracks();
-      if (!tracks || !tracks.length) { state = 'unavailable'; return; }
+      if (!tracks || !tracks.length) {
+        console.warn('LLL: no subtitle tracks found in this page’s player data.');
+        state = 'unavailable';
+        return;
+      }
 
       var track = tracks.find(function (t) { return LANGUAGES.indexOf(t.languageCode) !== -1; });
-      if (!track) { state = 'unavailable'; return; }
+      if (!track) {
+        console.warn('LLL: this video has no Japanese subtitles. Tracks offered:',
+          tracks.map(function (t) { return t.languageCode; }).join(', '));
+        state = 'unavailable';
+        return;
+      }
 
-      var res = await fetch(track.baseUrl + '&fmt=json3');
-      var text = await res.text();
+      console.log('LLL: fetching the', track.languageCode, 'subtitle track');
+      var text = await request(track.baseUrl + '&fmt=json3');
       if (!text) {
-        // An empty body means the address was not accepted. Nothing here can
-        // fix that, so say so rather than failing quietly.
+        // An empty body means the address was refused. Nothing here can fix
+        // that, so say so rather than failing quietly.
         console.warn('LLL: YouTube returned no subtitle data for this video.');
         state = 'unavailable';
         return;
       }
 
-      cues = parse(JSON.parse(text));
+      var loaded = parse(JSON.parse(text));
+      if (videoId !== id) return;         // navigated away while fetching
+      cues = loaded;
       state = cues.length ? 'ready' : 'unavailable';
-      if (videoId !== id) cues = [];      // navigated away while fetching
+      console.log('LLL:', cues.length, 'subtitle lines ready — turn YouTube’s captions off');
     } catch (err) {
-      console.warn('LLL: could not load subtitles —', err.message);
+      console.warn('LLL: could not load subtitles —', err && err.message);
       state = 'unavailable';
     }
+  }
+
+  /**
+   * Fetch as the page would.
+   *
+   * This matters more than it looks. Under Manifest V3 a content script's own
+   * fetch goes out as the extension, not as the page — and YouTube answers a
+   * subtitle request that did not come from YouTube with an empty body. Firefox
+   * keeps the page's own fetch reachable as `content.fetch`, which is exactly
+   * what this needs; without it the request looks foreign and comes back blank.
+   */
+  async function request(url) {
+    var fetcher = (typeof content !== 'undefined' && content && content.fetch)
+      ? content.fetch
+      : window.fetch;
+    var res = await fetcher(url, { credentials: 'include' });
+    if (!res.ok) {
+      console.warn('LLL: subtitle request came back', res.status);
+      return '';
+    }
+    return res.text();
   }
 
   /**
@@ -213,6 +289,7 @@ var LLLSubtitles = (function () {
     cueAt: cueAt,
     cueFor: cueFor,
     parse: parse,
+    step: step,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; }
   };

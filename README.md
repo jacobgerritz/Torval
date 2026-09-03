@@ -69,6 +69,7 @@ and #400 is real; the gap between #7,261 and #7,800 is noise. A round band says
 both of those at once and needs no legend. The exact rank is on hover for when
 it matters. A word with no band at all is one the corpus never saw, which tells
 you something in itself.
+| **A** / **D** | step back and forward a subtitle line |
 | **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
 
@@ -139,8 +140,10 @@ pressing **+** narrows it to the meanings you actually met — 語 is both "word
 term" and "language", and you rarely want both. Clicking nothing means all of
 them, so the ordinary case needs no clicks.
 
-Duplicates are refused, so pressing **+** on a word you already have tells you so
-rather than making a second card.
+Pressing **+** on a word you already have says so rather than making a second
+card. That check is on the *word*: one sentence often teaches three words, and
+mining all three is the point. Anki's own duplicate rule compares first fields,
+which on a sentence-mining note type is the sentence, so it is left off.
 
 ---
 
@@ -149,6 +152,10 @@ rather than making a second card.
 On YouTube, LLL fetches the Japanese subtitle track and draws it itself. **Turn
 YouTube's own captions off**; these replace them. They are ordinary text, so
 Shift-hovering them works exactly like hovering anything else.
+
+**A** steps back a line and **D** forward — part-way through a line, A restarts
+it, and pressing it again goes to the line before, which is how you rewatch
+something you did not catch.
 
 The point is not the look of them, it is that LLL then knows precisely when each
 line runs from and to. That is what makes the audio clean.

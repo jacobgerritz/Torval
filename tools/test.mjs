@@ -250,7 +250,7 @@ const run = async () => {
     { word: '食べる', media: {
       image: { filename: 'lll-abc.jpg', data: 'AAAA' },
       sentenceAudio: { filename: 'lll-abc.webm', data: 'BBBB' } } });
-  const added = mediaCalls[mediaCalls.length - 1].params.note.fields;
+  const added = mediaCalls.find((c) => c.action === 'addNote').params.note.fields;
   check('a frame is stored and referenced as an image',
     mediaCalls.filter((c) => c.action === 'storeMediaFile').length === 2 &&
     added['Images'] === '<img src="lll-abc.jpg">',
@@ -263,9 +263,58 @@ const run = async () => {
   await Anki.addNote(
     { deck: 'D', model: 'M', fields: { 'Target Word': 'word', Images: 'image' } },
     { word: '食べる', media: {} });
+  const noFrame = mediaCalls.find((c) => c.action === 'addNote');
   check('no video still makes the card, with the frame left off',
-    mediaCalls.length === 1 && !('Images' in mediaCalls[0].params.note.fields),
+    noFrame && !('Images' in noFrame.params.note.fields) &&
+    !mediaCalls.some((c) => c.action === 'storeMediaFile'),
     JSON.stringify(mediaCalls.map((c) => c.action)));
+
+  // One sentence can teach three words, so a repeated sentence is not a
+  // duplicate. Anki compares first fields, and on a sentence-mining note type
+  // that is the sentence — so the check has to be made on the word instead.
+  let queries = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    queries.push(body);
+    return { ok: true, json: async () => ({
+      result: body.action === 'findNotes' ? [] : 1, error: null }) };
+  };
+  const mining = { deck: 'Japanese::Sentence Mining', model: 'M',
+    fields: { Sentence: 'sentence', 'Target Word': 'word' } };
+  await Anki.addNote(mining, { word: '食べる', sentence: 'A' });
+  const search = queries.find((q) => q.action === 'findNotes');
+  check('the collection is asked about the word, not the sentence',
+    search && search.params.query.includes('Target Word:食べる'), JSON.stringify(search));
+  check('the search is scoped to the chosen deck',
+    search.params.query.includes('deck:Japanese::Sentence Mining'), search.params.query);
+  check('Anki’s own first-field duplicate rule is turned off',
+    queries.find((q) => q.action === 'addNote').params.note.options.allowDuplicate === true);
+
+  // ...but the same word twice really is a duplicate.
+  queries = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    return { ok: true, json: async () => ({
+      result: body.action === 'findNotes' ? [1234] : 1, error: null }) };
+  };
+  let refusal = null;
+  await Anki.addNote(mining, { word: '食べる', sentence: 'B' }).catch((e) => { refusal = e.message; });
+  check('a word already in the collection is refused, and says so',
+    refusal && refusal.includes('食べる'), refusal);
+
+  // Deck names nest with colons, which must survive; a word's own colon must not.
+  check('deck names keep their colons, field values do not',
+    Anki.escapeSearch('A::B') === 'A::B' && Anki.escapeSearch('a:b', true) === 'a\\:b',
+    Anki.escapeSearch('A::B') + ' | ' + Anki.escapeSearch('a:b', true));
+
+  // Back to a collection that has nothing in it yet.
+  mediaCalls = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    mediaCalls.push(body);
+    return { ok: true, json: async () => ({
+      result: body.action === 'findNotes' ? [] : 1, error: null }) };
+  };
 
   // Nothing is captured for a card that has nowhere to put it.
   mediaCalls = [];
@@ -296,8 +345,10 @@ const run = async () => {
     JSON.stringify(sent && sent.params.note.fields));
   check('unmapped fields are left off the card entirely',
     !('Pitch' in sent.params.note.fields), JSON.stringify(Object.keys(sent.params.note.fields)));
-  check('duplicates are refused by default',
-    sent.params.note.options.allowDuplicate === false);
+  // Anki would compare first fields, which on a sentence-mining note type is
+  // the sentence; LLL asks about the word instead. See the duplicate tests below.
+  check('Anki’s first-field duplicate rule is left off',
+    sent.params.note.options.allowDuplicate === true);
 
   let refused = null;
   await Anki.addNote({ deck: 'D', model: 'M', fields: {} }, { word: 'x' }).catch((e) => { refused = e.message; });
@@ -334,9 +385,10 @@ const run = async () => {
   await Anki.addNote(
     { deck: 'D', model: 'M', fields: { 'Target Word': 'word', 'Word Audio': 'audio' } },
     { word: '食べる', reading: 'たべる' });
+  const withoutAudio = calls.find((c) => c.action === 'addNote');
   check('no audio still makes the card, with the audio field left off',
-    calls.length === 1 && calls[0].action === 'addNote' &&
-    !('Word Audio' in calls[0].params.note.fields),
+    withoutAudio && !('Word Audio' in withoutAudio.params.note.fields) &&
+    !calls.some((c) => c.action === 'storeMediaFile'),
     JSON.stringify(calls.map((c) => c.action)));
 
   // And when there is audio, it is stored and referenced.
@@ -349,11 +401,12 @@ const run = async () => {
   await Anki.addNote(
     { deck: 'D', model: 'M', fields: { 'Target Word': 'word', 'Word Audio': 'audio' } },
     { word: '食べる', reading: 'たべる' });
+  const withAudio = calls.find((c) => c.action === 'addNote');
   check('audio is stored in Anki and referenced by a sound tag',
-    calls.length === 2 && calls[0].action === 'storeMediaFile' &&
-    /^\[sound:lll-.+\.mp3\]$/.test(calls[1].params.note.fields['Word Audio']),
+    calls.some((c) => c.action === 'storeMediaFile') && withAudio &&
+    /^\[sound:lll-.+\.mp3\]$/.test(withAudio.params.note.fields['Word Audio']),
     JSON.stringify(calls.map((c) => c.action)) + ' ' +
-    JSON.stringify(calls[1] && calls[1].params.note.fields));
+    JSON.stringify(withAudio && withAudio.params.note.fields));
 
   check('Word Audio is guessed from the field name',
     Anki.guessMapping(['Word Audio'])['Word Audio'] === 'audio');
@@ -545,6 +598,17 @@ const run = async () => {
     Subs.cueFor('図書館で本を').start === 3);
   check('the bolded sentence from a card still matches',
     Subs.cueFor('<b>食べなかった</b>').start === 12);
+
+  // A steps back a line, D forward. Part-way through a line, A restarts it;
+  // pressing it again goes to the line before, which is how you rewatch.
+  check('A part-way through a line goes back to its start',
+    Subs.step(2.2, -1).start === 1, JSON.stringify(Subs.step(2.2, -1)));
+  check('A at the start of a line goes to the one before',
+    Subs.step(3.0, -1).start === 1, JSON.stringify(Subs.step(3.0, -1)));
+  check('D goes to the next line', Subs.step(2.2, 1).start === 3, JSON.stringify(Subs.step(2.2, 1)));
+  check('D from a gap goes to the line after it', Subs.step(7, 1).start === 12);
+  check('D past the last line has nowhere to go', Subs.step(99, 1) === null);
+  check('A before the first line has nowhere to go', Subs.step(0.2, -1) === null);
 
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its

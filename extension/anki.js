@@ -177,15 +177,66 @@ var LLLAnki = (function () {
     });
     if (!any) throw new Error('None of the note type’s fields are mapped yet — see LLL’s options.');
 
+    if (await alreadyHave(config, note)) {
+      throw new Error('Already in your collection: ' + note.word);
+    }
+
     return invoke(config.url, 'addNote', {
       note: {
         deckName: config.deck,
         modelName: config.model,
         fields: fields,
         tags: config.tags && config.tags.length ? config.tags : ['lll'],
-        options: { allowDuplicate: false, duplicateScope: 'deck' }
+        // Anki's own duplicate rule is off; see alreadyHave for why.
+        options: { allowDuplicate: true }
       }
     });
+  }
+
+  /** The field a given piece of the card goes into, if any. */
+  function fieldFor(config, source) {
+    var fields = (config && config.fields) || {};
+    var names = Object.keys(fields);
+    for (var i = 0; i < names.length; i++) {
+      if (fields[names[i]] === source) return names[i];
+    }
+    return null;
+  }
+
+  /**
+   * Do we already have a card for this word?
+   *
+   * Anki decides two notes are duplicates by comparing their first fields, and
+   * on a sentence-mining note type the first field is the sentence. So mining a
+   * second word out of one sentence looked like a duplicate and was refused —
+   * which is wrong: one sentence can easily teach you three words.
+   *
+   * A card is a duplicate when it is the same *word*, so that is what gets
+   * asked, and Anki's rule is turned off. If the question cannot be asked — no
+   * word field mapped, or an Anki too old to answer — the card is simply made.
+   */
+  async function alreadyHave(config, note) {
+    var field = fieldFor(config, 'word');
+    if (!field || !note.word) return false;
+    try {
+      var query = '"deck:' + escapeSearch(config.deck) + '" "' +
+        escapeSearch(field) + ':' + escapeSearch(note.word, true) + '"';
+      var found = await invoke(config.url, 'findNotes', { query: query });
+      return !!(found && found.length);
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /**
+   * Anki's search syntax. Quotes and backslashes always need escaping; in a
+   * field's value so do the wildcards and the colon, which would otherwise be
+   * read as syntax. Deck names keep their colons — that is how nesting is
+   * written.
+   */
+  function escapeSearch(text, isValue) {
+    var out = String(text).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    return isValue ? out.replace(/[:*_]/g, '\\$&') : out;
   }
 
   return {
@@ -195,6 +246,8 @@ var LLLAnki = (function () {
     describe: describe,
     fieldNames: fieldNames,
     guessMapping: guessMapping,
+    escapeSearch: escapeSearch,
+    fieldFor: fieldFor,
     fetchAudio: fetchAudio,
     audioFilename: audioFilename,
     addNote: addNote
