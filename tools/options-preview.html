@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>LLL settings preview</title>
+<title>PREVIEW — not your real LLL settings</title>
 <!--
   A page for working on how the settings look, without reloading the extension
   in Firefox every time.
@@ -11,7 +11,29 @@
   copied here — it is fetched from the extension itself, so this can never
   drift out of step with what actually ships. The only fake parts are Anki,
   which is not running, and the stored word list, which lives in memory.
+
+  Because it renders the real page it looks exactly like the real settings,
+  which is confusing enough to have caught somebody out already — hence the
+  banner. Nothing done here can reach the extension's own storage: this is an
+  ordinary web page on localhost, and the word list below exists only until
+  the tab is closed.
 -->
+
+<style>
+  .preview-warning {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    margin: -48px -24px 32px;
+    padding: 10px 24px;
+    background: #4a2c22;
+    border-bottom: 1px solid #6b3f30;
+    color: #f0d5c6;
+    font: 13px/1.5 -apple-system, "Segoe UI", sans-serif;
+  }
+  .preview-warning b { color: #fff; }
+  .preview-warning span { color: #d0a693; }
+</style>
 
 <script>
 // --- stand in for Anki and for browser storage ------------------------------
@@ -20,11 +42,12 @@ const MODELS = ['LLL', 'Basic'];
 const FIELDS = { LLL: ['Word', 'Reading', 'Sentence', 'Definition', 'Audio', 'Pitch', 'Image'], Basic: ['Front', 'Back'] };
 
 // A word list big enough to show what browsing a real one is like, including
-// the paging and the search.
+// the scrolling and the search. The filler is named so that nobody reading it
+// could mistake it for a word they once learned.
 const known = new Map();
 const SAMPLE = ['本', '人', '車', '食べる', '読む', '図書館', '日本語', '勉強', '新しい', '親切', '料理', '上手', '買う'];
 SAMPLE.forEach((word, i) => known.set(word, Date.now() - i * 86400000));
-for (let i = 0; i < 400; i++) known.set('見本' + i, Date.now() - (i + 20) * 3600000);
+for (let i = 0; i < 400; i++) known.set('（例' + i + '・にせもの）', Date.now() - (i + 20) * 3600000);
 
 let stored = { ankiConfig: { deck: '日本語::Mining', model: 'LLL', tags: ['lll'], fields: {} } };
 
@@ -74,7 +97,15 @@ window.browser = {
     clone.href = '../extension/' + link.getAttribute('href');
     document.head.appendChild(clone);
   }
-  document.body.appendChild(page.querySelector('main'));
+  const main = page.querySelector('main');
+  const warning = document.createElement('div');
+  warning.className = 'preview-warning';
+  warning.innerHTML = '<b>Preview — made-up data.</b> ' +
+    '<span>This is not your settings and not your words. Nothing here is saved, ' +
+    'and nothing here can reach the extension. Your real settings open from ' +
+    'LLL&rsquo;s toolbar button, or the &#9881; on the bar at the top of a page.</span>';
+  main.prepend(warning);
+  document.body.appendChild(main);
 
   for (const script of page.querySelectorAll('script')) {
     await new Promise((resolve, reject) => {
