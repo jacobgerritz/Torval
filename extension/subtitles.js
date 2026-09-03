@@ -22,8 +22,10 @@
  *      cannot jump to a line the video has not reached yet, only back through
  *      ones already seen.
  *
- * Either way, YouTube's own captions are the thing on screen and should stay
- * turned on — nothing here draws a replacement for them.
+ * Either way, keep YouTube's own captions turned on — LLL needs a source of
+ * text to read, whichever method supplies the timing. What is actually shown
+ * on screen is drawn by LLL itself, in its own look, so a line always reads as
+ * LLL's rather than being mistaken for YouTube's plain caption box.
  */
 
 var LLLSubtitles = (function () {
@@ -47,6 +49,7 @@ var LLLSubtitles = (function () {
     enabled = true;
     window.addEventListener('keydown', keys, true);
     setInterval(watch, 1000);
+    setInterval(renderCue, 200);
     watch();
     console.log('LLL: watching for subtitles');
   }
@@ -494,6 +497,80 @@ var LLLSubtitles = (function () {
     while (at < list.length && list[at].start < cue.start) at++;
     list.splice(at, 0, cue);
     return list;
+  }
+
+  // -------------------------------------------------------------------------
+  // Drawing them, in LLL's own look
+  // -------------------------------------------------------------------------
+
+  // Same palette as the popup: a dark card, one bright text colour, one border
+  // colour, the same font stack. Whatever supplied the timing — the fetched
+  // file or the screen itself — the line you actually see is always drawn by
+  // LLL, so it never gets mistaken for YouTube's own plain caption box.
+  var overlay = null;
+  var overlayLine = null;
+  var hideNative = null;
+
+  function ensureOverlay() {
+    if (overlay) return;
+
+    // YouTube's own caption box is hidden rather than touched any other way:
+    // in the on-screen fallback its text is still being read as the source of
+    // the timing, so it has to go on updating — it just should not also be
+    // visible sitting underneath LLL's version of the same line.
+    hideNative = document.createElement('style');
+    hideNative.textContent =
+      '.ytp-caption-window-container,.captions-text{opacity:0!important;pointer-events:none!important;}';
+    document.head.appendChild(hideNative);
+
+    var player = document.querySelector('.html5-video-player') || document.body;
+    overlay = document.createElement('div');
+    overlay.setAttribute('data-lll-subtitle', '');
+    overlay.style.cssText = [
+      'position:absolute', 'left:0', 'right:0', 'bottom:9%', 'display:none',
+      'z-index:60', 'justify-content:center', 'pointer-events:none', 'padding:0 6%'
+    ].join(';');
+
+    overlayLine = document.createElement('span');
+    // The text itself must stay hoverable — that is the whole point of timing
+    // subtitles at all — even though the box around it should not swallow
+    // clicks meant for the player underneath.
+    overlayLine.style.cssText = [
+      'pointer-events:auto', 'user-select:text', 'cursor:default', 'max-width:88%',
+      'background:#16171a', 'border:1px solid #292b30', 'border-radius:6px',
+      'box-shadow:0 8px 28px rgba(0,0,0,.5)', 'color:#f4f5f7',
+      'padding:6px 16px',
+      'font:500 26px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
+        '"Yu Gothic UI",Meiryo,sans-serif',
+      'text-align:center', 'white-space:pre-wrap'
+    ].join(';');
+    overlay.appendChild(overlayLine);
+    player.appendChild(overlay);
+  }
+
+  /**
+   * Whatever line is playing right now, drawn in LLL's own style.
+   *
+   * In the on-screen fallback, a line only enters `cues` once it has ended —
+   * its end time is not known until the next one begins. Without checking
+   * `openCue` too, the overlay would always be exactly one line behind: it
+   * would show nothing for whichever line is currently in progress.
+   */
+  function renderCue() {
+    if (!enabled || !video || (!cues.length && !openCue)) {
+      if (overlay) overlay.style.display = 'none';
+      return;
+    }
+    var cue = cueAt(video.currentTime);
+    var text = cue ? cue.text
+      : (openCue && video.currentTime >= openCue.start ? openCue.text : null);
+    if (!text) {
+      if (overlay) overlay.style.display = 'none';
+      return;
+    }
+    ensureOverlay();
+    overlay.style.display = 'flex';
+    if (overlayLine.textContent !== text) overlayLine.textContent = text;
   }
 
   // -------------------------------------------------------------------------

@@ -11,11 +11,10 @@
  * sent back to the start of it, recorded to the end of it, and put back where it
  * was: same moment, same speed, same paused or playing.
  *
- * It happens in silence. Muting the element does not mute what is captured from
- * it, because the stream is taken before the speakers — so the line is replayed
- * at full volume into the recording and at no volume into the room. It takes as
- * long as the line does, and what comes out is exactly the line, with no
- * guessing about where the speech began.
+ * The line plays out loud while this happens — you hear it the same as the
+ * recording captures it, rather than mining blind. It takes as long as the
+ * line does, and what comes out is exactly the line, with no guessing about
+ * where the speech began.
  *
  * The earlier design recorded continuously in case you might mine something.
  * This one records only what you asked for.
@@ -130,7 +129,6 @@ var LLLVideo = (function () {
     var wasPaused = video.paused;
     var wasTime = video.currentTime;
     var wasRate = video.playbackRate;
-    var wasMuted = video.muted;
     var length = Math.min(end - start, MAX_CLIP_SECONDS);
 
     var recorder;
@@ -145,10 +143,8 @@ var LLLVideo = (function () {
     var finished = new Promise(function (resolve) { recorder.onstop = resolve; });
 
     try {
-      // Muting the element does not mute what is captured from it — the stream
-      // is taken before the speakers. So the line is replayed in silence: the
-      // recording is full volume, and you hear nothing.
-      video.muted = true;
+      // The line plays out loud while this records — that is deliberate, so
+      // you can hear what is being captured rather than mining blind.
       video.playbackRate = 1;
       video.currentTime = Math.max(0, start - PREROLL_SECONDS);
       await seeked(video);
@@ -166,16 +162,15 @@ var LLLVideo = (function () {
       try { recorder.stop(); } catch (ignored) { /* already stopped */ }
       return null;
     } finally {
-      restore(video, wasTime, wasRate, wasPaused, wasMuted);
+      restore(video, wasTime, wasRate, wasPaused);
     }
 
     return chunks.length ? new Blob(chunks, { type: type }) : null;
   }
 
-  function restore(video, time, rate, paused, muted) {
+  function restore(video, time, rate, paused) {
     try {
       video.playbackRate = rate;
-      video.muted = muted;
       video.currentTime = time;
       if (paused) video.pause(); else video.play();
     } catch (err) { /* the page took the video away mid-capture */ }

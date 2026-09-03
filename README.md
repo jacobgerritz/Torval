@@ -151,9 +151,10 @@ which on a sentence-mining note type is the sentence, so it is left off.
 
 LLL times YouTube's Japanese subtitles so it knows exactly when each line
 starts and ends — that timing is what lets a line be replayed and recorded
-precisely, and what lets **A** and **D** jump between lines. It draws nothing
-of its own over the video, so **keep YouTube's own captions turned on**; they
-are what LLL reads.
+precisely, and what lets **A** and **D** jump between lines. **Keep YouTube's
+own captions turned on**; LLL needs them as a source of text to read. What you
+actually see is drawn by LLL itself, in the same look as the popup — YouTube's
+own caption box is hidden underneath it, so a line always reads as LLL's.
 
 There are two ways it gets the timing, tried in that order:
 
@@ -182,11 +183,9 @@ it, before anything moves. The audio is taken by replaying the line: the video
 is sent back to the start of it, recorded to the end of it, and put back
 exactly as it was — same moment, same speed, same paused or playing.
 
-It happens in silence. Muting the video does not mute what is captured from it,
-because the stream is taken before the speakers, so the line is replayed at
-full volume into the recording and at no volume into the room. It takes as long
-as the line does — a couple of seconds — and what comes out is exactly the
-line.
+The line plays out loud while this happens, so you hear what is being put on
+the card rather than mining blind. It takes as long as the line does — a
+couple of seconds — and what comes out is exactly the line.
 
 Playback speed is forced to normal while it records, since a line captured at
 1.5× is a line spoken at 1.5×.
