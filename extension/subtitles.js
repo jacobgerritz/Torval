@@ -349,14 +349,33 @@ var LLLSubtitles = (function () {
     }
   }
 
+  /**
+   * The API key every request on this page already uses.
+   *
+   * A silent failure here previously meant the fresh request was never really
+   * tried, and nothing said so — the code just quietly fell back to the stale
+   * copy, which looked identical in the console to the fresh path having been
+   * attempted and lost. Every path here now says what happened.
+   */
   function ytConfig() {
     try {
       var cfg = window.wrappedJSObject && window.wrappedJSObject.ytcfg;
-      var key = cfg && typeof cfg.get === 'function' && cfg.get('INNERTUBE_API_KEY');
-      return key ? { key: key, context: cfg.get('INNERTUBE_CONTEXT') } : null;
+      if (cfg && typeof cfg.get === 'function') {
+        var key = cfg.get('INNERTUBE_API_KEY');
+        if (key) return { key: key, context: cfg.get('INNERTUBE_CONTEXT') };
+      }
     } catch (err) {
-      return null;
+      console.warn('LLL: could not read ytcfg —', err && err.message);
     }
+
+    // ytcfg was not reachable as a live object, or did not have a key on it.
+    // The same key sits in the page's own source as plain text — the same
+    // fallback captionTracks already uses when the live objects come up empty.
+    var match = document.documentElement.innerHTML.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
+    if (match) return { key: match[1], context: null };
+
+    console.warn('LLL: could not find an API key anywhere on this page — cannot make a fresh request.');
+    return null;
   }
 
   function tracksFrom(data, from) {
