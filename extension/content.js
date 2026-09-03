@@ -310,9 +310,10 @@
       escapeHtml(text.slice(index + length));
   }
 
-  function definitionHtml(entry) {
-    const numbered = entry.s.length > 1;
-    return entry.s
+  function definitionHtml(entry, senses) {
+    const chosen = senses.map((i) => entry.s[i]);
+    const numbered = chosen.length > 1;
+    return chosen
       .map((sense, i) => (numbered ? (i + 1) + '. ' : '') + escapeHtml(sense.g.join('; ')))
       .join('<br>');
   }
@@ -468,12 +469,21 @@
       head.appendChild(reading);
     }
 
+    const list = document.createElement('ol');
+    list.className = 'senses';
+
     const add = document.createElement('button');
     add.className = 'add';
     add.textContent = '+';
     add.title = 'Add to Anki';
     add.addEventListener('click', () => {
-      mine(add, el, { word: hit.word, reading: hit.reading || '', entry, surface });
+      mine(add, el, {
+        word: hit.word,
+        reading: hit.reading || '',
+        entry,
+        surface,
+        senses: chosenSenses(list)
+      });
     });
     head.appendChild(add);
     el.appendChild(head);
@@ -500,8 +510,6 @@
       el.appendChild(why);
     }
 
-    const list = document.createElement('ol');
-    list.className = 'senses';
     let previous = entry.s[0].p.join(',');   // already said on the meta line
 
     entry.s.forEach((sense, i) => {
@@ -524,11 +532,30 @@
         li.appendChild(note);
       }
       li.appendChild(document.createTextNode(sense.g.join('; ')));
+
+      // Click a sense to put only that one on the card. 語 is "word; term" and
+      // "language"; usually you met just one of them. Choosing nothing means
+      // the whole entry, so the common case still needs no clicks at all.
+      li.title = 'click to put only this on the card';
+      li.addEventListener('click', () => {
+        // Ignore the click that ends a drag over the text, or selecting a
+        // definition to copy would silently change what gets mined.
+        if (String(window.getSelection())) return;
+        li.classList.toggle('chosen');
+        list.classList.toggle('choosing', !!list.querySelector('.chosen'));
+      });
       list.appendChild(li);
     });
 
     el.appendChild(list);
     return el;
+  }
+
+  /** Which senses were picked, or all of them when none were. */
+  function chosenSenses(list) {
+    const items = [...list.children];
+    const picked = items.filter((li) => li.classList.contains('chosen'));
+    return (picked.length ? picked : items).map((li) => items.indexOf(li));
   }
 
   function renderMeta(parts) {
@@ -554,7 +581,7 @@
    * script, which is the only part that may reach your local Anki; which field
    * each piece lands in is set once in LLL's options.
    */
-  async function mine(button, entryEl, { word, reading, entry, surface }) {
+  async function mine(button, entryEl, { word, reading, entry, surface, senses }) {
     button.disabled = true;
     button.textContent = '·';
     const old = entryEl.querySelector('.error');
@@ -568,7 +595,7 @@
       sentence: context ? markSentence(context, surface.length) : '',
       // Kept so a mapping saved before the two were merged still fills in.
       sentenceMarked: context ? markSentence(context, surface.length) : '',
-      definition: definitionHtml(entry)
+      definition: definitionHtml(entry, senses)
     };
 
     let reply;

@@ -69,6 +69,7 @@ and #400 is real; the gap between #7,261 and #7,800 is noise. A round band says
 both of those at once and needs no legend. The exact rank is on hover for when
 it matters. A word with no band at all is one the corpus never saw, which tells
 you something in itself.
+| **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
 
 While Shift is held the popup follows whatever you point at, and closes if you
@@ -130,6 +131,11 @@ left empty rather than guessed at.
 The bold marks the word **as the page wrote it**, so a conjugated form is
 highlighted in full — 「<b>食べなかった</b>ので、お腹が空いた。」 — while the Target
 Word field still says 食べる.
+
+By default a card carries every sense of the word. Clicking a sense before
+pressing **+** narrows it to the meanings you actually met — 語 is both "word;
+term" and "language", and you rarely want both. Clicking nothing means all of
+them, so the ordinary case needs no clicks.
 
 Duplicates are refused, so pressing **+** on a word you already have tells you so
 rather than making a second card.

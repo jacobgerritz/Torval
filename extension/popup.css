@@ -175,3 +175,21 @@
   font-size: 12px;
   color: #949aa3;
 }
+
+/*
+ * Picking senses to mine. Clicking one puts only that meaning on the card;
+ * picking none means all of them, so the ordinary case needs no clicks.
+ */
+.senses li {
+  padding: 1px 5px;
+  margin-left: -5px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.senses li:hover { background: #1c1e22; }
+
+.senses li.chosen { background: #1e2731; }
+
+/* Once something is picked, what is not picked recedes. */
+.senses.choosing li:not(.chosen) { opacity: 0.4; }
