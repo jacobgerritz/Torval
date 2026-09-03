@@ -177,17 +177,18 @@ var LLLAnki = (function () {
     });
     if (!any) throw new Error('None of the note type’s fields are mapped yet — see LLL’s options.');
 
-    if (await alreadyHave(config, note)) {
-      throw new Error('Already in your collection: ' + note.word);
-    }
-
+    // Duplicates are allowed on purpose: mining a second word from a sentence
+    // you have already mined once is completely ordinary. Anki's own
+    // duplicate rule compares first fields, which on a sentence-mining note
+    // type is the sentence rather than the word, so it is turned off rather
+    // than half-applied. Whether this word already exists is answered
+    // separately, up front — see alreadyHave — as a heads-up, not a gate.
     return invoke(config.url, 'addNote', {
       note: {
         deckName: config.deck,
         modelName: config.model,
         fields: fields,
         tags: config.tags && config.tags.length ? config.tags : ['lll'],
-        // Anki's own duplicate rule is off; see alreadyHave for why.
         options: { allowDuplicate: true }
       }
     });
@@ -248,6 +249,7 @@ var LLLAnki = (function () {
     guessMapping: guessMapping,
     escapeSearch: escapeSearch,
     fieldFor: fieldFor,
+    alreadyHave: alreadyHave,
     fetchAudio: fetchAudio,
     audioFilename: audioFilename,
     addNote: addNote

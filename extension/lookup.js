@@ -138,24 +138,33 @@ var LLLLookup = (function () {
   }
 
   /**
-   * Tags carried by every sense of an entry.
+   * Tags carried by every sense of an entry, for some field on a sense (`m` for
+   * misc tags, `p` for part of speech).
    *
-   * JMdict files these per sense, but some of them cannot vary between
-   * definitions: "uk" says the word is usually written in kana, which is a fact
-   * about the word, not about any one meaning of it. Printed against all four
-   * senses of a word it is just noise repeated four times. So a tag on every
-   * sense is lifted out and shown once, beside the word; a tag on only some
-   * senses genuinely belongs to those, and stays with them.
+   * JMdict files both per sense, but some of what they carry cannot vary
+   * between definitions: "uk" says the word is usually written in kana, which
+   * is a fact about the word, not about any one meaning of it. Printed against
+   * every sense it is just noise repeated that many times. So whatever is
+   * common to every sense is lifted out and shown once, beside the word;
+   * whatever is not stays where it actually belongs.
+   *
+   * Part of speech needs this every bit as much as misc tags do. 勉強 is
+   * "n,vs,vt" for one sense and "n,vs,vi" for another and plain "n" for a
+   * third — printing the first sense's combination as though it summed up the
+   * whole word would simply be wrong for the other two.
    */
-  function sharedTags(entry) {
+  function commonAcrossSenses(entry, field) {
     if (!entry.s.length) return [];
-    var first = entry.s[0].m || [];
+    var first = entry.s[0][field] || [];
     return first.filter(function (code) {
       return entry.s.every(function (sense) {
-        return (sense.m || []).indexOf(code) !== -1;
+        return (sense[field] || []).indexOf(code) !== -1;
       });
     });
   }
+
+  function sharedTags(entry) { return commonAcrossSenses(entry, 'm'); }
+  function sharedPos(entry) { return commonAcrossSenses(entry, 'p'); }
 
   // How common a word is, rounded to the precision the number deserves.
   //
@@ -255,6 +264,7 @@ var LLLLookup = (function () {
     displayForm: displayForm,
     frequencyBand: frequencyBand,
     sharedTags: sharedTags,
+    sharedPos: sharedPos,
     MAX_SCAN: MAX_SCAN
   };
 })();

@@ -114,6 +114,7 @@ window.browser = {
           if (h.word in ACCENTS) h.pitch = ACCENTS[h.word];
           h.band = LLLLookup.frequencyBand(h.entry.q);
           h.shared = LLLLookup.sharedTags(h.entry);
+          h.sharedPos = LLLLookup.sharedPos(h.entry);
         }
         return { status: { state: 'ready' }, groups };
       }

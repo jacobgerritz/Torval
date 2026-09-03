@@ -41,6 +41,7 @@ api.runtime.onMessage.addListener((message) => {
     case 'status': return Promise.resolve({ status });
     case 'tags':   return loadTags();
     case 'ankiAdd':      return ankiAdd(message.note);
+    case 'ankiDuplicate': return ankiDuplicate(message.word);
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     default:       return undefined;
@@ -56,6 +57,19 @@ if (api.action && api.action.onClicked) {
 async function guard(fn) {
   try { return { ok: true, result: await fn() }; }
   catch (err) { return { ok: false, error: err.message }; }
+}
+
+/**
+ * A quick, up-front answer to "do I already have this word?" — asked the
+ * moment + is pressed, well before the slower work of capturing the sentence
+ * audio even starts, so the answer is not stuck waiting behind it. This never
+ * blocks the card being made; it is only a heads-up.
+ */
+async function ankiDuplicate(word) {
+  return guard(async () => {
+    const { ankiConfig } = await api.storage.local.get('ankiConfig');
+    return LLLAnki.alreadyHave(ankiConfig, { word });
+  });
 }
 
 async function ankiAdd(note) {
@@ -84,6 +98,7 @@ async function handleLookup(text) {
         hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
         hit.band = LLLLookup.frequencyBand(hit.entry.q);
         hit.shared = LLLLookup.sharedTags(hit.entry);
+        hit.sharedPos = LLLLookup.sharedPos(hit.entry);
       }
     }
     return { status, groups };

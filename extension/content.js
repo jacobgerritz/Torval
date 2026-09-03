@@ -485,6 +485,11 @@
     add.textContent = '+';
     add.title = 'Add to Anki';
     add.addEventListener('click', () => {
+      // Fired off first, before the slower work of capturing the sentence
+      // (and any video audio) even starts: a duplicate is not an error and
+      // never stops the card being made, but it is worth knowing right away
+      // rather than only once the recording has already finished.
+      warnIfDuplicate(el, hit.word);
       mine(add, el, {
         word: hit.word,
         reading: hit.reading || '',
@@ -507,7 +512,13 @@
         : 'the pitch drops after mora ' + hit.pitch]);
     }
     for (const code of hit.shared || []) meta.push([label(code), tags[code] || code]);
-    if (entry.s[0].p.length) meta.push([entry.s[0].p.map(label).join(', '), '']);
+    // Only the part of speech every sense actually has in common goes on the
+    // meta line. 勉強 is a transitive suru-verb for one sense and intransitive
+    // for another and plain "noun" for a third — showing the first sense's
+    // combination as though it summed up the word would just be wrong for
+    // the rest of them.
+    const sharedPos = hit.sharedPos || [];
+    if (sharedPos.length) meta.push([sharedPos.map(label).join(', '), '']);
 
     if (meta.length) el.appendChild(renderMeta(meta));
 
@@ -518,17 +529,15 @@
       el.appendChild(why);
     }
 
-    let previous = entry.s[0].p.join(',');   // already said on the meta line
-
-    entry.s.forEach((sense, i) => {
+    entry.s.forEach((sense) => {
       const li = document.createElement('li');
 
-      // Only what this sense adds: the grammar it does not share with the line
-      // above, and any tag that applies to it alone.
+      // Only what this sense adds beyond what already applies to the whole
+      // word: the grammar it does not share with every other sense, and any
+      // tag that belongs to it alone.
       const qualifiers = [];
-      const pos = sense.p.join(',');
-      if (i > 0 && pos !== previous) qualifiers.push(...sense.p.map(label));
-      previous = pos;
+      const extraPos = sense.p.filter((code) => sharedPos.indexOf(code) === -1);
+      if (extraPos.length) qualifiers.push(...extraPos.map(label));
       for (const code of sense.m || []) {
         if ((hit.shared || []).indexOf(code) === -1) qualifiers.push(label(code));
       }
@@ -582,6 +591,29 @@
       line.appendChild(span);
     });
     return line;
+  }
+
+  /**
+   * A quick, non-blocking heads-up if this word is already in the collection.
+   * Duplicates are allowed — one sentence can easily teach three words, and
+   * mining the same word again later is not a mistake either — so this never
+   * stops the card being made; it only says so, and as early as possible.
+   */
+  async function warnIfDuplicate(entryEl, word) {
+    const old = entryEl.querySelector('.dup-note');
+    if (old) old.remove();
+    let reply;
+    try {
+      reply = await api.runtime.sendMessage({ type: 'ankiDuplicate', word });
+    } catch (err) {
+      return;
+    }
+    if (reply && reply.ok && reply.result) {
+      const note = document.createElement('div');
+      note.className = 'note dup-note';
+      note.textContent = 'Already in your collection — adding it again too.';
+      entryEl.appendChild(note);
+    }
   }
 
   /**

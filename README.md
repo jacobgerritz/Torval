@@ -135,6 +135,11 @@ The bold marks the word **as the page wrote it**, so a conjugated form is
 highlighted in full — 「<b>食べなかった</b>ので、お腹が空いた。」 — while the Target
 Word field still says 食べる.
 
+Duplicates are allowed. A repeated word gets a small note the moment **+** is
+pressed, before the slower work of capturing the sentence even starts — but the
+card is made either way. One sentence often teaches several words, and mining
+the same word again later is not a mistake either.
+
 By default a card carries every sense of the word. Clicking a sense before
 pressing **+** narrows it to the meanings you actually met — 語 is both "word;
 term" and "language", and you rarely want both. Clicking nothing means all of
@@ -176,6 +181,13 @@ There are two ways it gets the timing, tried in that order:
 Whichever way found the timing, **A** steps back a line and **D** forward.
 Part-way through a line, A restarts it; pressing it again goes to the line
 before, which is how you rewatch something you did not catch.
+
+In the on-screen fallback specifically, auto-generated captions are often
+revealed a few words at a time as recognition catches up rather than appearing
+whole. LLL treats a growing or slightly revised line as the same line still
+being written, not a new one each time — otherwise both the audio and the
+timing would start wherever the last fragment happened to begin, not at the
+sentence's true start.
 
 Pressing **+** on a word in a subtitle also puts on the card the frame you were
 looking at and the audio of that line. The frame is taken the instant you press

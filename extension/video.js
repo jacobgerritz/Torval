@@ -162,16 +162,24 @@ var LLLVideo = (function () {
       try { recorder.stop(); } catch (ignored) { /* already stopped */ }
       return null;
     } finally {
-      restore(video, wasTime, wasRate, wasPaused);
+      await restore(video, wasTime, wasRate, wasPaused);
     }
 
     return chunks.length ? new Blob(chunks, { type: type }) : null;
   }
 
-  function restore(video, time, rate, paused) {
+  /**
+   * Put the video back. Waits for the seek to actually land before resuming
+   * play or pause — setting currentTime does not take effect instantly, and
+   * calling play() before it does risks the browser starting playback from
+   * wherever it still was, which would look like the recording had put you
+   * back at the start of the clip rather than where you actually were.
+   */
+  async function restore(video, time, rate, paused) {
     try {
       video.playbackRate = rate;
       video.currentTime = time;
+      await seeked(video);
       if (paused) video.pause(); else video.play();
     } catch (err) { /* the page took the video away mid-capture */ }
   }

@@ -76,12 +76,22 @@ var LLLSubtitles = (function () {
   }
 
   function jump(direction) {
-    var target = step(video.currentTime, direction);
+    var target = step(video.currentTime, direction, openCue);
     if (target) video.currentTime = target.start;
   }
 
-  /** The line A or D should take you to from here, or null if there is none. */
-  function step(now, direction) {
+  /**
+   * The line A or D should take you to from here, or null if there is none.
+   *
+   * In the on-screen fallback, the line currently being spoken is not in
+   * `cues` yet — it only gets recorded once it ends. Without also checking the
+   * one still in progress, D would work only until you pressed A once: from
+   * the line before, there would be nothing later in `cues` to step forward
+   * to, since the very next line is the one still open. This is the ordinary
+   * case, not a rare one — it happens every single time you rewind and then
+   * want to come back.
+   */
+  function step(now, direction, current) {
     if (direction < 0) {
       // A little grace, so that pressing A part-way through a line takes you to
       // the start of it — and pressing it again takes you to the line before.
@@ -90,10 +100,14 @@ var LLLSubtitles = (function () {
       }
       return null;
     }
+    var best = null;
     for (var j = 0; j < cues.length; j++) {
-      if (cues[j].start > now + 0.05) return cues[j];
+      if (cues[j].start > now + 0.05) { best = cues[j]; break; }
     }
-    return null;
+    if (current && current.start > now + 0.05 && (!best || current.start < best.start)) {
+      return current;
+    }
+    return best;
   }
 
   function watch() {
@@ -458,17 +472,50 @@ var LLLSubtitles = (function () {
     return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
   }
 
-  /** Text changed on screen: close whatever line was open, open whatever is new. */
+  /**
+   * Text changed on screen: close whatever line was open, open whatever is new
+   * — unless the new text is plainly the same line still being revealed.
+   *
+   * Auto-generated captions are very often drawn incrementally, word by word,
+   * as speech recognition catches up rather than appearing all at once. Toward
+   * the end of a sentence, this looked like several unrelated short "lines" in
+   * a row, and only the last fragment reached the one-second floor to be kept
+   * — so the recorded cue started wherever that last fragment began, not at
+   * the true start of the sentence. Recording 今回の動画では… came out starting
+   * at 動画 for exactly this reason.
+   */
   function checkCaption() {
     if (!enabled || !video) return;
     var text = captionText();
-    if (text === (openCue ? openCue.text : '')) return;
+    var current = openCue ? openCue.text : '';
+    if (text === current) return;
+
+    if (openCue && text && isContinuation(current, text)) {
+      openCue.text = text;
+      return;
+    }
 
     var now = video.currentTime;
     if (openCue && now - openCue.start >= MIN_OBSERVED_SECONDS) {
       upsertCue({ start: openCue.start, end: now, text: openCue.text });
     }
     openCue = text ? { start: now, text: text } : null;
+  }
+
+  /** Is `next` plausibly the same line as `prev`, just further revealed? */
+  function isContinuation(prev, next) {
+    if (!prev) return false;
+    if (next.indexOf(prev) === 0 || prev.indexOf(next) === 0) return true;
+    // Auto-generated captions occasionally revise earlier words as recognition
+    // improves, not only add to the end, so a large shared prefix counts too.
+    var shared = commonPrefixLength(prev, next);
+    return shared >= 3 && shared >= Math.min(prev.length, next.length) * 0.6;
+  }
+
+  function commonPrefixLength(a, b) {
+    var i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    return i;
   }
 
   function upsertCue(cue) {
@@ -527,7 +574,7 @@ var LLLSubtitles = (function () {
     overlay = document.createElement('div');
     overlay.setAttribute('data-lll-subtitle', '');
     overlay.style.cssText = [
-      'position:absolute', 'left:0', 'right:0', 'bottom:9%', 'display:none',
+      'position:absolute', 'left:0', 'right:0', 'bottom:4%', 'display:none',
       'z-index:60', 'justify-content:center', 'pointer-events:none', 'padding:0 6%'
     ].join(';');
 
@@ -539,8 +586,8 @@ var LLLSubtitles = (function () {
       'pointer-events:auto', 'user-select:text', 'cursor:default', 'max-width:88%',
       'background:#16171a', 'border:1px solid #292b30', 'border-radius:6px',
       'box-shadow:0 8px 28px rgba(0,0,0,.5)', 'color:#f4f5f7',
-      'padding:6px 16px',
-      'font:500 26px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
+      'padding:9px 22px',
+      'font:500 34px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
         '"Yu Gothic UI",Meiryo,sans-serif',
       'text-align:center', 'white-space:pre-wrap'
     ].join(';');
@@ -612,6 +659,7 @@ var LLLSubtitles = (function () {
     parseXml: parseXml,
     step: step,
     insertObserved: insertObserved,
+    isContinuation: isContinuation,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; }
   };

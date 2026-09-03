@@ -269,38 +269,41 @@ const run = async () => {
     !mediaCalls.some((c) => c.action === 'storeMediaFile'),
     JSON.stringify(mediaCalls.map((c) => c.action)));
 
-  // One sentence can teach three words, so a repeated sentence is not a
-  // duplicate. Anki compares first fields, and on a sentence-mining note type
-  // that is the sentence — so the check has to be made on the word instead.
-  let queries = [];
-  globalThis.fetch = async (url, init) => {
-    const body = JSON.parse(init.body);
-    queries.push(body);
-    return { ok: true, json: async () => ({
-      result: body.action === 'findNotes' ? [] : 1, error: null }) };
-  };
+  // One sentence can teach three words, so a repeated sentence must not be
+  // treated as a duplicate. Anki's own rule compares first fields, which on a
+  // sentence-mining note type is the sentence — so that rule is left off, and
+  // whether a word is already known is answered separately, up front, as
+  // information rather than as a gate. See the duplicate tests just below.
   const mining = { deck: 'Japanese::Sentence Mining', model: 'M',
     fields: { Sentence: 'sentence', 'Target Word': 'word' } };
-  await Anki.addNote(mining, { word: '食べる', sentence: 'A' });
-  const search = queries.find((q) => q.action === 'findNotes');
-  check('the collection is asked about the word, not the sentence',
-    search && search.params.query.includes('Target Word:食べる'), JSON.stringify(search));
-  check('the search is scoped to the chosen deck',
-    search.params.query.includes('deck:Japanese::Sentence Mining'), search.params.query);
-  check('Anki’s own first-field duplicate rule is turned off',
-    queries.find((q) => q.action === 'addNote').params.note.options.allowDuplicate === true);
 
-  // ...but the same word twice really is a duplicate.
-  queries = [];
+  // Duplicates are allowed: addNote must succeed even when the word is
+  // already in the collection, and must not itself refuse or even ask.
+  let dupCalls = [];
+  globalThis.fetch = async (url, init) => {
+    const body = JSON.parse(init.body);
+    dupCalls.push(body.action);
+    return { ok: true, json: async () => ({
+      result: body.action === 'findNotes' ? [999] : 1, error: null }) };
+  };
+  let dupErr = null;
+  await Anki.addNote(mining, { word: '食べる', sentence: 'C' }).catch((e) => { dupErr = e.message; });
+  check('adding an already-known word succeeds rather than being refused',
+    !dupErr, dupErr);
+  check('addNote does not itself query for duplicates — that is a separate, up-front check',
+    !dupCalls.includes('findNotes'), JSON.stringify(dupCalls));
+
+  // The separate, explicit check still correctly reports a duplicate when asked.
   globalThis.fetch = async (url, init) => {
     const body = JSON.parse(init.body);
     return { ok: true, json: async () => ({
-      result: body.action === 'findNotes' ? [1234] : 1, error: null }) };
+      result: body.action === 'findNotes' ? [999] : [], error: null }) };
   };
-  let refusal = null;
-  await Anki.addNote(mining, { word: '食べる', sentence: 'B' }).catch((e) => { refusal = e.message; });
-  check('a word already in the collection is refused, and says so',
-    refusal && refusal.includes('食べる'), refusal);
+  check('alreadyHave reports a duplicate when asked directly',
+    await Anki.alreadyHave(mining, { word: '食べる' }));
+  globalThis.fetch = async () => ({ ok: true, json: async () => ({ result: [], error: null }) });
+  check('alreadyHave reports no duplicate for a genuinely new word',
+    !(await Anki.alreadyHave(mining, { word: '新語' })));
 
   // Deck names nest with colons, which must survive; a word's own colon must not.
   check('deck names keep their colons, field values do not',
@@ -506,6 +509,21 @@ const run = async () => {
   check('an entry with no tags at all is handled',
     JSON.stringify(Lookup.sharedTags({ s: [{ g: ['x'] }, { g: ['y'] }] })) === '[]');
 
+  // --- part of speech shared across senses -------------------------------
+  // 勉強 has four senses with genuinely different grammar: n,vs,vt / n,vs,vi /
+  // plain n / n,vs,vt,vi. Only "n" is common to all four.
+  const benkyouAll = (await db.getEntries(['勉強'])).get('勉強');
+  const benkyouEntry = benkyouAll.find((e) => e.s.length === 4);
+  check('the shared part of speech is only what every sense actually has',
+    JSON.stringify(Lookup.sharedPos(benkyouEntry)) === '["n"]',
+    JSON.stringify(Lookup.sharedPos(benkyouEntry)));
+
+  // 読む is v5m,vt on every one of its senses — the whole combination is shared.
+  const yomuEntry = (await db.getEntries(['読む'])).get('読む')[0];
+  check('a part of speech identical on every sense is shared in full',
+    JSON.stringify(Lookup.sharedPos(yomuEntry).sort()) === '["v5m","vt"]',
+    JSON.stringify(Lookup.sharedPos(yomuEntry)));
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',
@@ -631,6 +649,35 @@ const run = async () => {
   check('D from a gap goes to the line after it', Subs.step(7, 1).start === 12);
   check('D past the last line has nowhere to go', Subs.step(99, 1) === null);
   check('A before the first line has nowhere to go', Subs.step(0.2, -1) === null);
+
+  // The on-screen fallback only records a line once it ends, so the one
+  // currently playing is not in `cues` yet — without also checking it, D
+  // would work only up to the line before the one in progress, which in
+  // practice meant D stopped working the moment you had used A even once.
+  const inProgress = { start: 20, text: 'still being said' };
+  check('D reaches the line still in progress when nothing later is known',
+    Subs.step(15, 1, inProgress).start === 20, JSON.stringify(Subs.step(15, 1, inProgress)));
+  check('D still prefers a fully-known line over the in-progress one if it is sooner',
+    Subs.step(2.2, 1, inProgress).start === 3, JSON.stringify(Subs.step(2.2, 1, inProgress)));
+  check('the in-progress line is ignored once it is in the past',
+    Subs.step(25, 1, inProgress) === null);
+
+  // --- merging a progressively-revealed caption ---------------------------
+  // Auto-generated captions are very often drawn word by word as recognition
+  // catches up, not all at once. Treating each partial reveal as a brand new
+  // line meant a recorded cue could start wherever the LAST fragment began
+  // rather than at the sentence's true start — 今回の動画では… coming out
+  // starting at 動画 specifically because of this.
+  check('a line growing forward is recognised as the same line',
+    Subs.isContinuation('今回の', '今回の動画では'));
+  check('a line growing further still is still the same line',
+    Subs.isContinuation('今回の動画では', '今回の動画では、公園で'));
+  check('a shorter revision of the same start is still the same line',
+    Subs.isContinuation('今回の動画では、公園で', '今回の動画では'));
+  check('an unrelated new line is not treated as a continuation',
+    !Subs.isContinuation('今回の動画では', '図書館で本を読んでいました'));
+  check('there is nothing to continue when no line was open',
+    !Subs.isContinuation('', '今回の'));
 
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its
