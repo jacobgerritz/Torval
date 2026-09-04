@@ -75,7 +75,6 @@
 
   let shiftDown = false;
   let pointer = { x: 0, y: 0 };
-  let lastQuery = null;
   let queryToken = 0;
   let scanScheduled = false;
   let tags = {};
@@ -279,7 +278,14 @@
       // last result stranded behind the cursor. Let go of Shift and it stays
       // put, so you can move over to it and read.
       if (!found) { hide(); return; }
-      if (found.text === lastQuery) return;
+      // Same test as plain hovering: has the cursor actually left the word
+      // being shown. Comparing the surrounding text instead, which is what
+      // this used to do, meant panning along a line with Shift held never
+      // looked like a change — reading outward from the cursor gives the
+      // same stretch of text for every character of it — so the popup sat on
+      // the first word of the line however far the mouse travelled.
+      const settled = ui && ui.host.style.display === 'block';
+      if (settled && inCurrentWord(found)) return;
       lookup(found.text, pointer, found);
       return;
     }
@@ -294,6 +300,11 @@
   // something to act on immediately.
   // -------------------------------------------------------------------------
 
+  /** Is the cursor still inside the word the current answer is about? */
+  function inCurrentWord(found) {
+    return found.block === hoverBlock && found.at >= hoverFrom && found.at < hoverTo;
+  }
+
   async function hoverScan(found) {
     if (!found) { clearHover(); return; }
 
@@ -305,7 +316,7 @@
     // change and the mark stayed stuck on the first word. Comparing where
     // the cursor is against where the answer actually reaches is the thing
     // that was meant all along.
-    if (found.block === hoverBlock && found.at >= hoverFrom && found.at < hoverTo) return;
+    if (inCurrentWord(found)) return;
 
     hoverBlock = null;
     hoverWord = null;
@@ -752,7 +763,6 @@
   // -------------------------------------------------------------------------
 
   async function lookup(text, at, where) {
-    lastQuery = text;
     // Captured now rather than when "+" is clicked: on a page whose text keeps
     // changing — subtitles, above all — the sentence may be gone by then. This
     // is only ever provisional when `where.point` is set: the real word may
@@ -777,6 +787,21 @@
       if (loc) context = sentenceAt(loc.node, loc.offset);
     }
 
+    // Whatever this turned out to be is now the word in play, whether it was
+    // reached by hovering, by clicking or by holding Shift. Recording it here
+    // rather than only in hoverScan is what lets Shift-panning tell "still
+    // the same word" from "the next one along", and what lets 3 and 4 act on
+    // a word the popup was opened on by a click.
+    const top = reply.groups && reply.groups[0];
+    if (where && where.pieces && top) {
+      const from = where.base + (typeof reply.start === 'number' ? reply.start : where.point);
+      hoverBlock = where.block;
+      hoverFrom = from;
+      hoverTo = from + top.length;
+      hoverWord = top.hits[0].word;
+      hoverState = stateOf(top.hits[0]);
+    }
+
     if (reply.status.state === 'loading') {
       showMessage(`Building dictionary… ${Math.round(reply.status.progress * 100)}%`, at);
     } else if (reply.status.state === 'error') {
@@ -784,7 +809,11 @@
     } else if (reply.groups && reply.groups.length) {
       showResults(reply.groups, at);
     } else {
-      lastQuery = null;   // allow a retry on the same text once data is ready
+      // Nothing there. Leaving the last word on screen would be worse than
+      // showing nothing: while Shift is held the popup is meant to follow the
+      // cursor, and a stale answer sitting under a word it has nothing to do
+      // with reads as an answer about that word.
+      hide();
     }
   }
 
@@ -819,7 +848,6 @@
 
   function hide() {
     if (ui) ui.host.style.display = 'none';
-    lastQuery = null;
   }
 
   async function showMessage(text, at) {
