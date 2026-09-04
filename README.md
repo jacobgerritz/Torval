@@ -63,9 +63,11 @@ that actually reaches it.
 | **other matches** | other words that start at the same place |
 | **A** / **D** | step back and forward a subtitle line |
 | **3** | mark the word under the cursor as known, popup or not |
+| **4** | ignore it instead: never mention this one again |
 | **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
 | **✓** | mark as known, or unmark it |
+| **⊘** | ignore, or stop ignoring |
 
 While Shift is held the popup follows whatever you point at, and closes if you
 point at something that is not a word. Let go of Shift, or click a word
@@ -359,16 +361,42 @@ would not be worth reading.
 
 Pressing **✓** in the popup moves the number immediately. A word's count is
 exactly how far the bar shifts, so nothing has to be read a second time.
-**⟳** reads the page again, **⚙** opens the settings, **×** hides the bar until
-the page is reloaded. It hides itself while a video is full screen, and never
-appears at all on a page with no Japanese on it.
+**⟳** reads the page again, **⚙** opens the settings, **📌** pins it open. It
+hides itself while a video is full screen, and never appears at all on a page
+with no Japanese on it.
+
+While the dictionary is still being built, or a page is still being read, the
+handle says so rather than sitting there silently: "LLL 42%" the first time,
+when 218,000 entries are being copied into the browser's own database, and
+"LLL ·" for the moment a page takes to read.
 
 A grammatical pattern JMdict happens to file as one entry — お元気ですか
 ("how are you") is nothing more than the honorific お, 元気, the copula です
 and the particle か — counts as known once every piece of it is, even though
-that exact four-word entry was never separately marked known itself. A true
-idiom, where the meaning genuinely is not the sum of its words, gets none of
-this: JMdict's own "id" tag is what tells the two apart.
+that exact four-word entry was never separately marked known itself. The same
+goes for ことがある. A true idiom, where the meaning genuinely is not the sum
+of its words, gets none of this: JMdict's own "id" tag is what tells the two
+apart, so 猫の手も借りたい stays unknown no matter how well you know 猫 and 手.
+
+Any reading of what is actually written counts, not only the best one. 来た is
+the past tense of 来る and also, on paper, a rare interjection; 読み is the stem
+of 読む and also a noun in its own right. Knowing either reading of what is on
+the page means nothing is missing, so an i-stem never counts as a new word
+just because the dictionary also lists it separately.
+
+### Ignored words
+
+Some words are never going to be learned and should not be counted either
+way: names, pieces of English, things the dictionary read wrongly. Press **⊘**
+in the popup, or the **4** key, and the word leaves the question entirely —
+not marked on the page, and out of the comprehension total rather than
+counting for or against it. Counting them unknown would say a page is harder
+than it is; counting them known would say the opposite; neither is true.
+
+Known and ignored are the same kind of decision with different answers, so a
+word is one or the other or neither, never both: putting it on one list takes
+it off the other. Both are browsable under LLL's settings, and either can be
+taken back.
 
 ### Does counting words this way actually make sense?
 
@@ -381,13 +409,11 @@ Two honest limits are worth knowing about. First, this is a vocabulary score,
 not a comprehension score in the full sense: understanding a sentence also
 takes grammar, and two sentences with the same known-word percentage are not
 always equally easy to follow. Second, a word the dictionary does not
-recognize at all (a name, a coined word, a typo) is currently left out of the
-count entirely, rather than counted as unknown, since there is no dictionary
-entry it could be, and so no way to ever mark it "known" either. On a video
-full of character names this can read a little higher than it should. Making
-that honest instead, without also being unfair to it, means giving names and
-other non-dictionary words their own way of being marked known, which is a
-real feature worth building next rather than a quick fix now.
+recognize at all — a name, a coined word, a typo — is left out of the count
+entirely rather than counted as unknown, since there is no dictionary entry it
+could be. On a video full of character names this reads a little higher than
+it should. Ignoring a word does the same thing deliberately, and for the same
+reason; the difference is that this happens without being asked.
 
 ---
 
@@ -509,10 +535,11 @@ would otherwise invent words that do not exist.
 
 In rough order of intent:
 
-- **Marking names and other non-dictionary words known.** A word the
-  dictionary does not recognize at all currently has no way to ever be marked
-  known, which can make a name-heavy video read as less understood than it
-  actually is.
+- **Reaching words the dictionary does not know at all.** Ignoring covers the
+  case where JMdict has an entry LLL read wrongly, but a name or coined word
+  with no entry at all never becomes a word in the first place, so there is
+  nothing to press ⊘ on. It is silently left out of the count either way,
+  which is the right answer often enough not to be urgent.
 - **Packaging.** Sign it, so it survives a Firefox restart.
 
 ---

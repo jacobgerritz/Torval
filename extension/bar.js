@@ -27,12 +27,13 @@ var LLLBar = (function () {
   var root = null;
   var els = {};
   var data = null;        // the last reading: { total, known, counts }
-  var dismissed = false;
   var onRefresh = null;
 
   var expanded = false;
   var pinned = false;
   var retractTimer = null;
+
+  var HANDLE_TITLE = 'How much of this page you understand';
 
   // Read once, up front, so the very first paint already knows whether to
   // start down — by the time a reading is ready to show (at the earliest,
@@ -49,28 +50,69 @@ var LLLBar = (function () {
    */
   function show(reading) {
     data = reading;
-    if (dismissed || !reading || !reading.total) return;
+    if (!reading || !reading.total) return;
     build();
+    idle();
     render();
   }
 
-  /** A reading is being taken — say so rather than sitting on a stale number. */
-  function working() {
-    if (dismissed || !data) return;
+  /**
+   * Say what LLL is busy doing, before there is any number to show.
+   *
+   * Building the dictionary takes a minute the first time and reading a page
+   * takes a moment every time, and until now both happened in complete
+   * silence — nothing on the page said anything at all, so the only thing to
+   * conclude was that nothing worked. The handle carries it, since that is
+   * what is visible while the bar is tucked away: "LLL 42%" while the
+   * dictionary is still being built, "LLL ·" while a page is being read.
+   */
+  function busy(what, progress) {
     build();
-    els.score.textContent = '…';
+    els.handle.textContent = typeof progress === 'number'
+      ? 'LLL ' + Math.round(progress * 100) + '%'
+      : 'LLL ·';
+    els.handle.classList.add('busy');
+    els.handle.title = what;
+    els.note.textContent = what;
+    els.note.hidden = false;
+    els.score.hidden = true;
+    els.detail.hidden = true;
+  }
+
+  /** Done being busy: back to whatever number there is, if there is one. */
+  function idle() {
+    if (!host) return;
+    els.handle.textContent = 'LLL';
+    els.handle.classList.remove('busy');
+    els.handle.title = HANDLE_TITLE;
+    els.note.hidden = true;
+    els.score.hidden = false;
+    els.detail.hidden = false;
   }
 
   /**
-   * One word was just marked known, or unmarked, from the popup. Its count is
-   * exactly how much the total moves, so the bar answers at once instead of
+   * One word just moved between known, ignored and neither. Its count is
+   * exactly how much the numbers move, so the bar answers at once instead of
    * reading the whole page again for a change of one word.
+   *
+   * Both ends of the move are needed rather than just the new state: going
+   * straight from known to ignored takes the word out of two counts at once,
+   * and only knowing where it came from says so.
    */
-  function adjust(word, isKnown) {
-    if (!data || !data.counts) return;
+  function restate(word, before, after) {
+    if (!data || !data.counts || before === after) return;
     var count = data.counts[word] || 0;
     if (!count) return;
-    data.known = Math.max(0, Math.min(data.total, data.known + (isKnown ? count : -count)));
+
+    // An ignored word is not part of the question at all, so it leaves the
+    // total; anything else is, so it rejoins it.
+    if (after === 'ignored') data.total -= count;
+    if (before === 'ignored') data.total += count;
+    if (after === 'known') data.known += count;
+    if (before === 'known') data.known -= count;
+
+    data.total = Math.max(0, data.total);
+    data.known = Math.max(0, Math.min(data.total, data.known));
     if (host) render();
   }
 
@@ -100,7 +142,7 @@ var LLLBar = (function () {
     els.handle = document.createElement('button');
     els.handle.className = 'handle';
     els.handle.textContent = 'LLL';
-    els.handle.title = 'Show how much of this page you understand';
+    els.handle.title = HANDLE_TITLE;
     els.handle.addEventListener('click', function () { setExpanded(!expanded); });
 
     els.bar = document.createElement('div');
@@ -122,6 +164,11 @@ var LLLBar = (function () {
     els.detail = document.createElement('span');
     els.detail.className = 'detail';
 
+    // Stands in for the score while there is not one yet.
+    els.note = document.createElement('span');
+    els.note.className = 'note';
+    els.note.hidden = true;
+
     var spacer = document.createElement('span');
     spacer.className = 'spacer';
 
@@ -131,14 +178,13 @@ var LLLBar = (function () {
     var settings = button('⚙', 'LLL settings', function () {
       api.runtime.sendMessage({ type: 'openOptions' }).catch(function () {});
     });
-    els.pin = button('📌', '', function () { setPinned(!pinned); });
+    // Not an emoji: an emoji renders in its own colours whatever the CSS
+    // says, so the pin had no way to look switched on. A plain character
+    // takes the colour it is given.
+    els.pin = button('◉', '', function () { setPinned(!pinned); });
     els.pin.className = 'pin';
-    var close = button('×', 'Hide until this page is reloaded', function () {
-      dismissed = true;
-      host.style.display = 'none';
-    });
 
-    els.bar.append(mark, els.score, els.detail, spacer, refresh, settings, els.pin, close);
+    els.bar.append(mark, els.score, els.note, els.detail, spacer, refresh, settings, els.pin);
     root.append(style, els.handle, els.bar);
     (document.body || document.documentElement).appendChild(host);
 
@@ -149,7 +195,7 @@ var LLLBar = (function () {
     // across it. The page's own reading is unaffected — it comes straight back
     // on the way out.
     document.addEventListener('fullscreenchange', function () {
-      if (!dismissed && data) host.style.display = document.fullscreenElement ? 'none' : 'block';
+      if (data) host.style.display = document.fullscreenElement ? 'none' : 'block';
     });
   }
 
@@ -208,6 +254,10 @@ var LLLBar = (function () {
     '  letter-spacing: 0.06em; color: #6b7079; cursor: pointer;',
     '}',
     '.handle:hover { color: #dfe1e5; }',
+    // While something is being worked out, the handle is the only part
+    // showing, so it is the part that has to say so.
+    '.handle.busy { color: #c7ab72; border-color: #4a4034; }',
+    '.note { color: #c7ab72; }',
     '.bar {',
     '  position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;',
     '  box-sizing: border-box; height: 40px; display: flex; align-items: center; gap: 14px;',
@@ -232,15 +282,18 @@ var LLLBar = (function () {
     '  font: inherit; font-size: 16px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
     'button:hover { background: #24262b; color: #dfe1e5; }',
-    '.pin { font-size: 13px; }',
-    '.pin.on { color: #dba35f; }',
-    '.pin.on:hover { color: #e6b578; }'
+    '.pin { font-size: 12px; }',
+    // Unmistakably switched on, not just a shade different: a pin you
+    // cannot tell the state of is a pin you press twice.
+    '.pin.on { color: #16171a; background: #dba35f; }',
+    '.pin.on:hover { color: #16171a; background: #e6b578; }'
   ].join('\n');
 
   return {
     show: show,
-    working: working,
-    adjust: adjust,
+    busy: busy,
+    idle: idle,
+    restate: restate,
     onRefresh: function (fn) { onRefresh = fn; }
   };
 })();
