@@ -8,6 +8,7 @@
     <h1>LLL</h1>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="known">Known words</button>
+    <button class="tab" data-panel="ignored">Ignored words</button>
   </nav>
 
   <main>
@@ -96,6 +97,34 @@
 
       <div id="list" class="words"></div>
       <p id="more" class="note more" hidden></p>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-ignored" hidden>
+    <div class="count" id="count-ignored">…</div>
+    <p class="note count-note">
+      Words you never want to be told about again: names, pieces of English,
+      things the dictionary read wrongly. They are left unmarked on the page
+      and taken out of the comprehension score altogether, rather than
+      counting for or against it. Press ⊘ on any word in the popup, or
+      the 4 key, to put one here.
+    </p>
+
+    <section>
+      <h2>Browse</h2>
+      <p class="note">
+        Newest first. &times; takes a word back out, so it counts again.
+      </p>
+
+      <label class="search">
+        <span>Search</span>
+        <input id="search-ignored" type="search" placeholder="ネカフェ" spellcheck="false">
+      </label>
+
+      <div id="list-ignored" class="words"></div>
+      <p id="more-ignored" class="note more" hidden></p>
     </section>
   </div>
 

@@ -1,10 +1,15 @@
 /*
- * LLL — the known words panel
+ * LLL — the known and ignored word panels
  *
- * The list the comprehension percentage is measured against: every word you
- * have said you already know. Words arrive here two ways — one at a time, by
- * pressing ✓ on a word in the popup, or in bulk, by pasting in something you
- * have already read.
+ * Two lists of words, browsed exactly the same way, so they are one piece of
+ * code told which list it is looking at.
+ *
+ *   known    what the comprehension percentage is measured against. Words
+ *            arrive by pressing ✓ on one in the popup, by the 3 key, or in
+ *            bulk by pasting in something already read.
+ *   ignored  words never to be mentioned again: names, pieces of English,
+ *            things the dictionary read wrongly. They leave the comprehension
+ *            question rather than counting either way.
  *
  * Adding in bulk is done by the exact same code that answers a Shift-hover,
  * run across a whole passage instead of stopping at one word: each Japanese
@@ -28,144 +33,172 @@
   // search box is how you find one word among that many.
   const PAGE = 200;
 
-  const countEl = document.getElementById('count');
-  const textEl = document.getElementById('text');
-  const fileEl = document.getElementById('file');
-  const addButton = document.getElementById('add');
-  const resultEl = document.getElementById('result');
-  const searchEl = document.getElementById('search');
-  const listEl = document.getElementById('list');
-  const moreEl = document.getElementById('more');
-
-  let all = [];        // [{ word, added }], newest first
-  let shown = PAGE;
-
-  refresh();
-
-  // -------------------------------------------------------------------------
-  // Adding
-  // -------------------------------------------------------------------------
-
-  fileEl.addEventListener('change', async () => {
-    const file = fileEl.files[0];
-    if (!file) return;
-    textEl.value = await file.text();
-    fileEl.value = '';
+  browsePanel({
+    list: 'knownList',
+    forget: 'forgetWords',
+    noun: 'known word',
+    ids: { count: 'count', search: 'search', list: 'list', more: 'more' },
+    empty: 'Nothing here yet — press ✓ on a word in the popup, or paste a text above.'
   });
 
-  addButton.addEventListener('click', async () => {
-    const text = textEl.value.trim();
-    if (!text) return;
-
-    addButton.disabled = true;
-    addButton.textContent = 'Reading…';
-    resultEl.textContent = '';
-    resultEl.className = 'note';
-
-    try {
-      const found = await api.runtime.sendMessage({ type: 'extractWords', text });
-      if (!found.ok) throw new Error(found.error);
-
-      const added = await api.runtime.sendMessage({ type: 'addKnownWords', words: found.result });
-      if (!added.ok) throw new Error(added.error);
-
-      const already = found.result.length - added.result.added;
-      resultEl.textContent = `Found ${found.result.length} words — ` +
-        `${added.result.added} new, ${already} already known.`;
-      await refresh();
-    } catch (err) {
-      resultEl.textContent = err.message;
-      resultEl.className = 'note error';
-    } finally {
-      addButton.disabled = false;
-      addButton.textContent = 'Add words from this text';
-    }
+  browsePanel({
+    list: 'ignoredList',
+    forget: 'forgetIgnored',
+    noun: 'ignored word',
+    ids: {
+      count: 'count-ignored', search: 'search-ignored',
+      list: 'list-ignored', more: 'more-ignored'
+    },
+    empty: 'Nothing ignored yet — press ⊘ on a word in the popup, or the 4 key.'
   });
 
+  addFromText();
+
   // -------------------------------------------------------------------------
-  // Browsing
+  // Browsing one of the lists
   // -------------------------------------------------------------------------
 
-  searchEl.addEventListener('input', () => { shown = PAGE; draw(); });
+  function browsePanel(config) {
+    const countEl = document.getElementById(config.ids.count);
+    const searchEl = document.getElementById(config.ids.search);
+    const listEl = document.getElementById(config.ids.list);
+    const moreEl = document.getElementById(config.ids.more);
+    if (!countEl || !listEl) return;
 
-  // More rows arrive by scrolling to them rather than by pressing a button.
-  // A list of two thousand words is eleven presses of "show more", which is
-  // ten more decisions than anybody wants to make about a word list.
-  listEl.addEventListener('scroll', () => {
-    if (listEl.scrollTop + listEl.clientHeight < listEl.scrollHeight - 200) return;
-    if (shown >= matching().length) return;
-    shown += PAGE;
-    draw({ keepScroll: true });
-  });
+    let all = [];        // [{ word, added }], newest first
+    let shown = PAGE;
 
-  async function refresh() {
-    const reply = await api.runtime.sendMessage({ type: 'knownList' });
-    all = reply.ok ? reply.result : [];
-    setCount(all.length);
-    shown = PAGE;
-    draw();
-  }
+    refresh();
+    // The bulk-add form needs to redraw whichever list it just added to.
+    if (config.list === 'knownList') window.LLLRefreshKnown = refresh;
 
-  function matching() {
-    const query = searchEl.value.trim();
-    if (!query) return all;
-    return all.filter((row) => row.word.indexOf(query) !== -1);
-  }
+    searchEl.addEventListener('input', () => { shown = PAGE; draw(); });
 
-  function draw(options) {
-    const rows = matching();
-    const at = listEl.scrollTop;
-    listEl.textContent = '';
-
-    if (!rows.length) {
-      const empty = document.createElement('p');
-      empty.className = 'note';
-      empty.textContent = all.length
-        ? 'No known word matches that.'
-        : 'Nothing here yet — press ✓ on a word in the popup, or paste a text above.';
-      listEl.appendChild(empty);
-      moreEl.hidden = true;
-      return;
-    }
-
-    for (const row of rows.slice(0, shown)) listEl.appendChild(wordRow(row));
-    if (options && options.keepScroll) listEl.scrollTop = at;
-
-    const left = rows.length - shown;
-    moreEl.hidden = left <= 0;
-    if (left > 0) moreEl.textContent = `${left.toLocaleString('en-US')} more — keep scrolling.`;
-  }
-
-  function wordRow({ word, added }) {
-    const row = document.createElement('div');
-    row.className = 'word-row';
-
-    const text = document.createElement('span');
-    text.className = 'word';
-    text.textContent = word;
-
-    const when = document.createElement('span');
-    when.className = 'when';
-    when.textContent = added ? new Date(added).toLocaleDateString() : '';
-
-    const remove = document.createElement('button');
-    remove.className = 'remove';
-    remove.textContent = '×';
-    remove.title = 'Forget this word';
-    remove.addEventListener('click', async () => {
-      remove.disabled = true;
-      const reply = await api.runtime.sendMessage({ type: 'forgetWords', words: [word] });
-      if (!reply || !reply.ok) { remove.disabled = false; return; }
-      all = all.filter((r) => r.word !== word);
-      setCount(all.length);
-      draw();
+    // More rows arrive by scrolling to them rather than by pressing a button.
+    // A list of two thousand words is eleven presses of "show more", which is
+    // ten more decisions than anybody wants to make about a word list.
+    listEl.addEventListener('scroll', () => {
+      if (listEl.scrollTop + listEl.clientHeight < listEl.scrollHeight - 200) return;
+      if (shown >= matching().length) return;
+      shown += PAGE;
+      draw({ keepScroll: true });
     });
 
-    row.append(text, when, remove);
-    return row;
+    async function refresh() {
+      const reply = await api.runtime.sendMessage({ type: config.list });
+      all = reply && reply.ok ? reply.result : [];
+      setCount(all.length);
+      shown = PAGE;
+      draw();
+    }
+
+    function matching() {
+      const query = searchEl.value.trim();
+      if (!query) return all;
+      return all.filter((row) => row.word.indexOf(query) !== -1);
+    }
+
+    function draw(options) {
+      const rows = matching();
+      const at = listEl.scrollTop;
+      listEl.textContent = '';
+
+      if (!rows.length) {
+        const empty = document.createElement('p');
+        empty.className = 'note';
+        empty.textContent = all.length ? 'Nothing here matches that.' : config.empty;
+        listEl.appendChild(empty);
+        moreEl.hidden = true;
+        return;
+      }
+
+      for (const row of rows.slice(0, shown)) listEl.appendChild(wordRow(row));
+      if (options && options.keepScroll) listEl.scrollTop = at;
+
+      const left = rows.length - shown;
+      moreEl.hidden = left <= 0;
+      if (left > 0) moreEl.textContent = `${left.toLocaleString('en-US')} more — keep scrolling.`;
+    }
+
+    function wordRow({ word, added }) {
+      const row = document.createElement('div');
+      row.className = 'word-row';
+
+      const text = document.createElement('span');
+      text.className = 'word';
+      text.textContent = word;
+
+      const when = document.createElement('span');
+      when.className = 'when';
+      when.textContent = added ? new Date(added).toLocaleDateString() : '';
+
+      const remove = document.createElement('button');
+      remove.className = 'remove';
+      remove.textContent = '×';
+      remove.title = 'Take this word off the list';
+      remove.addEventListener('click', async () => {
+        remove.disabled = true;
+        const reply = await api.runtime.sendMessage({ type: config.forget, words: [word] });
+        if (!reply || !reply.ok) { remove.disabled = false; return; }
+        all = all.filter((r) => r.word !== word);
+        setCount(all.length);
+        draw();
+      });
+
+      row.append(text, when, remove);
+      return row;
+    }
+
+    function setCount(n) {
+      countEl.textContent = n.toLocaleString('en-US') + ' ' + config.noun + (n === 1 ? '' : 's');
+    }
   }
 
-  function setCount(n) {
-    countEl.textContent = n.toLocaleString('en-US') + (n === 1 ? ' known word' : ' known words');
+  // -------------------------------------------------------------------------
+  // Adding a whole text at once, which only the known list takes
+  // -------------------------------------------------------------------------
+
+  function addFromText() {
+    const textEl = document.getElementById('text');
+    const fileEl = document.getElementById('file');
+    const addButton = document.getElementById('add');
+    const resultEl = document.getElementById('result');
+    if (!textEl || !addButton) return;
+
+    fileEl.addEventListener('change', async () => {
+      const file = fileEl.files[0];
+      if (!file) return;
+      textEl.value = await file.text();
+      fileEl.value = '';
+    });
+
+    addButton.addEventListener('click', async () => {
+      const text = textEl.value.trim();
+      if (!text) return;
+
+      addButton.disabled = true;
+      addButton.textContent = 'Reading…';
+      resultEl.textContent = '';
+      resultEl.className = 'note';
+
+      try {
+        const found = await api.runtime.sendMessage({ type: 'extractWords', text });
+        if (!found.ok) throw new Error(found.error);
+
+        const added = await api.runtime.sendMessage({ type: 'addKnownWords', words: found.result });
+        if (!added.ok) throw new Error(added.error);
+
+        const already = found.result.length - added.result.added;
+        resultEl.textContent = `Found ${found.result.length} words — ` +
+          `${added.result.added} new, ${already} already known.`;
+        if (window.LLLRefreshKnown) await window.LLLRefreshKnown();
+      } catch (err) {
+        resultEl.textContent = err.message;
+        resultEl.className = 'note error';
+      } finally {
+        addButton.disabled = false;
+        addButton.textContent = 'Add words from this text';
+      }
+    });
   }
 })();

@@ -110,12 +110,17 @@ var LLLHighlight = (function () {
   }
 
   /**
-   * A word was just ticked, or unticked, in the popup. Every place it appears
-   * changes at once, and without reading anything again — which is the point
-   * of having kept where each word was rather than only how many there were.
+   * A word was just ticked, unticked or set aside in the popup. Every place
+   * it appears changes at once, and without reading anything again — which is
+   * the point of having kept where each word was rather than only how many
+   * there were.
+   *
+   * Only one question is asked here: should this word be marked. Knowing it
+   * and never wanting to hear about it are different states elsewhere, but on
+   * the page they look the same, which is no mark at all.
    */
-  function mark(word, isKnown) {
-    if (isKnown) unknown.delete(word); else unknown.add(word);
+  function setMarked(word, shouldMark) {
+    if (shouldMark) unknown.add(word); else unknown.delete(word);
     apply();
   }
 
@@ -178,7 +183,7 @@ var LLLHighlight = (function () {
     var total = 0;
     for (var word in result.places) {
       if (!Object.prototype.hasOwnProperty.call(result.places, word)) continue;
-      if (result.knownHere.indexOf(word) === -1) unknown.add(word); else unknown.delete(word);
+      if (result.unmarked.indexOf(word) === -1) unknown.add(word); else unknown.delete(word);
 
       // start, length, group — see the comment on wordPlaces in background.js
       // for why the alternating group travels with the position rather than
@@ -344,7 +349,7 @@ var LLLHighlight = (function () {
   return {
     start: start,
     read: read,
-    mark: mark,
+    setMarked: setMarked,
     supported: supported,
     // Exposed for the tests: turning a position in the gathered text back into
     // a place on the page is the part with the arithmetic in it.

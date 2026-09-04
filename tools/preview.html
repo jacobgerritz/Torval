@@ -106,6 +106,7 @@ const TAGS = {
 // known up front so the comprehension bar starts on a real number rather than
 // zero, and so the popup has both states of the ✓ to show.
 const known = new Set(['本', '人']);
+const ignored = new Set();
 
 // --- stand in for the extension's messaging ---------------------------------
 let settings = {};
@@ -121,30 +122,34 @@ window.browser = {
     getURL: (p) => '../extension/' + p,
     async sendMessage(msg) {
       if (msg.type === 'tags') return TAGS;
-      if (msg.type === 'status') return { status: { state: 'ready' } };
       if (msg.type === 'ankiAdd') { window.__lastNote = msg.note; return { ok: true, result: 1 }; }
       if (msg.type === 'openOptions') { console.log('preview: would open the settings page'); return { ok: true }; }
+      if (msg.type === 'status') return { status: { state: 'ready', progress: 1 } };
       if (msg.type === 'setKnown') {
-        if (msg.known) known.add(msg.word); else known.delete(msg.word);
-        return { ok: true, result: { word: msg.word, known: msg.known, total: known.size } };
+        if (msg.known) { known.add(msg.word); ignored.delete(msg.word); } else known.delete(msg.word);
+        return { ok: true, result: { word: msg.word, on: msg.known, total: known.size } };
+      }
+      if (msg.type === 'setIgnored') {
+        if (msg.ignored) { ignored.add(msg.word); known.delete(msg.word); } else ignored.delete(msg.word);
+        return { ok: true, result: { word: msg.word, on: msg.ignored, total: ignored.size } };
       }
       if (msg.type === 'comprehension') {
-        const tokens = await LLLLookup.extractTokens(msg.text, db);
-        return { ok: true, result: LLLLookup.coverage(tokens, known) };
+        const tokens = await LLLLookup.locateTokens(msg.text, db);
+        return { ok: true, result: LLLLookup.coverage(tokens, known, ignored) };
       }
       if (msg.type === 'wordPlaces') {
         const tokens = await LLLLookup.locateTokens(msg.text, db);
         const places = {};
-        const knownHere = [];
+        const unmarked = [];
         tokens.forEach((t, i) => {
           if (!places[t.word]) {
             places[t.word] = [];
-            if (known.has(t.word)) knownHere.push(t.word);
+            if (ignored.has(t.word) || LLLLookup.isKnown(t, known)) unmarked.push(t.word);
           }
           places[t.word].push(t.start, t.length, i % 2);
         });
-        const score = LLLLookup.coverage(tokens.map((t) => t.word), known);
-        return { ok: true, result: { ...score, places, knownHere } };
+        const score = LLLLookup.coverage(tokens, known, ignored);
+        return { ok: true, result: { ...score, places, unmarked } };
       }
       if (msg.type === 'lookup') {
         const start = typeof msg.point === 'number' ? await LLLLookup.wordAt(msg.text, msg.point, db) : 0;
@@ -158,6 +163,7 @@ window.browser = {
           h.shared = LLLLookup.sharedTags(h.entry);
           h.sharedPos = LLLLookup.sharedPos(h.entry);
           h.known = known.has(h.word);
+          h.ignored = ignored.has(h.word);
         }
         return { status: { state: 'ready' }, groups, start };
       }

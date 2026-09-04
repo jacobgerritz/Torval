@@ -50,6 +50,10 @@ const SAMPLE = ['本', '人', '車', '食べる', '読む', '図書館', '日本
 SAMPLE.forEach((word, i) => known.set(word, Date.now() - i * 86400000));
 for (let i = 0; i < 400; i++) known.set('（例' + i + '・にせもの）', Date.now() - (i + 20) * 3600000);
 
+// A few words on the ignored list too, so that panel has something to show.
+const ignored = new Map();
+['ネカフェ', '（にせもの・な・まえ）', 'ＡＢＣ'].forEach((word, i) => ignored.set(word, Date.now() - i * 3600000));
+
 let stored = { ankiConfig: { deck: '日本語::Mining', model: 'LLL', tags: ['lll'], fields: {} } };
 
 window.browser = {
@@ -69,6 +73,14 @@ window.browser = {
         case 'knownList':
           return { ok: true, result: [...known].map(([word, added]) => ({ word, added }))
             .sort((a, b) => b.added - a.added) };
+        case 'ignoredList':
+          return { ok: true, result: [...ignored].map(([word, added]) => ({ word, added }))
+            .sort((a, b) => b.added - a.added) };
+        case 'forgetIgnored': {
+          let removed = 0;
+          for (const word of msg.words) if (ignored.delete(word)) removed++;
+          return { ok: true, result: { removed, total: ignored.size } };
+        }
         case 'extractWords':
           return { ok: true, result: [...new Set(msg.text.match(/[一-鿿ぁ-ヿ]+/g) || [])] };
         case 'addKnownWords': {

@@ -86,9 +86,16 @@
   // Plain hovering, with no Shift and no click — what is under the cursor
   // right now, kept up to date on every mouse movement so that a click or a
   // press of 3 has an answer ready rather than a fresh lookup to wait on.
-  let hoverText = null;
   let hoverToken = 0;
-  let hoverWord = null;   // the dictionary form of whatever hoverText resolved to
+  let hoverWord = null;   // the dictionary form of whatever is under the cursor
+  let hoverState = 'unknown';   // and whether it is already known or ignored
+  // The stretch of the page the current answer covers, so that moving the
+  // mouse along a word does not ask about it again, while moving to the next
+  // word does. Keyed by the block it was read from, since two blocks each
+  // have their own idea of what character number 5 is.
+  let hoverBlock = null;
+  let hoverFrom = -1;
+  let hoverTo = -1;
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 
@@ -119,7 +126,8 @@
       hide();
       return;
     }
-    if (e.key === '3' && markHoverAsKnown(e)) return;
+    if (e.key === '3' && markHover(e, 'know')) return;
+    if (e.key === '4' && markHover(e, 'ignore')) return;
     if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
@@ -133,28 +141,28 @@
   window.addEventListener('blur', () => { shiftDown = false; });
 
   /**
-   * 3 marks the word being pointed at as known, without reaching for the ✓.
+   * 3 says you know the word being pointed at; 4 says never to mention it
+   * again. Neither needs the ✓ or the ⊘, or even an open popup: whatever
+   * plain hovering has already resolved is what they act on, the same word a
+   * click would open.
    *
-   * Most of what you meet while reading is a word you already know, and saying
-   * so is the one thing worth doing often enough that it should not cost a
-   * mouse movement or an open popup — whatever plain hovering has already
-   * resolved is what this acts on, the same word a click would open.
+   * Most of what you meet while reading is a word you already know, and
+   * saying so is the one thing done often enough that it should not cost a
+   * mouse movement. The numbers are 3 and 4 because that is where "known"
+   * and "ignored" sit in the scheme every other tool of this kind uses, so
+   * the fingers already know them, and 1 and 2 stay free should there ever
+   * be more answers to the question than these.
    *
-   * The number is 3 because that is where "known" sits in the scheme every
-   * other tool of this kind uses, so the finger already knows it — and it
-   * leaves 1 and 2 free should there ever be more than two answers to the
-   * question.
+   * They set rather than toggle. Pressing one twice should not undo it: with
+   * keys this easy to lean on, an accidental repeat must be harmless.
+   * Undoing either is a deliberate click in the popup.
    *
-   * It sets rather than toggles. Pressing it twice should not undo it: with a
-   * key this easy to lean on, an accidental repeat must be harmless. Unmarking
-   * is the ✓ in the popup, where it takes a deliberate click.
-   *
-   * Answers whether it did anything, because the key has to be taken away from
-   * the page when it did — YouTube reads the number keys as "jump to 30% of
-   * the video", and this must never also lose your place, whether or not a
-   * popup happens to be open.
+   * Answers whether it did anything, because the key has to be taken away
+   * from the page when it did — YouTube reads the number keys as "jump to
+   * 30% of the video", and this must never also lose your place, whether or
+   * not a popup happens to be open.
    */
-  function markHoverAsKnown(e) {
+  function markHover(e, kind) {
     if (e.ctrlKey || e.altKey || e.metaKey) return false;
 
     const focused = document.activeElement;
@@ -162,15 +170,15 @@
       /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return false;
 
     // A popup already open for exactly this word is driven through its own
-    // button, so its tick lights up too rather than only the page's marking
-    // updating out from under it.
+    // button, so the button lights up too rather than only the page's
+    // marking updating out from under it.
     if (ui && ui.host.style.display === 'block') {
-      const button = ui.card.querySelector('.entry .know');
+      const button = ui.card.querySelector('.entry .' + kind);
       const wordEl = ui.card.querySelector('.entry .word');
-      if (button && button.setKnown && wordEl && wordEl.textContent === hoverWord) {
+      if (button && button.setState && wordEl && wordEl.textContent === hoverWord) {
         e.preventDefault();
         e.stopPropagation();
-        button.setKnown(true);
+        button.setState(true);
         return true;
       }
     }
@@ -178,13 +186,35 @@
     if (!hoverWord) return false;
     e.preventDefault();
     e.stopPropagation();
-    const word = hoverWord;
-    api.runtime.sendMessage({ type: 'setKnown', word, known: true }).then((reply) => {
-      if (!reply || !reply.ok) return;
-      if (typeof LLLBar !== 'undefined') LLLBar.adjust(word, true);
-      if (typeof LLLHighlight !== 'undefined') LLLHighlight.mark(word, true);
-    }).catch(() => {});
+    applyState(hoverWord, kind, true, hoverState);
+    hoverState = kind === 'know' ? 'known' : 'ignored';
     return true;
+  }
+
+  /**
+   * Record that a word is known, or ignored, and reflect it everywhere at
+   * once: the number at the top of the page, and every place that word is
+   * marked on it.
+   *
+   * Known and ignored both mean "stop marking this", so the page treats them
+   * the same. The score does not: a known word counts towards understanding
+   * the page, while an ignored one leaves the question altogether. The bar is
+   * told where the word was and where it has gone rather than just what
+   * changed, because moving straight from known to ignored has to take it out
+   * of two counts at once, and only the two ends of the move say that.
+   */
+  function applyState(word, kind, on, before) {
+    const message = kind === 'know'
+      ? { type: 'setKnown', word, known: on }
+      : { type: 'setIgnored', word, ignored: on };
+    const after = !on ? 'unknown' : (kind === 'know' ? 'known' : 'ignored');
+
+    return api.runtime.sendMessage(message).then((reply) => {
+      if (!reply || !reply.ok) return false;
+      if (typeof LLLBar !== 'undefined') LLLBar.restate(word, before, after);
+      if (typeof LLLHighlight !== 'undefined') LLLHighlight.setMarked(word, after === 'unknown');
+      return true;
+    }).catch(() => false);
   }
 
   window.addEventListener('mousemove', (e) => {
@@ -266,9 +296,20 @@
 
   async function hoverScan(found) {
     if (!found) { clearHover(); return; }
-    if (found.text === hoverText) return;
-    hoverText = found.text;
+
+    // Ask again only when the cursor has actually left the word already
+    // being shown. This used to compare the surrounding text instead, which
+    // seemed reasonable and was quietly useless: reading outward from the
+    // cursor in both directions gives the *same* stretch of text for every
+    // character of 花は小さく, so panning along a line never looked like a
+    // change and the mark stayed stuck on the first word. Comparing where
+    // the cursor is against where the answer actually reaches is the thing
+    // that was meant all along.
+    if (found.block === hoverBlock && found.at >= hoverFrom && found.at < hoverTo) return;
+
+    hoverBlock = null;
     hoverWord = null;
+    hoverState = 'unknown';
     const token = ++hoverToken;
 
     let reply;
@@ -282,19 +323,26 @@
 
     const top = reply.groups[0];
     hoverWord = top.hits[0].word;
+    hoverState = stateOf(top.hits[0]);
 
     // The word may genuinely have begun before the character the cursor
     // happened to land on — hovering anywhere inside ネカフェ still finds
     // and marks the whole word, not just whatever was directly underneath.
-    const start = typeof reply.start === 'number'
-      ? locateInPieces(found.pieces, found.base + reply.start)
-      : { node: found.node, offset: found.offset };
+    const from = found.base + (typeof reply.start === 'number' ? reply.start : found.point);
+    hoverBlock = found.block;
+    hoverFrom = from;
+    hoverTo = from + top.length;
+
+    const start = locateInPieces(found.pieces, from);
     if (start) paintHover(start.node, start.offset, top.length);
   }
 
   function clearHover() {
-    hoverText = null;
+    hoverBlock = null;
+    hoverFrom = -1;
+    hoverTo = -1;
     hoverWord = null;
+    hoverState = 'unknown';
     hoverToken++;
     if (hoverSupported()) CSS.highlights.delete(HOVER_HIGHLIGHT);
   }
@@ -401,7 +449,11 @@
     if (!loc) return null;
     return {
       text: block.text.slice(start, end), node: loc.node, offset: loc.offset,
-      point: at - start, pieces: block.pieces, base: start
+      point: at - start, pieces: block.pieces, base: start,
+      // Where the cursor is in the block's own terms, and which block that
+      // is, so hovering can tell "still the same word" from "the next word
+      // along" without asking the dictionary again.
+      block: block.block, at
     };
   }
 
@@ -471,7 +523,7 @@
       pieces.push({ node: n, start: text.length, end: text.length + n.data.length });
       text += n.data;
     }
-    return { pieces, text };
+    return { pieces, text, block };
   }
 
   /** Where a known (node, offset) sits within blockPieces' combined text. */
@@ -601,6 +653,7 @@
     if (typeof LLLHighlight !== 'undefined') await LLLHighlight.start();
 
     LLLBar.onRefresh(() => { lastTranscript = ''; readPage(); });
+    await waitForDictionary();
     setTimeout(readPage, 1500);   // let the page finish putting itself together
 
     // Subtitles arrive well after the page does, and replace it as the thing
@@ -613,6 +666,35 @@
         seen = now;
         if (now) readPage();
       }, 2000);
+    }
+  }
+
+  /**
+   * Wait for the dictionary to be ready, saying so on the way.
+   *
+   * The first time LLL runs it copies 218,000 entries into the browser's own
+   * database, which takes about a minute; every start after that still needs
+   * a moment to open it. None of that used to show anywhere on the page, so
+   * the only thing to conclude from hovering a word and getting nothing was
+   * that the whole thing was broken. Now the handle in the corner says what
+   * is happening, and how far along it is.
+   */
+  async function waitForDictionary() {
+    for (;;) {
+      let reply;
+      try {
+        reply = await api.runtime.sendMessage({ type: 'status' });
+      } catch (err) {
+        return;   // the background is restarting; reading will retry anyway
+      }
+      const state = reply && reply.status;
+      if (!state || state.state === 'ready') return;
+      if (state.state === 'error') {
+        LLLBar.busy('LLL could not load its dictionary');
+        return;
+      }
+      LLLBar.busy('Building the dictionary, one time only…', state.progress || 0);
+      await new Promise((resolve) => setTimeout(resolve, 700));
     }
   }
 
@@ -637,7 +719,7 @@
   async function readPage() {
     if (readingPage || !isCurrent()) return;
     readingPage = true;
-    LLLBar.working();
+    LLLBar.busy('Reading this page…');
 
     const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
     let scored = false;
@@ -850,16 +932,14 @@
       });
     });
 
-    // Two different things you might want to do with a word you have just
-    // looked up, and they are not the same thing: + means "teach me this",
-    // ✓ means "I already have this". The tick is what the comprehension
-    // percentage is built out of, so marking one moves the bar at the top of
-    // the page immediately.
-    const know = knownButton(hit);
-
+    // Three different things you might want to do with a word you have just
+    // looked up, none of them the same: ⊘ means "never mention this again",
+    // ✓ means "I already have this", + means "teach me this". The first two
+    // are what the comprehension percentage is built out of, so either one
+    // moves the bar at the top of the page immediately.
     const buttons = document.createElement('span');
     buttons.className = 'buttons';
-    buttons.append(know, add);
+    buttons.append(stateButton(hit, 'ignore'), stateButton(hit, 'know'), add);
     head.appendChild(buttons);
     el.appendChild(head);
 
@@ -942,52 +1022,85 @@
     return el;
   }
 
+  const STATES = {
+    know: {
+      glyph: '✓',
+      on: 'Known — click to unmark',
+      off: 'Mark as already known (or press 3)'
+    },
+    ignore: {
+      glyph: '⊘',
+      on: 'Ignored — click to stop ignoring it',
+      off: 'Never mention this word again (or press 4)'
+    }
+  };
+
   /**
-   * The tick that says "I already know this word".
+   * The tick that says "I already know this word", and the ⊘ that says "never
+   * mention this one again" — a name, a piece of English, something the
+   * dictionary read wrongly. Both are the same button with a different
+   * meaning, so they behave identically and there is one description of what
+   * marking a word does.
    *
-   * It toggles, because the commonest mistake to make with it is pressing it
-   * on the wrong word, and a list you can only add to is one that slowly fills
-   * with things that are not true.
+   * They toggle, because the commonest mistake to make with either is
+   * pressing it on the wrong word, and a list you can only add to is one that
+   * slowly fills with things that are not true. They are also mutually
+   * exclusive: a word is known, or ignored, or neither, so turning one on
+   * turns the other off, both here and in what gets stored.
    */
-  function knownButton(hit) {
+  function stateButton(hit, kind) {
+    const labels = STATES[kind];
     const button = document.createElement('button');
-    button.className = 'know';
-    button.textContent = '✓';
-    let known = !!hit.known;
+    button.className = kind;
+    button.textContent = labels.glyph;
+    let on = kind === 'know' ? !!hit.known : !!hit.ignored;
     paint();
 
-    // Clicking asks for the opposite of whatever it is now; the 3 key asks for
-    // known outright. Both end up here, so there is one description of what
-    // marking a word actually does.
-    button.addEventListener('click', () => set(!known));
-    button.setKnown = set;
+    // Clicking asks for the opposite of whatever it is now; 3 and 4 ask for
+    // it outright. Both end up here.
+    button.addEventListener('click', () => set(!on));
+    button.setState = set;
 
     async function set(wanted) {
-      if (wanted === known) return;
+      if (wanted === on) return;
       button.disabled = true;
-      let reply;
-      try {
-        reply = await api.runtime.sendMessage({ type: 'setKnown', word: hit.word, known: wanted });
-      } catch (err) {
-        reply = null;
-      }
+      const ok = await applyState(hit.word, kind, wanted, stateOf(hit));
       button.disabled = false;
-      if (!reply || !reply.ok) return;
-      known = wanted;
-      hit.known = wanted;
+      if (!ok) return;
+      on = wanted;
+      if (kind === 'know') hit.known = wanted; else hit.ignored = wanted;
       paint();
-      // The score and every mark of that word on the page both answer at once.
-      if (typeof LLLBar !== 'undefined') LLLBar.adjust(hit.word, wanted);
-      if (typeof LLLHighlight !== 'undefined') LLLHighlight.mark(hit.word, wanted);
+      // Turning one on turns the other off. The stored lists already sort
+      // that out themselves, so this only has to repaint the other button —
+      // sending a second message would tell the bar to count the same change
+      // twice.
+      if (wanted) {
+        const other = button.parentElement &&
+          button.parentElement.querySelector('.' + (kind === 'know' ? 'ignore' : 'know'));
+        if (other && other.repaint) {
+          if (kind === 'know') hit.ignored = false; else hit.known = false;
+          other.repaint();
+        }
+      }
     }
 
     function paint() {
-      button.classList.toggle('on', known);
-      button.title = known
-        ? 'Known — click to unmark'
-        : 'Mark as already known (or press 3)';
+      button.classList.toggle('on', on);
+      button.title = on ? labels.on : labels.off;
     }
+
+    button.repaint = function () {
+      on = kind === 'know' ? !!hit.known : !!hit.ignored;
+      paint();
+    };
     return button;
+  }
+
+  /** Which of the three a word is in right now: known, ignored, or neither. */
+  function stateOf(hit) {
+    if (hit.ignored) return 'ignored';
+    if (hit.known) return 'known';
+    return 'unknown';
   }
 
   /** Which senses were picked, or all of them when none were. */

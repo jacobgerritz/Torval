@@ -147,7 +147,8 @@
 }
 
 .add,
-.know {
+.know,
+.ignore {
   padding: 0 2px;
   border: 0;
   background: none;
@@ -159,20 +160,27 @@
 }
 
 .add:hover:not(:disabled),
-.know:hover:not(:disabled) { color: #cfd3da; }
+.know:hover:not(:disabled),
+.ignore:hover:not(:disabled) { color: #cfd3da; }
 .add:disabled,
-.know:disabled { cursor: default; }
+.know:disabled,
+.ignore:disabled { cursor: default; }
 .add.done { color: #6f9e78; }
 
-.know {
+.know,
+.ignore {
   font-size: 15px;
   color: #3d4148;
 }
 
-/* Known words stay lit, so a popup says at a glance which of its matches are
-   already accounted for. */
+/* Known and ignored words stay lit, so a popup says at a glance which of its
+   matches are already accounted for, and which way. Green for "I have this",
+   grey-blue for "never mention it again" — the second is not an achievement,
+   so it does not get a colour that reads like one. */
 .know.on { color: #6f9e78; }
 .know.on:hover:not(:disabled) { color: #8fbe98; }
+.ignore.on { color: #6b7d8c; }
+.ignore.on:hover:not(:disabled) { color: #8ba0b0; }
 
 .toggle {
   margin-top: 7px;
