@@ -591,6 +591,70 @@ const run = async () => {
     (await Lookup.extractWords('本、車、人', db)).length === 3,
     JSON.stringify(await Lookup.extractWords('本、車、人', db)));
 
+  // --- crediting a transparent phrase for parts already known -------------
+  // お元気ですか ("how are you") is filed in JMdict as one "exp" entry, but it
+  // is nothing more than the honorific お, 元気, the copula です and the
+  // particle か — someone who knows all four has no real gap here.
+  const ogenki = await Lookup.locateTokens('お元気ですか', db);
+  check('お元気ですか is read as one expression, tagged decomposable',
+    ogenki.length === 1 && ogenki[0].word === 'お元気ですか' && ogenki[0].expression === true,
+    JSON.stringify(ogenki));
+  check('knowing every piece makes the whole phrase decomposable',
+    await Lookup.decomposeKnown('お元気ですか', 0, 'お元気ですか'.length, db,
+      new Set(['お', '元気', 'です', 'か'])));
+  check('missing even one piece leaves it undecomposable',
+    !(await Lookup.decomposeKnown('お元気ですか', 0, 'お元気ですか'.length, db,
+      new Set(['お', '元気', 'です']))));
+  check('an untouched span with nothing known does not decompose',
+    !(await Lookup.decomposeKnown('お元気ですか', 0, 'お元気ですか'.length, db, new Set())));
+
+  // A genuine idiom must never get this credit. Knowing 猫, の, 手, も and
+  // 借りる word for word does not hand you "desperately busy" — JMdict marks
+  // it with the misc tag "id" for exactly this reason, and that is what has
+  // to keep it out, since "exp" alone would not (猫の手も借りたい carries
+  // both "exp" and "adj-i", the same shape an ordinary expression has).
+  const idiom = await Lookup.locateTokens('猫の手も借りたい', db);
+  check('a genuine idiom is never marked decomposable, even though it is "exp" too',
+    idiom.length === 1 && idiom[0].expression === false, JSON.stringify(idiom));
+  check('a genuine idiom does not decompose even when every word in it is known',
+    !(await Lookup.decomposeKnown('猫の手も借りたい', 0, '猫の手も借りたい'.length, db,
+      new Set(['猫', 'の', '手', 'も', '借りる']))));
+
+  // Ordinary vocabulary — not an expression at all — is never sent through
+  // this at all; locateTokens should say so plainly.
+  const plain = await Lookup.locateTokens('食べる', db);
+  check('an ordinary word is not flagged as an expression',
+    plain.length === 1 && plain[0].expression === false, JSON.stringify(plain));
+
+  // --- finding the word a pointed-at character actually belongs to --------
+  // Pointing at フェ inside ネカフェ has to still find the whole word, not
+  // read forward from フェ and land on something shorter and unrelated.
+  for (let at = 0; at < 4; at++) {
+    const start = await Lookup.wordAt('ネカフェ', at, db);
+    const found = (await Lookup.search('ネカフェ'.slice(start), db))[0];
+    check(`pointing at character ${at} of ネカフェ finds the whole word`,
+      found && found.surface === 'ネカフェ', 'got ' + JSON.stringify(found));
+  }
+
+  // The same, inside a full sentence, must not overreach into a neighbouring
+  // word on either side.
+  const sentence = '昨日ネカフェに行った';
+  for (const [at, expectSurface] of [[0, '昨日'], [1, '昨日'], [2, 'ネカフェ'],
+    [4, 'ネカフェ'], [5, 'ネカフェ'], [7, '行った'], [9, '行った']]) {
+    const start = await Lookup.wordAt(sentence, at, db);
+    const found = (await Lookup.search(sentence.slice(start), db))[0];
+    check(`character ${at} of "${sentence}" resolves to ${expectSurface}`,
+      found && found.surface === expectSurface, 'got ' + JSON.stringify(found && found.surface));
+  }
+
+  // A noun immediately followed by に is the noun plus the ordinary particle,
+  // not the noun's own adverbial form — only a real na-adjective has one of
+  // those. This used to swallow に into the match for any noun at all.
+  await topMatch('ネカフェに行った', 'ネカフェ', 'ネカフェ');
+  // A genuine na-adjective's adverbial and attributive forms must still work.
+  await contains('元気に', '元気');
+  await contains('静かな', '静か');
+
   // --- comprehension ------------------------------------------------------
   // The percentage counts every word said, not every distinct word: a page
   // that says one unknown word forty times is not as hard as one with forty

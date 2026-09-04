@@ -100,6 +100,34 @@ var LLLLookup = (function () {
   }
 
   /**
+   * Where the word covering one particular character in `text` actually
+   * begins — not necessarily `at` itself.
+   *
+   * `search` only ever tries matches starting exactly where it is told to
+   * start, which is exactly right for a cursor that landed on the first
+   * character of a word and exactly wrong the rest of the time: pointing at
+   * フェ inside ネカフェ has no business finding フェ, but that is what
+   * happens if nothing is done. Every character from `at` back to where a
+   * word could plausibly have started is tried in turn, and whichever
+   * resulting match both reaches `at` and is longest overall wins — the same
+   * "longest wins" every other search in this file goes by. Ties keep the
+   * earliest start, which the loop order already gives for free.
+   */
+  async function wordAt(text, at, db) {
+    var bestStart = at;
+    var bestLength = 0;
+    var from = Math.max(0, at - MAX_SCAN + 1);
+    for (var start = from; start <= at; start++) {
+      var groups = await search(text.slice(start, start + MAX_SCAN), db);
+      if (!groups.length) continue;
+      var top = groups[0];
+      if (start + top.length <= at) continue;   // does not actually reach the pointed character
+      if (top.length > bestLength) { bestLength = top.length; bestStart = start; }
+    }
+    return bestStart;
+  }
+
+  /**
    * "Longest match wins" has one real trap: a common word plus a single
    * trailing particle sometimes happens to also spell a genuine, much rarer
    * dictionary entry. 今日は (2 characters, "today") plus は (the topic
@@ -108,7 +136,9 @@ var LLLLookup = (function () {
    * never what someone actually meant by typing 今日 followed by は.
    *
    * This does not change what is found, only which length is offered first —
-   * the longer reading is still right there under "shorter matches". It fires
+   * the longer reading is still right there under "other matches" (the popup
+   * calls that list "other" rather than "shorter" for exactly this reason:
+   * what ends up there is not always shorter). It fires
    * only when the character being trimmed off is, on its own, a particle
    * (checked with one small dictionary lookup rather than a hardcoded list of
    * them, since the dictionary already knows), and only when doing so jumps
@@ -365,7 +395,15 @@ var LLLLookup = (function () {
       if (!LLLJapanese.test(text[i])) { i++; continue; }
       var groups = await search(text.slice(i, i + MAX_SCAN), db);
       if (groups.length && groups[0].hits.length) {
-        tokens.push({ word: groups[0].hits[0].word, start: i, length: groups[0].length });
+        var hit = groups[0].hits[0];
+        tokens.push({
+          word: hit.word, start: i, length: groups[0].length,
+          // Whether JMdict itself tags this as an "expression" rather than a
+          // single word — the one fact that decides whether it is worth
+          // asking if a reader could piece it together from parts they
+          // already know. See decomposeKnown, below.
+          expression: isDecomposable(hit.entry)
+        });
         i += groups[0].length;
       } else {
         i++;
@@ -376,6 +414,97 @@ var LLLLookup = (function () {
       if ((++steps % 256) === 0) await pause();
     }
     return tokens;
+  }
+
+  /**
+   * A phrase worth checking for decomposeKnown, below: JMdict tags it `exp`,
+   * multiple words filed as one entry, and none of its senses are tagged
+   * `id` — an idiom, JMdict's own word for "the meaning is not what the
+   * parts say". 「exp」 alone is not enough on its own to tell them apart:
+   * 猫の手も借りたい ("desperately busy", literally "would even borrow a
+   * cat's paws") is filed as `exp,adj-i` exactly like an ordinary transparent
+   * expression is, and only the `id` tag actually says it is not one.
+   */
+  function isDecomposable(entry) {
+    var isExp = false;
+    for (var i = 0; i < entry.s.length; i++) {
+      var sense = entry.s[i];
+      if (sense.m && sense.m.indexOf('id') !== -1) return false;
+      if (sense.p.indexOf('exp') !== -1) isExp = true;
+    }
+    return isExp;
+  }
+
+  /**
+   * A genuine idiom specifically — both `exp` and JMdict's own `id` tag on
+   * the same sense — as opposed to merely "not decomposable", which is also
+   * true of every ordinary single word that was never a candidate for this in
+   * the first place. decomposeKnown needs the narrower question: a step
+   * partway through a breakdown that happens to consume everything left is
+   * completely ordinary (です often is exactly the last piece), and must not
+   * be refused just for not being an expression at all.
+   */
+  function isIdiom(entry) {
+    for (var i = 0; i < entry.s.length; i++) {
+      var sense = entry.s[i];
+      if (sense.p.indexOf('exp') !== -1 && sense.m && sense.m.indexOf('id') !== -1) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether a span some search already treated as one word can be understood
+   * anyway, because every smaller piece it is actually built from is
+   * separately known.
+   *
+   * JMdict lists a great many ordinary grammatical patterns as their own
+   * "expression" entries purely so they can be searched for — お元気ですか
+   * ("how are you") is filed as one entry, but it is nothing more than the
+   * polite prefix お, the word 元気, the copula です and the particle か, each
+   * an entirely ordinary word someone may already know on its own. Marking
+   * only the whole four-word entry "known" and never crediting the reader for
+   * already knowing all four pieces would be wrong in the other direction
+   * from the 今日は problem above: there, a rare reading was beating a common
+   * one; here, a rare *combination* would be allowed to hide four words
+   * someone plainly already has.
+   *
+   * A genuine idiom is not like this. Knowing every word in 猫の手も借りたい
+   * word for word ("even a cat's paws would help") does not hand you its
+   * actual meaning ("desperately busy") the way it does for a plain
+   * grammatical pattern, which is exactly what isDecomposable, above, is for
+   * — this only ever runs where that says the whole entry is transparent,
+   * and even then only ever replaces "known" with "known", never with
+   * "understood"; a reader who knows all four pieces of お元気ですか still
+   * sees the real phrase in the popup exactly as before.
+   */
+  async function decomposeKnown(text, start, length, db, known) {
+    var i = 0;
+    while (i < length) {
+      var remaining = length - i;
+      var groups = await search(text.slice(start + i, start + length), db);
+      if (!groups.length || !groups[0].hits.length) return false;
+
+      // Checked here, not left to whoever calls this, so nothing can ever
+      // mistakenly credit a genuine idiom by skipping the check upstream: if
+      // the whole remaining span is itself one entry and JMdict tags it a
+      // true idiom, refusing happens right here, whether or not this is the
+      // first step. An ordinary word that simply happens to reach exactly to
+      // the end — です often is the last piece of a breakdown — is not this;
+      // only a real idiom is.
+      if (groups[0].length === remaining && isIdiom(groups[0].hits[0].entry)) return false;
+
+      // At the very first step specifically, a match that swallows the whole
+      // remaining span again is not a breakdown — it is the same answer
+      // restated, and would otherwise make this always immediately "succeed".
+      var candidates = i === 0
+        ? groups.filter(function (g) { return g.length < remaining; })
+        : groups;
+      if (!candidates.length || !candidates[0].hits.length) return false;
+      var top = candidates[0];
+      if (!known.has(top.hits[0].word)) return false;
+      i += top.length;
+    }
+    return true;
   }
 
   function pause() {
@@ -417,6 +546,7 @@ var LLLLookup = (function () {
 
   return {
     search: search,
+    wordAt: wordAt,
     displayForm: displayForm,
     frequencyBand: frequencyBand,
     sharedTags: sharedTags,
@@ -424,6 +554,7 @@ var LLLLookup = (function () {
     extractWords: extractWords,
     extractTokens: extractTokens,
     locateTokens: locateTokens,
+    decomposeKnown: decomposeKnown,
     coverage: coverage,
     MAX_SCAN: MAX_SCAN
   };

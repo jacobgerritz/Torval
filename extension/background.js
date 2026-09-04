@@ -103,7 +103,7 @@ if (api.webRequest && api.webRequest.onHeadersReceived) {
 
 api.runtime.onMessage.addListener((message) => {
   switch (message && message.type) {
-    case 'lookup': return handleLookup(message.text);
+    case 'lookup': return handleLookup(message.text, message.point);
     case 'status': return Promise.resolve({ status });
     case 'tags':   return loadTags();
     case 'ankiAdd':      return ankiAdd(message.note);
@@ -166,11 +166,29 @@ async function ankiAdd(note) {
   });
 }
 
-async function handleLookup(text) {
+/**
+ * `point`, when given, is the index of the character actually pointed at
+ * within `text` — not necessarily where the word itself begins. A hover or a
+ * click lands wherever the cursor happens to be, which is the middle of a
+ * word at least as often as the start of one, and reading forward only from
+ * that exact character would find whatever shorter, unrelated thing merely
+ * starts there rather than the word that is actually there. Every plausible
+ * earlier starting point is tried instead, and `start` in the reply says
+ * which one won, so the content script can correct the sentence context and
+ * the hover mark to the word's real beginning rather than wherever the
+ * cursor was.
+ *
+ * Left out entirely, `text` is searched exactly as given, from its own
+ * start — what an explicit selection wants, since it was chosen on purpose.
+ */
+async function handleLookup(text, point) {
   if (status.state !== 'ready') return { status, groups: [] };
   try {
     await ready;
-    const groups = await LLLLookup.search(text, { getEntries });
+    const start = typeof point === 'number'
+      ? await LLLLookup.wordAt(text, point, { getEntries })
+      : 0;
+    const groups = await LLLLookup.search(text.slice(start), { getEntries });
     const known = await knownSet();
     // The accent is one number per word and the table is already in memory, so
     // it costs nothing to answer it here along with the definitions.
@@ -183,7 +201,7 @@ async function handleLookup(text) {
         hit.known = known.has(hit.word);
       }
     }
-    return { status, groups };
+    return { status, groups, start };
   } catch (err) {
     console.error('LLL lookup failed', err);
     return { status: { state: 'error', message: String(err) }, groups: [] };
@@ -241,8 +259,32 @@ async function extractWords(text) {
  */
 async function comprehension(text) {
   await requireDictionary();
-  const tokens = await LLLLookup.extractTokens(text, cachingReader());
-  return LLLLookup.coverage(tokens, await knownSet());
+  const reader = cachingReader();
+  const tokens = await LLLLookup.locateTokens(text, reader);
+  const known = await effectiveKnown(text, tokens, reader, await knownSet());
+  return LLLLookup.coverage(tokens.map((t) => t.word), known);
+}
+
+/**
+ * The stored known set, plus any expression that is not itself marked known
+ * but decomposes entirely into pieces that are — see decomposeKnown in
+ * lookup.js for why this is restricted to entries JMdict tags as an
+ * expression, and never touches ordinary vocabulary.
+ *
+ * A passage rarely has many distinct expressions in it even when it has many
+ * words, so each distinct one is only ever checked once no matter how many
+ * times it is said.
+ */
+async function effectiveKnown(text, tokens, reader, known) {
+  const checked = new Map();   // word -> already decided true/false this read
+  let extra = null;
+  for (const token of tokens) {
+    if (!token.expression || known.has(token.word) || checked.has(token.word)) continue;
+    const ok = await LLLLookup.decomposeKnown(text, token.start, token.length, reader, known);
+    checked.set(token.word, ok);
+    if (ok) { if (!extra) extra = new Set(known); extra.add(token.word); }
+  }
+  return extra || known;
 }
 
 /**
@@ -267,8 +309,9 @@ async function comprehension(text) {
  */
 async function wordPlaces(text) {
   await requireDictionary();
-  const tokens = await LLLLookup.locateTokens(text, cachingReader());
-  const known = await knownSet();
+  const reader = cachingReader();
+  const tokens = await LLLLookup.locateTokens(text, reader);
+  const known = await effectiveKnown(text, tokens, reader, await knownSet());
 
   const places = {};
   const knownHere = [];

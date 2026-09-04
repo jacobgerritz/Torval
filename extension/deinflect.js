@@ -247,8 +247,21 @@ var LLLDeinflect = (function () {
   rule('じゃない',     '', NA, NA, 'copula, negative');
   rule('ではない',     '', NA, NA, 'copula, negative');
   rule('じゃなかった', '', NA, NA, 'copula, negative past');
-  rule('な',           '', NA, NA, 'attributive');
-  rule('に',           '', NA, NA, 'adverbial');
+
+  // な (attributive) and に (adverbial) are different from the copula rules
+  // above them: any noun at all takes です or だった (猫です, 猫だった), but
+  // taking な or に as part of its own grammar is a na-adjective's trick
+  // specifically, not a plain noun's — 元気 ("healthy") does it because it is
+  // tagged both adj-na and n, but 猫 or ネカフェ, tagged only n, do not: 猫な
+  // and 猫に are not standard Japanese, only 猫だ and 猫に(as the particle)
+  // are. Restricted to plain 'n' as well as 'adj-na', this rule allowed any
+  // noun immediately followed by に to be misread as that noun's own
+  // adverbial form, so ネカフェに ("to the net cafe", noun + the ordinary
+  // particle に) was being offered as one long match instead of the noun and
+  // the particle after it.
+  var ADJ_NA = ['adj-na'];
+  rule('な', '', ADJ_NA, ADJ_NA, 'attributive');
+  rule('に', '', ADJ_NA, ADJ_NA, 'adverbial');
 
   // Index the rules by their ending so lookups stay fast.
   var byEnding = new Map();
