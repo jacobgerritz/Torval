@@ -9,6 +9,7 @@
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="known">Known words</button>
     <button class="tab" data-panel="ignored">Ignored words</button>
+    <button class="tab" data-panel="backup">Backup</button>
   </nav>
 
   <main>
@@ -125,6 +126,40 @@
 
       <div id="list-ignored" class="words"></div>
       <p id="more-ignored" class="note more" hidden></p>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-backup" hidden>
+    <section>
+      <h2>Save a copy</h2>
+      <p class="note">
+        Every word you have marked known or ignored, in one file. This is the
+        part of LLL that cannot be rebuilt: the dictionary downloads again in
+        a minute and the Anki settings are a minute of typing, but a known
+        list is however many months of reading, and it lives in one browser
+        profile belonging to an add-on that has to be loaded again by hand
+        every time Firefox restarts. Worth keeping a copy somewhere.
+      </p>
+      <p class="row">
+        <button id="save-words" class="primary">Save my words to a file</button>
+        <span id="save-note" class="note"></span>
+      </p>
+    </section>
+
+    <section>
+      <h2>Load a copy back</h2>
+      <p class="note">
+        Adds what is in the file to what is already here; nothing is removed
+        and nothing is overwritten. Restoring an old copy can only ever give
+        words back, never take away ones learned since, so carrying a file
+        between two machines works in either direction.
+      </p>
+      <p class="row">
+        <input type="file" id="load-words" accept=".json,application/json">
+        <span id="load-note" class="note"></span>
+      </p>
     </section>
   </div>
 

@@ -120,6 +120,8 @@ api.runtime.onMessage.addListener((message) => {
     case 'setIgnored':   return guard(() => setWordOn(IGNORED, message.word, message.ignored));
     case 'forgetWords':  return guard(() => forgetFrom(KNOWN, message.words));
     case 'forgetIgnored': return guard(() => forgetFrom(IGNORED, message.words));
+    case 'exportWords':  return guard(() => exportWords());
+    case 'importWords':  return guard(() => importWords(message.data));
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
     default:
       // Saying so out loud. A message with no case here simply never answers,
@@ -431,6 +433,63 @@ async function setWordOn(key, word, on) {
     if (otherMap[word]) { delete otherMap[word]; await saveWords(other, otherMap); }
   }
   return { word, on: !!on, total };
+}
+
+/**
+ * Both lists, with the dates, as one plain object to save somewhere safe.
+ *
+ * This is the part of LLL that cannot be rebuilt. The dictionary can be
+ * downloaded again and the settings retyped in a minute, but a known list is
+ * however many months of reading, and until now it existed in exactly one
+ * place — this browser profile, belonging to an add-on that has to be loaded
+ * again by hand every time Firefox restarts.
+ */
+async function exportWords() {
+  return {
+    format: 'lll-words',
+    version: 1,
+    saved: new Date().toISOString(),
+    known: await wordMap(KNOWN),
+    ignored: await wordMap(IGNORED)
+  };
+}
+
+/**
+ * Put a saved copy back, adding to what is already here rather than replacing
+ * it. Merging is the safe direction: restoring an old copy onto a newer list
+ * should never be able to lose the words learned since, and someone reading
+ * on two machines can carry a file between them without either one winning.
+ *
+ * A word cannot be on both lists, so if a file somehow says otherwise, known
+ * wins — it is the answer that costs less to be wrong about, since an ignored
+ * word is one you have said you never want to see again.
+ */
+async function importWords(data) {
+  if (!data || typeof data !== 'object') throw new Error('That file is not a saved word list.');
+  if (data.format !== 'lll-words') throw new Error('That is not a file LLL saved.');
+
+  const known = await wordMap(KNOWN);
+  const ignored = await wordMap(IGNORED);
+  const added = { known: 0, ignored: 0 };
+
+  const merge = (into, from, count) => {
+    if (!from || typeof from !== 'object') return;
+    for (const word of Object.keys(from)) {
+      const when = Number(from[word]);
+      if (!word || !Number.isFinite(when)) continue;
+      if (!into[word]) { into[word] = when; added[count]++; }
+      else into[word] = Math.min(into[word], when);   // keep the earlier date
+    }
+  };
+  merge(known, data.known, 'known');
+  merge(ignored, data.ignored, 'ignored');
+  for (const word of Object.keys(known)) delete ignored[word];
+
+  return {
+    added,
+    known: await saveWords(KNOWN, known),
+    ignored: await saveWords(IGNORED, ignored)
+  };
 }
 
 /** Take words back off a list. */

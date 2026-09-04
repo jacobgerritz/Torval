@@ -14,6 +14,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import vm from 'node:vm';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = join(ROOT, 'extension', 'data');
@@ -1042,6 +1043,88 @@ const run = async () => {
   const unused = [...answered].filter((type) => !mentioned.has(type) && type !== 'status');
   check('the background script answers nothing nobody asks for',
     unused.length === 0, 'never sent: ' + unused.join(', '));
+
+  // --- saving and restoring the word lists --------------------------------
+  // The real background script, loaded into a sandbox with a Map standing in
+  // for browser storage, so the merge rules are the ones that ship rather than
+  // a description of them. The dictionary cannot open in here and says so on
+  // the way past; nothing below needs it.
+  {
+    const stored = {};
+    let listener = null;
+    const noop = { addListener() {} };
+    const fakeApi = {
+      webRequest: {},
+      action: { onClicked: noop, setBadgeText: async () => {} },
+      storage: {
+        onChanged: noop,
+        local: {
+          async get(key) { return key in stored ? { [key]: stored[key] } : {}; },
+          async set(values) { Object.assign(stored, values); }
+        }
+      },
+      runtime: {
+        onMessage: { addListener(fn) { listener = fn; } },
+        getURL: (path) => path,
+        openOptionsPage() {}
+      }
+    };
+    const sandbox = {
+      browser: fakeApi, console: { log() {}, warn() {}, error() {} },
+      fetch: async () => { throw new Error('no dictionary in this test'); },
+      setTimeout, clearTimeout, URL
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
+
+    const send = (message) => listener(message);
+    const OLD = 1000, NEW = 9000;
+    stored.knownWords = { '本': NEW };
+    stored.ignoredWords = { 'ネカフェ': NEW };
+    const file = {
+      format: 'lll-words', version: 1, saved: '2026-01-01',
+      known: { '本': OLD, '読む': OLD },
+      ignored: { 'ＡＢＣ': OLD }
+    };
+
+    let reply = await send({ type: 'importWords', data: file });
+    check('a saved word list loads back in', reply.ok, JSON.stringify(reply));
+    check('only the words not already there count as added',
+      reply.result.added.known === 1 && reply.result.added.ignored === 1,
+      JSON.stringify(reply.result.added));
+    check('the earlier of the two dates is the one kept',
+      stored.knownWords['本'] === OLD, String(stored.knownWords['本']));
+    check('a word only the file had arrives', '読む' in stored.knownWords);
+
+    reply = await send({ type: 'importWords', data: file });
+    check('loading the same file twice adds nothing the second time',
+      reply.result.added.known === 0 && reply.result.added.ignored === 0,
+      JSON.stringify(reply.result.added));
+
+    await send({ type: 'importWords',
+      data: { format: 'lll-words', known: {}, ignored: { '本': OLD } } });
+    check('known beats ignored when a file disagrees',
+      '本' in stored.knownWords && !('本' in stored.ignoredWords),
+      JSON.stringify(stored.ignoredWords));
+
+    const before = JSON.stringify(stored);
+    const junk = await send({ type: 'importWords', data: { some: 'other tool' } });
+    const nothing = await send({ type: 'importWords', data: null });
+    check('a file from something else is refused', !junk.ok && !nothing.ok);
+    check('a refused file leaves both lists exactly as they were',
+      JSON.stringify(stored) === before);
+
+    const saved = await send({ type: 'exportWords' });
+    check('a saved file is marked as ours and carries both lists',
+      saved.ok && saved.result.format === 'lll-words' &&
+      '本' in saved.result.known && 'ネカフェ' in saved.result.ignored,
+      JSON.stringify(saved.result && saved.result.format));
+    const round = await send({ type: 'importWords', data: saved.result });
+    check('saving and loading straight back changes nothing',
+      round.result.added.known === 0 && round.result.added.ignored === 0,
+      JSON.stringify(round.result.added));
+  }
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',

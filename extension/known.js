@@ -33,6 +33,9 @@
   // search box is how you find one word among that many.
   const PAGE = 200;
 
+  const refreshers = [];   // one per browse panel
+  let refreshKnown = null;
+
   browsePanel({
     list: 'knownList',
     forget: 'forgetWords',
@@ -53,6 +56,7 @@
   });
 
   addFromText();
+  backupPanel();
 
   // -------------------------------------------------------------------------
   // Browsing one of the lists
@@ -69,8 +73,10 @@
     let shown = PAGE;
 
     refresh();
-    // The bulk-add form needs to redraw whichever list it just added to.
-    if (config.list === 'knownList') window.LLLRefreshKnown = refresh;
+    // The bulk-add form and a restored backup both need the lists they
+    // changed redrawn, and neither of them knows which panel is which.
+    refreshers.push(refresh);
+    if (config.list === 'knownList') refreshKnown = refresh;
 
     searchEl.addEventListener('input', () => { shown = PAGE; draw(); });
 
@@ -155,6 +161,88 @@
   }
 
   // -------------------------------------------------------------------------
+  // Keeping a copy of both lists somewhere else
+  // -------------------------------------------------------------------------
+
+  function backupPanel() {
+    const saveButton = document.getElementById('save-words');
+    const saveNote = document.getElementById('save-note');
+    const loadInput = document.getElementById('load-words');
+    const loadNote = document.getElementById('load-note');
+    if (!saveButton || !loadInput) return;
+
+    saveButton.addEventListener('click', async () => {
+      saveNote.className = 'note';
+      saveNote.textContent = '';
+      const reply = await api.runtime.sendMessage({ type: 'exportWords' });
+      if (!reply || !reply.ok) {
+        saveNote.className = 'note error';
+        saveNote.textContent = (reply && reply.error) || 'Could not read the lists.';
+        return;
+      }
+
+      const words = reply.result;
+      const day = new Date().toISOString().slice(0, 10);
+      download('lll-words-' + day + '.json', JSON.stringify(words, null, 2));
+      saveNote.textContent = count(words.known) + ' known, ' +
+        count(words.ignored) + ' ignored.';
+    });
+
+    loadInput.addEventListener('change', async () => {
+      const file = loadInput.files[0];
+      if (!file) return;
+      loadNote.className = 'note';
+      loadNote.textContent = 'Reading…';
+
+      try {
+        let data;
+        try {
+          data = JSON.parse(await file.text());
+        } catch (bad) {
+          // Whatever the parser complains about, the answer is the same one:
+          // this is not the file they meant to pick.
+          throw new Error('That file is not one LLL saved.');
+        }
+
+        const reply = await api.runtime.sendMessage({ type: 'importWords', data });
+        if (!reply.ok) throw new Error(reply.error);
+        const { added, known, ignored } = reply.result;
+        loadNote.textContent = added.known + ' known and ' + added.ignored +
+          ' ignored words added; ' + known + ' and ' + ignored + ' now in all.';
+        refreshAll();
+      } catch (err) {
+        loadNote.className = 'note error';
+        loadNote.textContent = err.message;
+      } finally {
+        loadInput.value = '';
+      }
+    });
+  }
+
+  function refreshAll() { for (const again of refreshers) again(); }
+
+  function count(map) {
+    return Object.keys(map || {}).length.toLocaleString('en-US');
+  }
+
+  /**
+   * Hand the file to the browser. An object URL rather than a data: one so
+   * that a list of tens of thousands of words is not squeezed through an
+   * address, and revoked straight after so it is not left holding the whole
+   * thing in memory.
+   */
+  function download(name, text) {
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  // -------------------------------------------------------------------------
   // Adding a whole text at once, which only the known list takes
   // -------------------------------------------------------------------------
 
@@ -191,7 +279,7 @@
         const already = found.result.length - added.result.added;
         resultEl.textContent = `Found ${found.result.length} words — ` +
           `${added.result.added} new, ${already} already known.`;
-        if (window.LLLRefreshKnown) await window.LLLRefreshKnown();
+        if (refreshKnown) await refreshKnown();
       } catch (err) {
         resultEl.textContent = err.message;
         resultEl.className = 'note error';

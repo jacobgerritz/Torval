@@ -417,6 +417,29 @@ reason; the difference is that this happens without being asked.
 
 ---
 
+## Keeping a copy of your words
+
+Under **Backup** in LLL's settings, **Save my words to a file** writes both
+lists, known and ignored, into a single JSON file with the date in its name.
+
+This is the one part of LLL that cannot be rebuilt. The dictionary downloads
+again in a minute and the Anki settings are a minute of typing, but a known
+list is however many months of reading, and it lives in one browser profile,
+belonging to an add-on that still has to be loaded again by hand every time
+Firefox restarts. Worth keeping a copy somewhere.
+
+Loading a file back **adds** to what is already there. Nothing is removed and
+nothing is overwritten, and where the same word is in both, the earlier of the
+two dates is the one kept. That makes an old backup safe to restore: it can
+only ever give words back, never take away ones learned since, so carrying one
+file between two machines works in either direction. If a word is known on one
+side and ignored on the other, known wins, since the two lists still cannot
+both hold it.
+
+A file that is not one LLL wrote is refused rather than half-read.
+
+---
+
 ## Marking the words you do not know
 
 The bar says how much of a page you know. The page itself says which parts you

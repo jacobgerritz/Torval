@@ -76,6 +76,24 @@ window.browser = {
         case 'ignoredList':
           return { ok: true, result: [...ignored].map(([word, added]) => ({ word, added }))
             .sort((a, b) => b.added - a.added) };
+        case 'exportWords':
+          return { ok: true, result: {
+            format: 'lll-words', version: 1, saved: new Date().toISOString(),
+            known: Object.fromEntries(known), ignored: Object.fromEntries(ignored)
+          } };
+        case 'importWords': {
+          const data = msg.data;
+          if (!data || data.format !== 'lll-words') return { ok: false, error: 'That is not a file LLL saved.' };
+          const added = { known: 0, ignored: 0 };
+          for (const [word, when] of Object.entries(data.known || {})) {
+            if (!known.has(word)) { known.set(word, when); added.known++; }
+          }
+          for (const [word, when] of Object.entries(data.ignored || {})) {
+            if (!ignored.has(word)) { ignored.set(word, when); added.ignored++; }
+          }
+          for (const word of known.keys()) ignored.delete(word);
+          return { ok: true, result: { added, known: known.size, ignored: ignored.size } };
+        }
         case 'forgetIgnored': {
           let removed = 0;
           for (const word of msg.words) if (ignored.delete(word)) removed++;
