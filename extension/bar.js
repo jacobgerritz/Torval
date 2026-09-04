@@ -25,8 +25,6 @@ var LLLBar = (function () {
   var data = null;        // the last reading: { total, known, counts }
   var dismissed = false;
   var onRefresh = null;
-  var onColour = null;
-  var colourOn = true;
 
   /**
    * Show a fresh reading. `counts` is how many times each word was said, kept
@@ -98,15 +96,6 @@ var LLLBar = (function () {
     var spacer = document.createElement('span');
     spacer.className = 'spacer';
 
-    // Marking the unknown words is the loudest thing LLL does to a page, so
-    // the switch for it belongs where the number is rather than buried in the
-    // settings — a page you only want to read is one press away.
-    els.colour = button('あ', '', function () {
-      if (onColour) onColour();
-    });
-    els.colour.className = 'colour';
-    paintColourButton();
-
     var refresh = button('⟳', 'Read this page again', function () {
       if (onRefresh) onRefresh();
     });
@@ -118,7 +107,7 @@ var LLLBar = (function () {
       host.style.display = 'none';
     });
 
-    bar.append(mark, els.score, els.detail, spacer, els.colour, refresh, settings, close);
+    bar.append(mark, els.score, els.detail, spacer, refresh, settings, close);
     root.append(style, bar);
     (document.body || document.documentElement).appendChild(host);
 
@@ -138,66 +127,39 @@ var LLLBar = (function () {
     return el;
   }
 
-  /** Say whether the unknown words are being marked, and offer the opposite. */
-  function colour(isOn) {
-    colourOn = isOn;
-    if (els.colour) paintColourButton();
-  }
-
-  function paintColourButton() {
-    els.colour.classList.toggle('on', colourOn);
-    els.colour.title = colourOn
-      ? 'Marking the words you do not know — click to stop'
-      : 'Not marking unknown words — click to start';
-  }
-
-  /** Hide the switch entirely where the browser cannot do the marking at all. */
-  function noColour() {
-    if (els.colour) els.colour.remove();
-  }
-
   // Same palette as the popup and the subtitles: one dark card colour, one
-  // border, one bright text colour, everything else muted.
+  // border, one bright text colour, everything else muted. Sized to be read
+  // at a glance rather than squinted at — the first version of this bar was
+  // built to take up as little room as possible, which mostly meant it was
+  // too small to actually see.
   var CSS = [
     ':host { all: initial; }',
     '.bar {',
     '  position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;',
-    '  box-sizing: border-box; height: 28px; display: flex; align-items: center; gap: 10px;',
-    '  padding: 0 10px;',
+    '  box-sizing: border-box; height: 40px; display: flex; align-items: center; gap: 14px;',
+    '  padding: 0 14px;',
     '  background: #16171a; border-bottom: 1px solid #292b30;',
-    '  font: 12px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
+    '  font: 14px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
     '}',
-    '.mark { font-size: 10px; letter-spacing: 0.08em; color: #5a5f67; }',
-    '.score { font-size: 13px; font-weight: 600; color: #f4f5f7; }',
+    '.mark { font-size: 12px; letter-spacing: 0.08em; color: #5a5f67; }',
+    '.score { font-size: 17px; font-weight: 600; color: #f4f5f7; }',
     '.score.easy { color: #7fb488; }',
     '.score.ok { color: #c7ab72; }',
     '.score.hard { color: #b8868a; }',
     '.detail { color: #767b84; }',
     '.spacer { flex: 1; }',
     'button {',
-    '  padding: 2px 5px; background: none; border: 0; border-radius: 3px;',
-    '  font: inherit; font-size: 13px; line-height: 1; color: #6b7079; cursor: pointer;',
+    '  padding: 4px 8px; background: none; border: 0; border-radius: 4px;',
+    '  font: inherit; font-size: 16px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
-    'button:hover { background: #24262b; color: #dfe1e5; }',
-    // The switch wears the same underline it puts on the page, so what it does
-    // needs no explaining.
-    '.colour { font-size: 12px; }',
-    '.colour.on {',
-    '  color: #dba35f;',
-    '  text-decoration: underline;',
-    '  text-decoration-thickness: 2px;',
-    '  text-underline-offset: 2px;',
-    '}'
+    'button:hover { background: #24262b; color: #dfe1e5; }'
   ].join('\n');
 
   return {
     show: show,
     working: working,
     adjust: adjust,
-    colour: colour,
-    noColour: noColour,
-    onRefresh: function (fn) { onRefresh = fn; },
-    onColour: function (fn) { onColour = fn; }
+    onRefresh: function (fn) { onRefresh = fn; }
   };
 })();
 

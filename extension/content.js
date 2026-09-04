@@ -81,6 +81,14 @@
   let tags = {};
   let ui = null;
   let context = null;   // the sentence the current lookup came from
+  let chosenList = null;   // the <ol> currently holding a picked sense, if any
+
+  // Plain hovering, with no Shift and no click — what is under the cursor
+  // right now, kept up to date on every mouse movement so that a click or a
+  // press of 3 has an answer ready rather than a fresh lookup to wait on.
+  let hoverText = null;
+  let hoverToken = 0;
+  let hoverWord = null;   // the dictionary form of whatever hoverText resolved to
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 
@@ -111,7 +119,7 @@
       hide();
       return;
     }
-    if (e.key === '3' && markTopAsKnown(e)) return;
+    if (e.key === '3' && markHoverAsKnown(e)) return;
     if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
@@ -129,10 +137,13 @@
    *
    * Most of what you meet while reading is a word you already know, and saying
    * so is the one thing worth doing often enough that it should not cost a
-   * mouse movement. The number is 3 because that is where "known" sits in the
-   * scheme every other tool of this kind uses, so the finger already knows it —
-   * and it leaves 1 and 2 free should there ever be more than two answers to
-   * the question.
+   * mouse movement or an open popup — whatever plain hovering has already
+   * resolved is what this acts on, the same word a click would open.
+   *
+   * The number is 3 because that is where "known" sits in the scheme every
+   * other tool of this kind uses, so the finger already knows it — and it
+   * leaves 1 and 2 free should there ever be more than two answers to the
+   * question.
    *
    * It sets rather than toggles. Pressing it twice should not undo it: with a
    * key this easy to lean on, an accidental repeat must be harmless. Unmarking
@@ -140,31 +151,71 @@
    *
    * Answers whether it did anything, because the key has to be taken away from
    * the page when it did — YouTube reads the number keys as "jump to 30% of
-   * the video", and marking a word must not also lose your place.
+   * the video", and this must never also lose your place, whether or not a
+   * popup happens to be open.
    */
-  function markTopAsKnown(e) {
-    if (!ui || ui.host.style.display !== 'block') return false;
+  function markHoverAsKnown(e) {
     if (e.ctrlKey || e.altKey || e.metaKey) return false;
 
     const focused = document.activeElement;
     if (focused && (focused.isContentEditable ||
       /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return false;
 
-    // First in the popup is the longest match, which is the word under the
-    // cursor; the ones below it are the shorter words sitting inside it.
-    const button = ui.card.querySelector('.know');
-    if (!button || !button.setKnown) return false;
+    // A popup already open for exactly this word is driven through its own
+    // button, so its tick lights up too rather than only the page's marking
+    // updating out from under it.
+    if (ui && ui.host.style.display === 'block') {
+      const button = ui.card.querySelector('.entry .know');
+      const wordEl = ui.card.querySelector('.entry .word');
+      if (button && button.setKnown && wordEl && wordEl.textContent === hoverWord) {
+        e.preventDefault();
+        e.stopPropagation();
+        button.setKnown(true);
+        return true;
+      }
+    }
 
+    if (!hoverWord) return false;
     e.preventDefault();
     e.stopPropagation();
-    button.setKnown(true);
+    const word = hoverWord;
+    api.runtime.sendMessage({ type: 'setKnown', word, known: true }).then((reply) => {
+      if (!reply || !reply.ok) return;
+      if (typeof LLLBar !== 'undefined') LLLBar.adjust(word, true);
+      if (typeof LLLHighlight !== 'undefined') LLLHighlight.mark(word, true);
+    }).catch(() => {});
     return true;
   }
 
   window.addEventListener('mousemove', (e) => {
     pointer = { x: e.clientX, y: e.clientY };
-    if (shiftDown) scheduleScan();
+    scheduleScan();
   }, true);
+
+  /**
+   * A click on a plain word looks it up exactly as Shift would, without
+   * needing Shift held down first. Links, buttons, form fields and anything
+   * already inside the popup are left alone — this only ever takes over a
+   * click that would otherwise have done nothing.
+   */
+  window.addEventListener('click', (e) => {
+    if (!isCurrent() || insidePopup(e)) return;
+    if (String(window.getSelection())) return;   // ending a drag-select, not a click to look up
+    if (isInteractive(e.target)) return;
+    const found = textAtPoint(e.clientX, e.clientY);
+    if (!found) return;
+    lookup(found.text, { x: e.clientX, y: e.clientY }, found);
+  }, true);
+
+  function isInteractive(el) {
+    let node = el;
+    while (node && node.nodeType === Node.ELEMENT_NODE) {
+      if (/^(A|BUTTON|INPUT|SELECT|TEXTAREA|LABEL)$/.test(node.tagName)) return true;
+      if (node.isContentEditable) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
 
   // Anything that is not "reading the popup" closes it: clicking the page,
   // scrolling it, or taking the mouse out of the frame entirely. Scrolling and
@@ -173,7 +224,7 @@
   // would not recognise its own contents.
   window.addEventListener('mousedown', (e) => { if (!insidePopup(e)) hide(); }, true);
   window.addEventListener('scroll', (e) => { if (!insidePopup(e)) hide(); }, true);
-  document.addEventListener('mouseleave', () => hide());
+  document.addEventListener('mouseleave', () => { hide(); clearHover(); });
 
   function insidePopup(e) {
     return !!ui && e.composedPath().indexOf(ui.host) !== -1;
@@ -191,13 +242,118 @@
   function scan() {
     if (!isCurrent()) return;
     const found = textAtPoint(pointer.x, pointer.y);
-    // While Shift is held the popup follows what you point at, so pointing at
-    // something that is not a word closes it rather than leaving the last
-    // result stranded behind the cursor. Let go of Shift and it stays put, so
-    // you can move over to it and read.
-    if (!found) { hide(); return; }
-    if (found.text === lastQuery) return;
-    lookup(found.text, pointer, found);
+
+    if (shiftDown) {
+      // While Shift is held the popup follows what you point at, so pointing
+      // at something that is not a word closes it rather than leaving the
+      // last result stranded behind the cursor. Let go of Shift and it stays
+      // put, so you can move over to it and read.
+      if (!found) { hide(); return; }
+      if (found.text === lastQuery) return;
+      lookup(found.text, pointer, found);
+      return;
+    }
+
+    hoverScan(found);
+  }
+
+  // -------------------------------------------------------------------------
+  // Plain hovering: a light mark on whatever word the cursor sits over, with
+  // no popup and no Shift needed. It exists so that a page reads as "here is
+  // where LLL can help" at a glance, and so that clicking or pressing 3 has
+  // something to act on immediately.
+  // -------------------------------------------------------------------------
+
+  async function hoverScan(found) {
+    if (!found) { clearHover(); return; }
+    if (found.text === hoverText) return;
+    hoverText = found.text;
+    hoverWord = null;
+    const token = ++hoverToken;
+
+    let reply;
+    try {
+      reply = await api.runtime.sendMessage({ type: 'lookup', text: found.text });
+    } catch (err) {
+      return;   // background restarting; the next hover will retry
+    }
+    if (token !== hoverToken || !isCurrent()) return;
+    if (!reply || !reply.groups || !reply.groups.length) { clearHover(); return; }
+
+    const top = reply.groups[0];
+    hoverWord = top.hits[0].word;
+    paintHover(found.node, found.offset, top.length);
+  }
+
+  function clearHover() {
+    hoverText = null;
+    hoverWord = null;
+    hoverToken++;
+    if (hoverSupported()) CSS.highlights.delete(HOVER_HIGHLIGHT);
+  }
+
+  function hoverSupported() {
+    return typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight === 'function';
+  }
+
+  const HOVER_HIGHLIGHT = 'lll-hover';
+  let hoverStyleAdded = false;
+
+  /**
+   * A quiet highlight under the word the cursor is on right now, using the
+   * same technique the unknown-word colouring uses — a Range and the CSS
+   * Custom Highlight API — rather than wrapping anything in a <span>, so
+   * hovering never touches the page's own DOM.
+   */
+  function paintHover(node, offset, length) {
+    if (!hoverSupported()) return;
+    if (!hoverStyleAdded) {
+      hoverStyleAdded = true;
+      const style = document.createElement('style');
+      style.textContent = '::highlight(' + HOVER_HIGHLIGHT + '){background-color:rgba(147,180,198,.3);}';
+      (document.head || document.documentElement).appendChild(style);
+    }
+    const end = spanEnd(node, offset, length);
+    if (!end) return;
+    try {
+      const range = document.createRange();
+      range.setStart(node, offset);
+      range.setEnd(end.node, end.offset);
+      CSS.highlights.set(HOVER_HIGHLIGHT, new Highlight(range));
+    } catch (err) {
+      // the page moved the text out from under this while it was being worked
+      // out — the next hover over it tries again.
+    }
+  }
+
+  /**
+   * Where a match of `length` characters starting at (node, offset) actually
+   * ends, which is not always the same text node it started in — 図書館 is
+   * routinely written as two adjacent <span>s, and the real dictionary match
+   * can run past the end of the one the cursor happens to be over.
+   */
+  function spanEnd(node, offset, length) {
+    const remaining = length - (node.data.length - offset);
+    if (remaining <= 0) return { node, offset: offset + length };
+
+    const block = blockAncestor(node);
+    const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        const parent = n.parentElement;
+        if (!parent || SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    walker.currentNode = node;
+
+    let left = remaining;
+    let next;
+    while ((next = walker.nextNode())) {
+      if (blockAncestor(next) !== block) return null;
+      if (next.data.length >= left) return { node: next, offset: left };
+      left -= next.data.length;
+    }
+    return null;
   }
 
   // -------------------------------------------------------------------------
@@ -389,13 +545,7 @@
   let readingPage = false;
 
   async function watchComprehension() {
-    const canColour = typeof LLLHighlight !== 'undefined' && await LLLHighlight.start();
-    if (canColour) {
-      LLLBar.colour(LLLHighlight.isOn());
-      LLLBar.onColour(async () => LLLBar.colour(await LLLHighlight.toggle()));
-    } else {
-      LLLBar.noColour();
-    }
+    if (typeof LLLHighlight !== 'undefined') await LLLHighlight.start();
 
     LLLBar.onRefresh(() => { lastTranscript = ''; readPage(); });
     setTimeout(readPage, 1500);   // let the page finish putting itself together
@@ -421,28 +571,45 @@
    * around the player is comments and menus, not the thing being watched. The
    * marking still goes on the page, because that is where the words are.
    *
-   * Everywhere else there is only the page, and reading it answers both
-   * questions at once, so it is read once.
+   * These are two separate questions asked in the same breath, not one
+   * question depending on the other. They used to share a single try block,
+   * which meant a stumble in the colouring — the page not being fully settled
+   * yet, a rectangle the browser refused to measure — aborted the score
+   * calculation too, before the score had even been asked for. The bar would
+   * sit on "…" until the next unrelated reason to read the page came along,
+   * which is exactly the "showed nothing, then later showed 72%" pattern:
+   * both numbers were being computed correctly, but only one of the two ever
+   * got the chance.
    */
   async function readPage() {
     if (readingPage || !isCurrent()) return;
     readingPage = true;
     LLLBar.working();
-    try {
-      const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
-      const score = typeof LLLHighlight !== 'undefined' ? await LLLHighlight.read() : null;
 
-      if (transcript && transcript !== lastTranscript) {
-        lastTranscript = transcript;
+    const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
+    let scored = false;
+
+    if (transcript && transcript !== lastTranscript) {
+      lastTranscript = transcript;
+      try {
         const reply = await api.runtime.sendMessage({ type: 'comprehension', text: transcript });
-        if (reply && reply.ok) return LLLBar.show(reply.result);
+        if (reply && reply.ok) { LLLBar.show(reply.result); scored = true; }
+        else lastTranscript = '';
+      } catch (err) {
+        lastTranscript = '';   // the dictionary was still loading; the next try may do better
       }
-      if (!transcript && score) LLLBar.show(score);
-    } catch (err) {
-      lastTranscript = '';   // the dictionary was still loading; the next try may do better
-    } finally {
-      readingPage = false;
     }
+
+    if (typeof LLLHighlight !== 'undefined') {
+      try {
+        const score = await LLLHighlight.read();
+        if (!transcript && score && !scored) LLLBar.show(score);
+      } catch (err) {
+        console.warn('LLL: could not colour this page —', err && err.message);
+      }
+    }
+
+    readingPage = false;
   }
 
   // -------------------------------------------------------------------------
@@ -523,6 +690,7 @@
     const { card } = await build();
     card.textContent = '';
     card.scrollTop = 0;   // a new word is a new thing to read, from the top
+    chosenList = null;    // the popup being replaced takes any chosen sense with it
 
     card.appendChild(renderGroup(groups[0], true));
 
@@ -684,8 +852,20 @@
         // Ignore the click that ends a drag over the text, or selecting a
         // definition to copy would silently change what gets mined.
         if (String(window.getSelection())) return;
+
+        // Senses picked in a different entry do not carry over — a card is
+        // one word, and choosing a meaning of 語 must not leave a meaning of
+        // 話 still marked chosen somewhere else in the popup, waiting to be
+        // put on the same card by mistake.
+        if (chosenList && chosenList !== list) {
+          for (const other of chosenList.children) other.classList.remove('chosen');
+          chosenList.classList.remove('choosing');
+        }
+
         li.classList.toggle('chosen');
-        list.classList.toggle('choosing', !!list.querySelector('.chosen'));
+        const active = !!list.querySelector('.chosen');
+        list.classList.toggle('choosing', active);
+        chosenList = active ? list : null;
       });
       list.appendChild(li);
     });

@@ -3,13 +3,14 @@
 <title>LLL settings</title>
 <link rel="stylesheet" href="options.css">
 
-<main>
-  <h1>LLL</h1>
-
-  <nav class="tabs">
+<div class="layout">
+  <nav class="sidebar">
+    <h1>LLL</h1>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="known">Known words</button>
   </nav>
+
+  <main>
 
   <!-- ------------------------------------------------------------------ -->
 
@@ -97,7 +98,9 @@
       <p id="more" class="note more" hidden></p>
     </section>
   </div>
-</main>
+
+  </main>
+</div>
 
 <script src="anki.js"></script>
 <script src="options.js"></script>
