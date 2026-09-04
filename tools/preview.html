@@ -83,7 +83,11 @@ const SAMPLE = [
   { k: [], kv: 0, q: 40000, r: ['ジャパニーズ'], f: 0, s: [{ p: ['n'], g: ['Japanese (people, language, style)'] }] },
   { k: ['鰺'], kv: 1, q: 22000, r: ['アジ'], f: 0, s: [{ p: ['n'], m: ['uk'], g: ['horse mackerel'] }] },
   { k: [], kv: 0, q: 30000, r: ['ニーズ'], f: 0, s: [{ p: ['n'], g: ['needs'] }] },
-  { k: ['仲間'], kv: 1, q: 900, r: ['なかま'], f: 50, s: [{ p: ['n'], g: ['companion', 'fellow', 'comrade'] }] }
+  { k: ['仲間'], kv: 1, q: 900, r: ['なかま'], f: 50, s: [{ p: ['n'], g: ['companion', 'fellow', 'comrade'] }] },
+  // A second, separate entry spelled exactly like the 本 above it. Two entries
+  // sharing a spelling is ordinary — こと is both a particle and a noun — and
+  // it means one popup can show the same word twice, each with its own tick.
+  { k: ['本'], kv: 1, q: 8000, r: ['ほん'], f: 10, s: [{ p: ['ctr'], g: ['counter for long cylindrical things'] }] }
 ];
 
 const entries = SAMPLE.map((e, id) => Object.assign(e, { id }));

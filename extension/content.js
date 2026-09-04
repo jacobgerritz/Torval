@@ -95,6 +95,7 @@
   let hoverBlock = null;
   let hoverFrom = -1;
   let hoverTo = -1;
+  let hoverSpan = null;   // the text those positions were measured against
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 
@@ -185,8 +186,10 @@
     if (!hoverWord) return false;
     e.preventDefault();
     e.stopPropagation();
+    // syncState, inside applyState, is what records the new state — including
+    // for the cursor, so a second press of the same key is a no-op rather than
+    // a second count of the same word.
     applyState(hoverWord, kind, true, hoverState);
-    hoverState = kind === 'know' ? 'known' : 'ignored';
     return true;
   }
 
@@ -212,8 +215,37 @@
       if (!reply || !reply.ok) return false;
       if (typeof LLLBar !== 'undefined') LLLBar.restate(word, before, after);
       if (typeof LLLHighlight !== 'undefined') LLLHighlight.setMarked(word, after === 'unknown');
+      syncState(word, after);
       return true;
     }).catch(() => false);
+  }
+
+  /**
+   * Bring everything that shows this word's state into line with what it has
+   * just become.
+   *
+   * Two places can be out of date at once, and both of them cost real
+   * accuracy rather than just looking wrong. What the cursor is hovering
+   * remembers the state it had when it was hovered, so marking a word known
+   * through the popup and then pressing 3 on the same word counted it twice.
+   * And the popup can list the same word more than once, since two separate
+   * dictionary entries can share a spelling — こと is both a particle and a
+   * noun — each with its own tick, each believing the word is still unknown.
+   *
+   * Telling the bar about a change it has already counted is the bug in
+   * both cases, so every button holding this word is corrected here, in the
+   * one place a change actually goes through, rather than each of them
+   * trying to keep up on its own.
+   */
+  function syncState(word, state) {
+    if (word === hoverWord) hoverState = state;
+    if (!ui) return;
+    for (const button of ui.card.querySelectorAll('.know, .ignore')) {
+      if (button.word !== word || !button.hit || !button.repaint) continue;
+      button.hit.known = state === 'known';
+      button.hit.ignored = state === 'ignored';
+      button.repaint();
+    }
   }
 
   window.addEventListener('mousemove', (e) => {
@@ -300,9 +332,18 @@
   // something to act on immediately.
   // -------------------------------------------------------------------------
 
-  /** Is the cursor still inside the word the current answer is about? */
+  /**
+   * Is the cursor still inside the word the current answer is about?
+   *
+   * The surrounding text has to match as well as the position, because a
+   * subtitle line is replaced under a barely-moving cursor every few
+   * seconds. Character seven of the old line and character seven of the new
+   * one are the same number and almost never the same word, and without this
+   * the answer for the line that just left would sit there looking current.
+   */
   function inCurrentWord(found) {
-    return found.block === hoverBlock && found.at >= hoverFrom && found.at < hoverTo;
+    return found.block === hoverBlock && found.text === hoverSpan &&
+      found.at >= hoverFrom && found.at < hoverTo;
   }
 
   async function hoverScan(found) {
@@ -319,6 +360,7 @@
     if (inCurrentWord(found)) return;
 
     hoverBlock = null;
+    hoverSpan = null;
     hoverWord = null;
     hoverState = 'unknown';
     const token = ++hoverToken;
@@ -341,6 +383,7 @@
     // and marks the whole word, not just whatever was directly underneath.
     const from = found.base + (typeof reply.start === 'number' ? reply.start : found.point);
     hoverBlock = found.block;
+    hoverSpan = found.text;
     hoverFrom = from;
     hoverTo = from + top.length;
 
@@ -350,6 +393,7 @@
 
   function clearHover() {
     hoverBlock = null;
+    hoverSpan = null;
     hoverFrom = -1;
     hoverTo = -1;
     hoverWord = null;
@@ -730,32 +774,41 @@
   async function readPage() {
     if (readingPage || !isCurrent()) return;
     readingPage = true;
-    LLLBar.busy('Reading this page…');
-
-    const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
     let scored = false;
 
-    if (transcript && transcript !== lastTranscript) {
-      lastTranscript = transcript;
-      try {
-        const reply = await api.runtime.sendMessage({ type: 'comprehension', text: transcript });
-        if (reply && reply.ok) { LLLBar.show(reply.result); scored = true; }
-        else lastTranscript = '';
-      } catch (err) {
-        lastTranscript = '';   // the dictionary was still loading; the next try may do better
-      }
-    }
+    // Wrapped so that anything unexpected still lets go of the flag. Left
+    // stuck true, this page would never read itself again for as long as it
+    // stayed open, and nothing would say why.
+    try {
+      LLLBar.busy('Reading this page…');
+      const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
 
-    if (typeof LLLHighlight !== 'undefined') {
-      try {
-        const score = await LLLHighlight.read();
-        if (!transcript && score && !scored) LLLBar.show(score);
-      } catch (err) {
-        console.warn('LLL: could not colour this page —', err && err.message);
+      if (transcript && transcript !== lastTranscript) {
+        lastTranscript = transcript;
+        try {
+          const reply = await api.runtime.sendMessage({ type: 'comprehension', text: transcript });
+          if (reply && reply.ok) { LLLBar.show(reply.result); scored = true; }
+          else lastTranscript = '';
+        } catch (err) {
+          lastTranscript = '';   // the dictionary was still loading; the next try may do better
+        }
       }
-    }
 
-    readingPage = false;
+      if (typeof LLLHighlight !== 'undefined') {
+        try {
+          const score = await LLLHighlight.read();
+          if (!transcript && score && !scored) { LLLBar.show(score); scored = true; }
+        } catch (err) {
+          console.warn('LLL: could not colour this page —', err && err.message);
+        }
+      }
+    } finally {
+      // Nothing to say about this page: no Japanese on it, or none that could
+      // be read. Saying so is what stops an English page keeping a handle in
+      // the corner that reads "still working on it" for ever.
+      if (!scored) LLLBar.quiet();
+      readingPage = false;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -796,6 +849,7 @@
     if (where && where.pieces && top) {
       const from = where.base + (typeof reply.start === 'number' ? reply.start : where.point);
       hoverBlock = where.block;
+      hoverSpan = where.text;
       hoverFrom = from;
       hoverTo = from + top.length;
       hoverWord = top.hits[0].word;
@@ -1095,21 +1149,8 @@
       const ok = await applyState(hit.word, kind, wanted, stateOf(hit));
       button.disabled = false;
       if (!ok) return;
-      on = wanted;
-      if (kind === 'know') hit.known = wanted; else hit.ignored = wanted;
-      paint();
-      // Turning one on turns the other off. The stored lists already sort
-      // that out themselves, so this only has to repaint the other button —
-      // sending a second message would tell the bar to count the same change
-      // twice.
-      if (wanted) {
-        const other = button.parentElement &&
-          button.parentElement.querySelector('.' + (kind === 'know' ? 'ignore' : 'know'));
-        if (other && other.repaint) {
-          if (kind === 'know') hit.ignored = false; else hit.known = false;
-          other.repaint();
-        }
-      }
+      // Both buttons for this word, here and anywhere else in the popup, are
+      // put right by syncState once the change has gone through.
     }
 
     function paint() {
@@ -1117,6 +1158,8 @@
       button.title = on ? labels.on : labels.off;
     }
 
+    button.word = hit.word;
+    button.hit = hit;
     button.repaint = function () {
       on = kind === 'know' ? !!hit.known : !!hit.ignored;
       paint();

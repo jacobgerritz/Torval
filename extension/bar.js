@@ -35,11 +35,15 @@ var LLLBar = (function () {
 
   var HANDLE_TITLE = 'How much of this page you understand';
 
+  // What LLL is in the middle of, and the timer waiting to say so.
+  var pending = null;
+  var pendingTimer = null;
+
   // Read once, up front, so the very first paint already knows whether to
   // start down — by the time a reading is ready to show (at the earliest,
   // 1.5 seconds after the page itself loads), this has almost always already
   // resolved.
-  var pinnedReady = api.storage.local.get('barPinned').then(function (stored) {
+  api.storage.local.get('barPinned').then(function (stored) {
     pinned = !!stored.barPinned;
     if (host && pinned && !expanded) setExpanded(true);
   }).catch(function () {});
@@ -56,6 +60,7 @@ var LLLBar = (function () {
     render();
   }
 
+
   /**
    * Say what LLL is busy doing, before there is any number to show.
    *
@@ -67,20 +72,43 @@ var LLLBar = (function () {
    * dictionary is still being built, "LLL ·" while a page is being read.
    */
   function busy(what, progress) {
-    build();
-    els.handle.textContent = typeof progress === 'number'
-      ? 'LLL ' + Math.round(progress * 100) + '%'
+    pending = { what: what, progress: progress };
+    if (host) return paintBusy();
+
+    // Nothing has been put on the page yet, so wait a moment before doing so.
+    // Most pages answer faster than this, and a page with no Japanese on it
+    // should never get a handle in the corner that appears and then vanishes
+    // again — it should never get one at all.
+    if (!pendingTimer) {
+      pendingTimer = setTimeout(function () {
+        pendingTimer = null;
+        if (!pending) return;
+        build();
+        paintBusy();
+      }, 400);
+    }
+  }
+
+  function paintBusy() {
+    els.handle.textContent = typeof pending.progress === 'number'
+      ? 'LLL ' + Math.round(pending.progress * 100) + '%'
       : 'LLL ·';
     els.handle.classList.add('busy');
-    els.handle.title = what;
-    els.note.textContent = what;
+    els.handle.title = pending.what;
+    els.note.textContent = pending.what;
     els.note.hidden = false;
     els.score.hidden = true;
     els.detail.hidden = true;
   }
 
+  function stopWaiting() {
+    pending = null;
+    if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
+  }
+
   /** Done being busy: back to whatever number there is, if there is one. */
   function idle() {
+    stopWaiting();
     if (!host) return;
     els.handle.textContent = 'LLL';
     els.handle.classList.remove('busy');
@@ -88,6 +116,18 @@ var LLLBar = (function () {
     els.note.hidden = true;
     els.score.hidden = false;
     els.detail.hidden = false;
+  }
+
+  /**
+   * There turned out to be nothing to say about this page. If a number has
+   * been shown before, go back to it; if not, LLL has no business being on
+   * this page at all, so it takes itself off it.
+   */
+  function quiet() {
+    stopWaiting();
+    if (!host) return;
+    if (data && data.total) { idle(); return; }
+    host.style.display = 'none';
   }
 
   /**
@@ -292,7 +332,7 @@ var LLLBar = (function () {
   return {
     show: show,
     busy: busy,
-    idle: idle,
+    quiet: quiet,
     restate: restate,
     onRefresh: function (fn) { onRefresh = fn; }
   };
