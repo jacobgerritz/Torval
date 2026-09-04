@@ -44,21 +44,28 @@ again each time until it is packaged and signed. That is a step for later.
 
 ## Using it
 
+Just hovering a Japanese word gives it a quiet highlight, so a page shows at a
+glance what LLL can help with. Click that word, or hold Shift and point at it,
+to actually open the dictionary.
+
 | | |
 |---|---|
-| **Shift** + point at a word | look it up |
+| point at a word | a quiet highlight, no popup yet |
+| **click** a word, or **Shift** + point at it | open the dictionary |
 | **Shift** with text selected | look up the selection |
-| **Esc**, a click, a scroll | close |
+| **Esc**, a click outside, a scroll | close |
 | **shorter matches** | other words that start at the same place |
 | **A** / **D** | step back and forward a subtitle line |
-| **3** | mark the word you are pointing at as known |
+| **3** | mark the word under the cursor as known, popup or not |
 | **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
 | **✓** | mark as known, or unmark it |
 
 While Shift is held the popup follows whatever you point at, and closes if you
-point at something that is not a word. Let go of Shift and it stays put, so you
-can move across and read it.
+point at something that is not a word. Let go of Shift, or click a word
+instead, and it stays put, so you can move across and read it. A click never
+takes over a link, a button, a form field, or text you were dragging to
+select, so nothing about ordinary browsing changes.
 
 Tags that hold for the whole word — `uk`, "usually written in kana" — sit beside
 it rather than against every definition. JMdict files them per sense, but a tag
@@ -80,12 +87,27 @@ scale already — #7,261 means nothing unless you have a feel for what #3,000 is
 like — and it claims a precision the data does not have. The gap between #100
 and #400 is real; the gap between #7,261 and #7,800 is noise. A round band says
 both of those at once and needs no legend. The exact rank is on hover for when
-it matters. A word with no band at all is one the corpus never saw, which tells
-you something in itself.
+it matters. A word with no band at all is one neither corpus ever saw, which
+tells you something in itself.
+
+The rank itself is blended from two corpora that read nothing alike: JPDB,
+built from anime, manga and visual novels, and BCCWJ, a government-run sample
+of newspapers, books and the web. A word common in casual speech but rare in
+print, or the other way round, still comes out ordinary once both are asked,
+rather than looking rare just because one of the two happens not to cover it.
 
 Point at the *first* character of a word. Japanese has no spaces, so the
 extension reads forward from wherever you are pointing and finds the longest
 thing that is a word — point at 日 in 日本語 and you get 日本語, not 日.
+
+Longest is not always right, and there is one well-known trap for it: a common
+word followed by a single particle can spell the same characters as a real,
+much rarer dictionary entry. 今日 ("today") plus は spells 今日は, a dated way
+to write こんにちは ("hello"), and JMdict really does list it. Rather than
+always trusting length, LLL checks whether trimming off a trailing particle
+lands on a dramatically more common word, and if so shows that instead. The
+rare reading has not gone anywhere. It sits right there under "shorter
+matches" for the rare case that is genuinely what was meant.
 
 It undoes conjugation on the way. 食べなかった is not in any dictionary, so it is
 walked back to 食べる and the steps taken are shown underneath, small and grey:
@@ -149,7 +171,10 @@ the same word again later is not a mistake either.
 By default a card carries every sense of the word. Clicking a sense before
 pressing **+** narrows it to the meanings you actually met — 語 is both "word;
 term" and "language", and you rarely want both. Clicking nothing means all of
-them, so the ordinary case needs no clicks.
+them, so the ordinary case needs no clicks. Picking several senses of the same
+word is fine, but a card is one word: choosing a sense in a different entry
+lets go of whatever was chosen before, rather than quietly mixing meanings
+from two different words onto one card.
 
 ---
 
@@ -311,12 +336,30 @@ times and one word you have never met is not as hard as one with forty
 different unknown words in it, and a score that could not tell those apart
 would not be worth reading.
 
-Pressing **✓** in the popup moves the number immediately — a word's count is
-exactly how far the bar shifts, so nothing has to be read a second time. **あ**
-turns the marking below on and off, **⟳** reads the page again, **⚙** opens the
-settings, **×** hides the bar until the page is reloaded. It hides itself while
-a video is full screen, and never appears at all on a page with no Japanese on
-it.
+Pressing **✓** in the popup moves the number immediately. A word's count is
+exactly how far the bar shifts, so nothing has to be read a second time.
+**⟳** reads the page again, **⚙** opens the settings, **×** hides the bar until
+the page is reloaded. It hides itself while a video is full screen, and never
+appears at all on a page with no Japanese on it.
+
+### Does counting words this way actually make sense?
+
+It is the standard approach every tool like this uses: percentage of running
+words already known, counted once per time a word is actually said rather than
+once per distinct word, so a page that says 私 forty times reads differently
+from one with forty different unknown words in it. That much is sound.
+
+Two honest limits are worth knowing about. First, this is a vocabulary score,
+not a comprehension score in the full sense: understanding a sentence also
+takes grammar, and two sentences with the same known-word percentage are not
+always equally easy to follow. Second, a word the dictionary does not
+recognize at all (a name, a coined word, a typo) is currently left out of the
+count entirely, rather than counted as unknown, since there is no dictionary
+entry it could be, and so no way to ever mark it "known" either. On a video
+full of character names this can read a little higher than it should. Making
+that honest instead, without also being unfair to it, means giving names and
+other non-dictionary words their own way of being marked known, which is a
+real feature worth building next rather than a quick fix now.
 
 ---
 
@@ -326,22 +369,27 @@ The bar says how much of a page you know. The page itself says which parts you
 do not: every word not in your list gets a soft underline where it stands, and
 a video's subtitle line is re-marked as each line arrives.
 
+Two words sitting right next to each other with nothing between them, which is
+ordinary in Japanese, alternate between two close but distinct shades rather
+than sharing one unbroken underline, so 関東沿岸部 reads as 関東 next to 沿岸部
+rather than looking like one long unknown word.
+
 **Nothing on the page is altered to do it.** The obvious way to colour a word
-is to wrap it in a `<span>`, and that is how this has always been done — but a
-page's own scripts own that DOM, and quietly inserting thousands of elements
-into it breaks sites in ways that are miserable to track down: React re-renders,
-`:first-child` rules start matching something else, and a click handler bound to
-a node that no longer exists silently stops working.
+is to wrap it in a `<span>`, and that is how this has always been done. A
+page's own scripts own that DOM though, and quietly inserting thousands of
+elements into it breaks sites in ways that are miserable to track down: React
+re-renders, `:first-child` rules start matching something else, and a click
+handler bound to a node that no longer exists silently stops working.
 
 The browser has a way to paint text without owning it. A `Range` describes a
-stretch of characters without being part of the document, a `Highlight` is a set
-of them, and `::highlight()` styles the lot. One `<style>` element is added and
-that is the whole of LLL's footprint on the page, so there is nothing for a site
-to trip over and turning it off is one line rather than an unpicking job.
+stretch of characters without being part of the document, a `Highlight` is a
+set of them, and `::highlight()` styles the lot. One `<style>` element is
+added and that is the whole of LLL's footprint on the page, so there is
+nothing for a site to trip over.
 
-Firefox has had this since **version 140**. On anything older the marking is
-skipped, the **あ** switch does not appear, and everything else works as before —
-rewriting a page's DOM is not something to fall back on quietly.
+Firefox has had this since **version 140**. On anything older, the marking is
+simply skipped and everything else works as before, since rewriting a page's
+DOM is not something to fall back on quietly.
 
 Pressing **✓** on a word clears its mark everywhere on the page at once, which
 is why the reading keeps *where* each word was rather than only how many there
@@ -389,7 +437,9 @@ page's own DOM.
 **`extension/japanese.js`** — what counts as a Japanese character. One line, in
 a file of its own, because four separate parts of LLL have to agree on it.
 
-**`extension/options.js`** — the settings page, and switching between its tabs.
+**`extension/options.js`** — the settings page, and switching between its
+sections, listed down the left rather than across the top so which section you
+are in and how to get to the other one live in the same place.
 
 **`extension/known.js`** — the known-words tab: adding, browsing, forgetting.
 
@@ -428,18 +478,27 @@ would otherwise invent words that do not exist.
 
 In rough order of intent:
 
+- **Marking names and other non-dictionary words known.** A word the
+  dictionary does not recognize at all currently has no way to ever be marked
+  known, which can make a name-heavy video read as less understood than it
+  actually is.
 - **Packaging.** Sign it, so it survives a Firefox restart.
 
 ---
 
 ## Dictionary data
 
-Frequency ranks come from **JPDB**, scraped from a corpus of anime, manga, light
-novels and visual novels — media Japanese rather than newspaper Japanese, which
-is the point. They are attached to the entries when the dictionary is built, so
-there is no separate file and no second lookup. They also decide which of two
-equally good matches goes first, which JMdict's own priority markers did poorly:
-those are coarse bands covering only the commonest 24,000 words.
+Frequency ranks are blended from two corpora when the dictionary is built, so
+there is no separate file and no second lookup at read time. **JPDB** comes
+from anime, manga, light novels and visual novels: media Japanese rather than
+newspaper Japanese. **BCCWJ**, the Balanced Corpus of Contemporary Written
+Japanese, comes from newspapers, books, magazines and the web instead. Where
+both have a rank for a word, the two are combined by their harmonic mean,
+which rewards a word for doing well in either list while still favoring one
+both lists agree is common over one only a single list has heard of. They also
+decide which of two equally good matches goes first, which JMdict's own
+priority markers did poorly: those are coarse bands covering only the
+commonest 24,000 words.
 
 The dictionary is **JMdict**, from the [Electronic Dictionary Research and
 Development Group](https://www.edrdg.org/), used under

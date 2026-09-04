@@ -24,7 +24,8 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    margin: -48px -24px 32px;
+    box-sizing: border-box;
+    width: 100%;
     padding: 10px 24px;
     background: #4a2c22;
     border-bottom: 1px solid #6b3f30;
@@ -97,15 +98,18 @@ window.browser = {
     clone.href = '../extension/' + link.getAttribute('href');
     document.head.appendChild(clone);
   }
-  const main = page.querySelector('main');
+  const layout = page.querySelector('.layout');
   const warning = document.createElement('div');
   warning.className = 'preview-warning';
   warning.innerHTML = '<b>Preview — made-up data.</b> ' +
     '<span>This is not your settings and not your words. Nothing here is saved, ' +
     'and nothing here can reach the extension. Your real settings open from ' +
     'LLL&rsquo;s toolbar button, or the &#9881; on the bar at the top of a page.</span>';
-  main.prepend(warning);
-  document.body.appendChild(main);
+  // Above the sidebar and the panel both, not squeezed into either — the
+  // layout below is a flex row, and a banner stuffed inside it would just
+  // become a third column rather than a strip across the top.
+  document.body.appendChild(warning);
+  document.body.appendChild(layout);
 
   for (const script of page.querySelectorAll('script')) {
     await new Promise((resolve, reject) => {
