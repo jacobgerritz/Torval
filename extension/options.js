@@ -1,5 +1,5 @@
 /*
- * LLL — settings
+ * LLL, settings
  *
  * Two things live here and they have nothing to do with each other: where
  * cards go, and which words you already know. They are tabs rather than one
@@ -34,7 +34,7 @@ function showPanel(name) {
   }
 }
 
-// Opened with #known — what the bar's ⚙ could later point straight at, and what
+// Opened with #known, what the bar's ⚙ could later point straight at, and what
 // makes the word list linkable rather than only reachable by clicking.
 showPanel(location.hash === '#known' ? 'known' : 'anki');
 
@@ -43,7 +43,7 @@ showPanel(location.hash === '#known' ? 'known' : 'anki');
 // -------------------------------------------------------------------------
 
 const SOURCE_LABELS = [
-  ['', '—'],
+  ['', ', '],
   ['word', 'Target word'],
   ['reading', 'Reading'],
   ['sentence', 'Sentence'],

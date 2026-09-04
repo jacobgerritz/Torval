@@ -1,5 +1,5 @@
 /*
- * LLL — pitch accent
+ * LLL, pitch accent
  *
  * Japanese words carry a pitch pattern, and the whole pattern follows from one
  * number: where the pitch drops. 0 means it never does.
@@ -12,8 +12,8 @@
  * Note the last two: 箸 and 橋 are both はし and differ only in pitch. That is
  * also why a reading alone is not enough to look one up.
  *
- * This draws the standard diagram — a dot per mora, high or low, joined by a
- * line — as an SVG that goes straight onto the card. The trailing hollow dot is
+ * This draws the standard diagram, a dot per mora, high or low, joined by a
+ * line, as an SVG that goes straight onto the card. The trailing hollow dot is
  * the following particle, which is what distinguishes 橋 (drops after) from
  * 日本語 (stays up).
  */

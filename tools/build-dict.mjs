@@ -1,5 +1,5 @@
 /*
- * LLL — dictionary build step
+ * LLL, dictionary build step
  *
  * Turns the raw JMdict file (a ~120 MB XML document) into small JSON chunks the
  * extension can stream into its own database on first run. This runs once on
@@ -93,6 +93,45 @@ async function main() {
     entry.q = combineRanks(jpdb, bccwj);
     if (entry.q) ranked++;
     if (jpdb && bccwj) blended++;
+
+    // One rank for the whole entry is not enough, because an entry can be
+    // written more than one way and the spellings are not equally likely to
+    // be what is on the page.
+    //
+    // 今日は is the kanji spelling of こんにちは, one of the commonest words
+    // there is, but almost nobody writes it that way: those three characters
+    // are far more often 今日 followed by は. の is the opposite case, filed
+    // under the spellings 乃 and 之 that nobody uses, which left the particle
+    // every sentence contains ranked around 13,000th and made it look cheaper
+    // to skip の than to read it. えこ is a third: a reading of 長子 that no
+    // one has ever used, inheriting 長子's perfectly respectable rank and
+    // becoming cheap enough to swallow half a name, which is how
+    // 僕もちえこさんも came out as 僕, もち, えこ, さん, も.
+    //
+    // So every spelling is priced on its own, and a spelling the corpora have
+    // never seen is priced as if it were unheard of, whatever else it shares
+    // an entry with. Only the spellings that disagree with the entry are
+    // written down, which is a small minority of them.
+    const spellings = {};
+    let disagrees = false;
+    for (const form of entry.k.concat(entry.r)) {
+      const own = combineRanks(bestRank(entry, frequency, [form]),
+        bestRank(entry, frequency2, [form]));
+      let rank = own;
+      if (!writtenInKana(entry) && entry.k.indexOf(form) === -1) {
+        // A reading of a word that is normally written in kanji. Its own rank
+        // can only ever count against it: 蛾 is read が, and the corpora, asked
+        // about が, answer with the particle. Letting that through would price
+        // the moth as one of the commonest words in the language.
+        rank = own ? Math.max(own, entry.q || own) : 0;
+      }
+      if ((rank || 0) !== (entry.q || 0)) {
+        spellings[form] = rank || 0;
+        disagrees = true;
+      }
+    }
+    if (disagrees) entry.qm = spellings;
+    delete entry.kana;
   }
   console.log(`  ${ranked} entries carry a frequency rank (${blended} from both corpora)`);
 
@@ -108,7 +147,7 @@ async function main() {
   writeFileSync(join(OUT, 'tags.json'), JSON.stringify(tags));
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({
     // Bumping this number makes the extension rebuild its database on next start.
-    version: 4,
+    version: 5,
     built: new Date().toISOString().slice(0, 10),
     entries: entries.length,
     terms: index.size,
@@ -126,7 +165,7 @@ async function main() {
  * Both lists used here happen to share this format, so one reader does for
  * both. Either can give two ranks per word: how often it appears at all, and
  * how often it appears written in kana. The kana one is marked with ㋕. For
- * 日本語 those are #4705 and #140824 — the second only says that people rarely
+ * 日本語 those are #4705 and #140824, the second only says that people rarely
  * write にほんご out in kana, which is not what "how common is this word"
  * means. So the plain rank wins wherever there is one, and the kana rank is
  * kept only for words that are always kana anyway, like every particle.
@@ -171,9 +210,13 @@ async function loadFrequency(file, url) {
  * spelling and reading it carries. 見る is far commoner than 観る, so this
  * takes the best any of an entry's forms achieves, since that is the word.
  */
-function bestRank(entry, frequency) {
+function bestRank(entry, frequency, only) {
   let best = 0;
-  const forms = entry.k.length ? entry.k : entry.r;
+  // Frequency lists are keyed by how a word is written, so an entry with
+  // kanji is looked up by its kanji and a kana-only entry by its reading.
+  // `only` narrows that to one spelling, which is how each spelling gets a
+  // rank of its own.
+  const forms = only || (entry.k.length ? entry.k : entry.r);
   for (const form of forms) {
     for (const reading of entry.r) {
       const rank = frequency.get(form + '\t' + reading) || frequency.get(form);
@@ -188,21 +231,32 @@ function bestRank(entry, frequency) {
  * into one.
  *
  * A plain average would let a word that is common in one corpus and entirely
- * absent from the other drag the number toward "rare", which is backwards —
+ * absent from the other drag the number toward "rare", which is backwards, 
  * H (a light novel about a schoolgirl) not covering technical vocabulary a
  * newspaper covers constantly says nothing about how common that vocabulary
  * actually is. The harmonic mean instead rewards a word for doing well in
  * either list, while still favouring one that both lists agree is common over
- * one only a single list has heard of — two independent corpora agreeing on
+ * one only a single list has heard of, two independent corpora agreeing on
  * "this word is common" is stronger evidence than either alone.
  */
+/**
+ * Is this a word people write in kana? True when it has no kanji at all, when
+ * JMdict says it is usually written in kana, and when every kanji spelling it
+ * does have is marked rare, irregular or search-only, which is the case for
+ * the particles: の is filed under 乃 and 之 and written neither way.
+ */
+function writtenInKana(entry) {
+  if (!entry.k.length || entry.kana) return true;
+  return entry.s.some((sense) => sense.m && sense.m.includes("uk"));
+}
+
 function combineRanks(a, b) {
   if (a && b) return Math.round((2 * a * b) / (a + b));
   return a || b || 0;
 }
 
 /**
- * Just enough of the zip format to get the files out — the frequency list is
+ * Just enough of the zip format to get the files out, the frequency list is
  * distributed as one, and this saves taking on a dependency to read it.
  */
 function unzip(buffer) {
@@ -246,7 +300,7 @@ function parseEntry(xml, byDescription) {
   let score = 0;
 
   // JMdict marks some spellings as not really for reading. The auxiliary verb
-  // ます, for instance, carries the kanji 〼 tagged "sK" — a search-only form,
+  // ます, for instance, carries the kanji 〼 tagged "sK", a search-only form,
   // meaning "match this, but never show it to anyone". Honour that: keep every
   // spelling for matching, but sort the showable ones to the front and record
   // how many there are, so the popup can display a word the way it is written.
@@ -264,6 +318,9 @@ function parseEntry(xml, byDescription) {
   spellings.sort((a, b) => a.rank - b.rank);
   for (const s of spellings) k.push(s.keb);
   const showable = spellings.filter((s) => s.rank < 2).length;
+  // Every spelling marked rare, irregular or search-only means the word is
+  // not really written in kanji at all, whatever JMdict says about kana.
+  const allKanjiRare = spellings.length > 0 && spellings.every((s) => s.rank > 0);
   for (const m of xml.matchAll(/<r_ele>([\s\S]*?)<\/r_ele>/g)) {
     const reb = pick(m[1], 'reb');
     if (reb) { r.push(reb); score = Math.max(score, priorityOf(m[1])); }
@@ -293,7 +350,10 @@ function parseEntry(xml, byDescription) {
   if (!senses.length) return null;
 
   // kv: how many of the spellings in `k` are fit to display.
-  return { k, r, s: senses, f: score, kv: showable };
+  const entry = { k, r, s: senses, f: score, kv: showable };
+  // Read while ranking, then dropped: it never ships.
+  if (allKanjiRare) entry.kana = true;
+  return entry;
 }
 
 function pick(xml, tag) {

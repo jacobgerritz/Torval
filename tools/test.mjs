@@ -1,12 +1,12 @@
 /*
- * LLL — test suite
+ * LLL, test suite
  *
  *   node --max-old-space-size=4096 tools/test.mjs
  *
  * Loads the built dictionary into memory and runs the extension's real lookup
  * code against it. The only thing stubbed is the storage layer: the extension
- * reads from IndexedDB, this reads from a Map. Everything above that — the
- * deinflection rules, the scan-every-length search, the ranking — is the same
+ * reads from IndexedDB, this reads from a Map. Everything above that, the
+ * deinflection rules, the scan-every-length search, the ranking, is the same
  * code that ships.
  */
 
@@ -69,7 +69,11 @@ function check(name, ok, detail) {
 
 /** The top match for `text` should be `expected` characters of surface text. */
 async function topMatch(text, expectedSurface, expectedHeadword, expectedReasons) {
-  const groups = await Lookup.search(text, db);
+  // What a hover on the first character actually does: read the sentence,
+  // then ask for the word the reading landed on. Asking search on its own
+  // would be asking a different question, one no part of the extension asks.
+  const at = await Lookup.tokenAt(text, 0, db);
+  const groups = await Lookup.search(text.slice(at.start), db, at.length);
   if (!groups.length) return check(text, false, 'no match at all');
   const top = groups[0];
   const hit = top.hits[0];
@@ -98,7 +102,7 @@ async function contains(text, headword) {
     'got ' + JSON.stringify(groups.map((g) => g.hits.map((h) => h.entry.k[0] || h.entry.r[0]))));
 }
 
-/** `text` must NOT produce `headword` — guards against the deinflector inventing words. */
+/** `text` must NOT produce `headword`, guards against the deinflector inventing words. */
 async function excludes(text, headword) {
   const groups = await Lookup.search(text, db);
   const found = groups.some((g) => g.hits.some((h) => h.entry.k[0] === headword || h.entry.r[0] === headword));
@@ -141,7 +145,7 @@ const run = async () => {
   await topMatch('遊んだ', '遊んだ', '遊ぶ', 'past');
   await topMatch('読んで', '読んで', '読む', '-te');
   await topMatch('取って', '取って', '取る', '-te');
-  // 行く is the classic irregular て-form — 行いて would be wrong.
+  // 行く is the classic irregular て-form, 行いて would be wrong.
   await contains('行って', '行く');
 
   // Irregulars.
@@ -172,13 +176,13 @@ const run = async () => {
   // write こんにちは ("hello"). Longest-match-wins would pick the greeting
   // every time, which is backwards for what someone actually typed.
   await topMatch('今日は早く起きた', '今日', '今日');
-  // The rare reading is still there, just not first — "shorter matches" is
+  // The rare reading is still there, just not first, "shorter matches" is
   // exactly where it belongs, for the rare case someone did mean "hello".
   await contains('今日は早く起きた', '今日は');
   // A real compound should never be second-guessed just for ending in a
-  // particle-shaped kana — 図書館 is not rare next to 図書, so it stays first.
+  // particle-shaped kana, 図書館 is not rare next to 図書, so it stays first.
   await topMatch('図書館で本を読む', '図書館', '図書館');
-  // 友達 (friend) is, if anything, commoner than 友 alone — nothing to demote.
+  // 友達 (friend) is, if anything, commoner than 友 alone, nothing to demote.
   await topMatch('友達と話した', '友達', '友達');
 
   // --- guarding against invented words ---------------------------------
@@ -288,7 +292,7 @@ const run = async () => {
 
   // One sentence can teach three words, so a repeated sentence must not be
   // treated as a duplicate. Anki's own rule compares first fields, which on a
-  // sentence-mining note type is the sentence — so that rule is left off, and
+  // sentence-mining note type is the sentence, so that rule is left off, and
   // whether a word is already known is answered separately, up front, as
   // information rather than as a gate. See the duplicate tests just below.
   const mining = { deck: 'Japanese::Sentence Mining', model: 'M',
@@ -307,7 +311,7 @@ const run = async () => {
   await Anki.addNote(mining, { word: '食べる', sentence: 'C' }).catch((e) => { dupErr = e.message; });
   check('adding an already-known word succeeds rather than being refused',
     !dupErr, dupErr);
-  check('addNote does not itself query for duplicates — that is a separate, up-front check',
+  check('addNote does not itself query for duplicates, that is a separate, up-front check',
     !dupCalls.includes('findNotes'), JSON.stringify(dupCalls));
 
   // The separate, explicit check still correctly reports a duplicate when asked.
@@ -433,7 +437,7 @@ const run = async () => {
   delete globalThis.fetch;
 
   // --- search-only spellings -------------------------------------------
-  // ます is filed under the kanji 〼, which JMdict tags "sK" — findable, but
+  // ます is filed under the kanji 〼, which JMdict tags "sK", findable, but
   // never to be shown. The entry must report no showable spelling at all.
   const masu = (await Lookup.search('ます', db))[0].hits
     .find((h) => h.entry.s.some((sn) => sn.p.includes('aux-v')));
@@ -470,7 +474,7 @@ const run = async () => {
     Lookup.displayForm({ k: ['本'], r: ['ほん'], s: [] }, '本').reading === 'ほん');
 
   // A word usually written in kana still has a kanji spelling filed in the
-  // dictionary, and matching it by that kanji spelling should show it — but
+  // dictionary, and matching it by that kanji spelling should show it, but
   // matching it by its kana should never surface the kanji instead. コーヒー
   // is "usually kana" over its own listed spelling 珈琲.
   const coffeeEntry = (await db.getEntries(['コーヒー'])).get('コーヒー')[0];
@@ -516,7 +520,7 @@ const run = async () => {
   // --- frequency blended from two corpora ---------------------------------
   // Every rank the extension ever sees already comes out of the build step
   // blended from JPDB (anime, manga, visual novels) and BCCWJ (newspapers,
-  // books, the web) — this only checks that ordinary, everyday words still
+  // books, the web), this only checks that ordinary, everyday words still
   // land solidly in the top bands once both have had a say, not any specific
   // number, since the exact rank moves whenever either source is refreshed.
   for (const [word, band] of [['本', 'top 1k'], ['車', 'top 1k'], ['食べる', 'top 1k'], ['人', 'top 1k']]) {
@@ -559,7 +563,7 @@ const run = async () => {
     JSON.stringify(Lookup.sharedPos(benkyouEntry)) === '["n"]',
     JSON.stringify(Lookup.sharedPos(benkyouEntry)));
 
-  // 読む is v5m,vt on every one of its senses — the whole combination is shared.
+  // 読む is v5m,vt on every one of its senses, the whole combination is shared.
   const yomuEntry = (await db.getEntries(['読む'])).get('読む')[0];
   check('a part of speech identical on every sense is shared in full',
     JSON.stringify(Lookup.sharedPos(yomuEntry).sort()) === '["v5m","vt"]',
@@ -592,10 +596,72 @@ const run = async () => {
     (await Lookup.extractWords('本、車、人', db)).length === 3,
     JSON.stringify(await Lookup.extractWords('本、車、人', db)));
 
+  // --- reading a sentence as a whole -------------------------------------
+  // The hard part of Japanese is that nobody writes spaces, so every one of
+  // these is a sentence that came out as nonsense when each word was chosen
+  // on its own without looking at what it left behind. They are kept as
+  // written rather than reduced to the two words that broke, because what is
+  // being tested is the shape of the whole sentence.
+  const reads = async (text, expected) => {
+    const words = await Lookup.segment(text, db);
+    const got = words.map((w) => text.slice(w.start, w.start + w.length));
+    check('reads ' + text, got.join(' ') === expected.join(' '), got.join(' '));
+  };
+
+  // があ is a real entry, and taking it strands る with nothing to be.
+  await reads('種がある。', ['種', 'が', 'ある']);
+  await reads('全世界で約70属3700種がある。',
+    ['全世界', 'で', '約', '属', '種', 'が', 'ある']);
+
+  // Nothing may begin on a small vowel, so ジャ cannot be cut in half into
+  // アジ and パ. っ is not in that company: って begins with one.
+  await reads('でもそれって', ['でも', 'それ', 'って']);
+  await reads('すごいですね。', ['すごい', 'です', 'ね']);
+
+  // The copula is a word, not an ending a noun grows.
+  await reads('単子葉植物の一つの科である。',
+    ['単子葉植物', 'の', '一つ', 'の', '科', 'である']);
+  await reads('よしとです。', ['よし', 'と', 'です']);
+  await reads('猫です。', ['猫', 'です']);
+  await reads('静かである。', ['静か', 'である']);
+  await reads('学生じゃないです。', ['学生', 'じゃない', 'です']);
+  // It does conjugate as itself, though: でした is the past of です.
+  const past = await Lookup.locateTokens('元気でした。', db);
+  check('でした is read as the past of です',
+    past.length === 2 && past[1].word === 'です', JSON.stringify(past));
+
+  // A greeting spelled a way nobody spells it must not beat two ordinary
+  // words, and a verb must not lose to an interjection nobody says.
+  await reads('今日は暑いですね。', ['今日', 'は', '暑い', 'です', 'ね']);
+  await reads('みなさんは日本に旅行に来たとき',
+    ['みなさん', 'は', '日本', 'に', '旅行', 'に', '来た', 'とき']);
+
+  // A name the dictionary has never heard of is left unread rather than
+  // assembled out of whatever happens to overlap it. 僕 survives on one side
+  // of it, which it did not when a stretch of nothing could run across the
+  // change from kanji to kana.
+  const name = await Lookup.segment('僕もちえこさんも', db);
+  const nameSurfaces = name.map((w) => '僕もちえこさんも'.slice(w.start, w.start + w.length));
+  check('a name nobody has heard of is left unread, not invented',
+    nameSurfaces.indexOf('もち') === -1 && nameSurfaces.indexOf('えこ') === -1 &&
+    nameSurfaces.indexOf('僕') !== -1, nameSurfaces.join(' '));
+
+  // A hover and the marking under it come from the same reading, so they
+  // cannot disagree about where a word begins or how long it is.
+  const line = '今日は暑いですね。';
+  for (const token of await Lookup.segment(line, db)) {
+    for (let at = token.start; at < token.start + token.length; at++) {
+      const found = await Lookup.tokenAt(line, at, db);
+      check('hovering character ' + at + ' of ' + line + ' finds the word it is in',
+        found.start === token.start && found.length === token.length,
+        JSON.stringify(found) + ' wanted ' + JSON.stringify({ start: token.start, length: token.length }));
+    }
+  }
+
   // --- crediting a transparent phrase for parts already known -------------
   // お元気ですか ("how are you") is filed in JMdict as one "exp" entry, but it
   // is nothing more than the honorific お, 元気, the copula です and the
-  // particle か — someone who knows all four has no real gap here.
+  // particle か, someone who knows all four has no real gap here.
   const ogenki = await Lookup.locateTokens('お元気ですか', db);
   check('お元気ですか is read as one expression, tagged decomposable',
     ogenki.length === 1 && ogenki[0].word === 'お元気ですか' && ogenki[0].expression === true,
@@ -610,7 +676,7 @@ const run = async () => {
     !(await Lookup.decomposeKnown('お元気ですか', 0, 'お元気ですか'.length, db, new Set())));
 
   // A genuine idiom must never get this credit. Knowing 猫, の, 手, も and
-  // 借りる word for word does not hand you "desperately busy" — JMdict marks
+  // 借りる word for word does not hand you "desperately busy". JMdict marks
   // it with the misc tag "id" for exactly this reason, and that is what has
   // to keep it out, since "exp" alone would not (猫の手も借りたい carries
   // both "exp" and "adj-i", the same shape an ordinary expression has).
@@ -621,7 +687,7 @@ const run = async () => {
     !(await Lookup.decomposeKnown('猫の手も借りたい', 0, '猫の手も借りたい'.length, db,
       new Set(['猫', 'の', '手', 'も', '借りる']))));
 
-  // Ordinary vocabulary — not an expression at all — is never sent through
+  // Ordinary vocabulary, not an expression at all, is never sent through
   // this at all; locateTokens should say so plainly.
   const plain = await Lookup.locateTokens('食べる', db);
   check('an ordinary word is not flagged as an expression',
@@ -651,7 +717,7 @@ const run = async () => {
       found && found.surface === 'ジャパニーズ', 'got ' + JSON.stringify(found && found.surface));
   }
 
-  // Reading a passage and hovering it have to agree, word for word — they are
+  // Reading a passage and hovering it have to agree, word for word, they are
   // what the marking on the page and the popup are each built from.
   for (const token of kTokens) {
     const start = await Lookup.wordAt(katakana, token.start, db);
@@ -690,7 +756,7 @@ const run = async () => {
   }
 
   // A noun immediately followed by に is the noun plus the ordinary particle,
-  // not the noun's own adverbial form — only a real na-adjective has one of
+  // not the noun's own adverbial form, only a real na-adjective has one of
   // those. This used to swallow に into the match for any noun at all.
   await topMatch('ネカフェに行った', 'ネカフェ', 'ネカフェ');
   // A genuine na-adjective's adverbial and attributive forms must still work.
@@ -767,7 +833,7 @@ const run = async () => {
     JSON.stringify(located));
 
   // Positions are into the text as handed over, so leading text has to shift
-  // them — this is what lets a page offset be mapped back to a text node.
+  // them, this is what lets a page offset be mapped back to a text node.
   const offset = await Lookup.locateTokens('Hello 本', db);
   check('positions count from the start of the whole passage, not the Japanese',
     offset.length === 1 && offset[0].start === 6, JSON.stringify(offset));
@@ -802,7 +868,7 @@ const run = async () => {
   check('a drop in the middle comes back down before the end',
     JSON.stringify(Pitch.heights(3, 2)) === '[false,true,false,false]');
 
-  // 箸 and 橋 are both はし and differ only in pitch — the case that proves a
+  // 箸 and 橋 are both はし and differ only in pitch, the case that proves a
   // reading alone cannot decide the accent.
   check('箸 is 1 and 橋 is 2, told apart by their kanji',
     (await Pitch.accentFor('箸', 'はし')) === 1 && (await Pitch.accentFor('橋', 'はし')) === 2,
@@ -913,7 +979,7 @@ const run = async () => {
   check('A before the first line has nowhere to go', Subs.step(0.2, -1) === null);
 
   // The on-screen fallback only records a line once it ends, so the one
-  // currently playing is not in `cues` yet — without also checking it, D
+  // currently playing is not in `cues` yet, without also checking it, D
   // would work only up to the line before the one in progress, which in
   // practice meant D stopped working the moment you had used A even once.
   const inProgress = { start: 20, text: 'still being said' };
@@ -928,7 +994,7 @@ const run = async () => {
   // Auto-generated captions are very often drawn word by word as recognition
   // catches up, not all at once. Treating each partial reveal as a brand new
   // line meant a recorded cue could start wherever the LAST fragment began
-  // rather than at the sentence's true start — 今回の動画では… coming out
+  // rather than at the sentence's true start, 今回の動画では… coming out
   // starting at 動画 specifically because of this.
   check('a line growing forward is recognised as the same line',
     Subs.isContinuation('今回の', '今回の動画では'));

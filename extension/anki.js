@@ -1,9 +1,9 @@
 /*
- * LLL — talking to Anki
+ * LLL, talking to Anki
  *
  * Anki itself has no way to accept a card from outside. AnkiConnect, the add-on,
  * opens a small web server on your own machine (port 8765) that does. So adding
- * a card is one HTTP request to 127.0.0.1 — nothing leaves your computer, and if
+ * a card is one HTTP request to 127.0.0.1, nothing leaves your computer, and if
  * Anki is closed the request simply fails and we say so.
  *
  * Only the background script may do this: a page cannot reach your local Anki,
@@ -24,12 +24,12 @@ var LLLAnki = (function () {
   // and a 200, whether or not it actually has the word: when it does not, you
   // get a fixed 52,288-byte recording saying the audio is unavailable. It is
   // always byte for byte identical, so the only way to tell is to hash what came
-  // back. Anything matching is thrown away and the audio field left empty —
+  // back. Anything matching is thrown away and the audio field left empty, 
   // better than a collection full of identical "no audio" clips.
   var AUDIO_URL = 'https://assets.languagepod101.com/dictionary/japanese/audiomp3.php';
   var NO_AUDIO_SHA256 = 'ae6398b5a27bc8c0a771df6c907ade794be15518174773c58c7c7ddd17098906';
-  // Only to catch empty or truncated replies. Real recordings get small — 犬 is
-  // about 1.6 KB — so this has to stay well clear of them; the hash does the
+  // Only to catch empty or truncated replies. Real recordings get small, 犬 is
+  // about 1.6 KB, so this has to stay well clear of them; the hash does the
   // actual work.
   var MIN_AUDIO_BYTES = 256;
 
@@ -144,7 +144,7 @@ var LLLAnki = (function () {
    */
   async function addNote(config, note) {
     if (!config || !config.deck || !config.model) {
-      throw new Error('No deck chosen yet — open LLL’s options and pick one.');
+      throw new Error('No deck chosen yet, open LLL’s options and pick one.');
     }
 
     // Only go looking for audio if somewhere on the card wants it.
@@ -175,14 +175,14 @@ var LLLAnki = (function () {
       var value = note[config.fields[field]];
       if (value) { fields[field] = value; any = true; }
     });
-    if (!any) throw new Error('None of the note type’s fields are mapped yet — see LLL’s options.');
+    if (!any) throw new Error('None of the note type’s fields are mapped yet, see LLL’s options.');
 
     // Duplicates are allowed on purpose: mining a second word from a sentence
     // you have already mined once is completely ordinary. Anki's own
     // duplicate rule compares first fields, which on a sentence-mining note
     // type is the sentence rather than the word, so it is turned off rather
     // than half-applied. Whether this word already exists is answered
-    // separately, up front — see alreadyHave — as a heads-up, not a gate.
+    // separately, up front, see alreadyHave, as a heads-up, not a gate.
     return invoke(config.url, 'addNote', {
       note: {
         deckName: config.deck,
@@ -209,12 +209,12 @@ var LLLAnki = (function () {
    *
    * Anki decides two notes are duplicates by comparing their first fields, and
    * on a sentence-mining note type the first field is the sentence. So mining a
-   * second word out of one sentence looked like a duplicate and was refused —
+   * second word out of one sentence looked like a duplicate and was refused, 
    * which is wrong: one sentence can easily teach you three words.
    *
    * A card is a duplicate when it is the same *word*, so that is what gets
-   * asked, and Anki's rule is turned off. If the question cannot be asked — no
-   * word field mapped, or an Anki too old to answer — the card is simply made.
+   * asked, and Anki's rule is turned off. If the question cannot be asked, no
+   * word field mapped, or an Anki too old to answer, the card is simply made.
    */
   async function alreadyHave(config, note) {
     var field = fieldFor(config, 'word');
@@ -232,7 +232,7 @@ var LLLAnki = (function () {
   /**
    * Anki's search syntax. Quotes and backslashes always need escaping; in a
    * field's value so do the wildcards and the colon, which would otherwise be
-   * read as syntax. Deck names keep their colons — that is how nesting is
+   * read as syntax. Deck names keep their colons, that is how nesting is
    * written.
    */
   function escapeSearch(text, isValue) {

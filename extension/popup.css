@@ -1,11 +1,11 @@
 /*
- * LLL — the popup's whole appearance.
+ * LLL, the popup's whole appearance.
  *
  * Loaded inside a shadow root, so nothing here can affect the page and nothing
  * on the page can affect it. Edit freely; it is the only file that decides how
  * the thing looks.
  *
- * The palette is deliberately small: four greys and one blue — the word, the
+ * The palette is deliberately small: four greys and one blue, the word, the
  * definitions, everything secondary, the separators, and the reading. An
  * earlier version gave the pitch, the tags and the frequency a colour each, and
  * the result was a popup where six things asked for attention at once.
@@ -137,7 +137,7 @@
 /*
  * The two things you can do with a word, kept together at the end of its line:
  * ✓ for "I already know this", + for "put this on a card". Deliberately quiet
- * until pointed at — the word and its meaning are what the popup is for.
+ * until pointed at, the word and its meaning are what the popup is for.
  */
 .buttons {
   display: flex;
@@ -175,7 +175,7 @@
 
 /* Known and ignored words stay lit, so a popup says at a glance which of its
    matches are already accounted for, and which way. Green for "I have this",
-   grey-blue for "never mention it again" — the second is not an achievement,
+   grey-blue for "never mention it again", the second is not an achievement,
    so it does not get a colour that reads like one. */
 .know.on { color: #6f9e78; }
 .know.on:hover:not(:disabled) { color: #8fbe98; }

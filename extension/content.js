@@ -1,5 +1,5 @@
 /*
- * LLL — the part that runs on the page
+ * LLL, the part that runs on the page
  *
  * Three jobs:
  *   1. Work out which text the mouse is actually pointing at.
@@ -10,7 +10,7 @@
  * us exactly which character sits under a pixel (caretPositionFromPoint), which
  * is a problem no other kind of program gets solved for free.
  *
- * The popup lives in a "shadow root" — a small sealed-off document of its own.
+ * The popup lives in a "shadow root", a small sealed-off document of its own.
  * Nothing the page does to its own styling can leak in and nothing we do leaks
  * out, so the popup looks identical on every site.
  */
@@ -41,7 +41,7 @@
     return false;
   }
 
-  // Hiragana, katakana, kanji, the repeat mark and halfwidth katakana — written
+  // Hiragana, katakana, kanji, the repeat mark and halfwidth katakana, written
   // down once, in japanese.js, because the hover, the reading of a whole passage
   // and the marking of a page all have to agree on what counts.
   const JAPANESE = LLLJapanese;
@@ -82,7 +82,7 @@
   let context = null;   // the sentence the current lookup came from
   let chosenList = null;   // the <ol> currently holding a picked sense, if any
 
-  // Plain hovering, with no Shift and no click — what is under the cursor
+  // Plain hovering, with no Shift and no click, what is under the cursor
   // right now, kept up to date on every mouse movement so that a click or a
   // press of 3 has an answer ready rather than a fresh lookup to wait on.
   let hoverToken = 0;
@@ -102,7 +102,7 @@
   // Recording ahead of the user costs something, so ask first whether any card
   // field is pointed at a video frame or the line's audio.
   // LLL draws its own subtitles, so it knows exactly when each line runs from
-  // and to — which is what lets it record the line itself rather than an
+  // and to, which is what lets it record the line itself rather than an
   // approximation of it. They are meant to replace YouTube's, so they are drawn
   // whether or not anything is being mined. Recording only happens on demand.
   if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.enable();
@@ -126,8 +126,9 @@
       hide();
       return;
     }
-    if (e.key === '3' && markHover(e, 'know')) return;
-    if (e.key === '4' && markHover(e, 'ignore')) return;
+    if (e.key === '1' && markHover(e, 'unknown')) return;
+    if (e.key === '2' && markHover(e, 'known')) return;
+    if (e.key === '3' && markHover(e, 'ignored')) return;
     if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
@@ -141,55 +142,52 @@
   window.addEventListener('blur', () => { shiftDown = false; });
 
   /**
-   * 3 says you know the word being pointed at; 4 says never to mention it
-   * again. Neither needs the ✓ or the ⊘, or even an open popup: whatever
-   * plain hovering has already resolved is what they act on, the same word a
-   * click would open.
+   * 1, 2 and 3 answer the only question there is about a word: 1 says you do
+   * not know it, 2 says you do, 3 says never to mention it again. Neither
+   * needs the ✓ or the ⊘, or even an open popup: whatever plain hovering has
+   * already resolved is what they act on, the same word a click would open.
    *
    * Most of what you meet while reading is a word you already know, and
    * saying so is the one thing done often enough that it should not cost a
-   * mouse movement. The numbers are 3 and 4 because that is where "known"
-   * and "ignored" sit in the scheme every other tool of this kind uses, so
-   * the fingers already know them, and 1 and 2 stay free should there ever
-   * be more answers to the question than these.
+   * mouse movement. They run 1, 2, 3 in the order the answers themselves run,
+   * from knowing nothing to wanting nothing, which is easier to keep hold of
+   * than remembering which numbers a different tool happened to use.
    *
-   * They set rather than toggle. Pressing one twice should not undo it: with
-   * keys this easy to lean on, an accidental repeat must be harmless.
-   * Undoing either is a deliberate click in the popup.
+   * They set rather than toggle, so leaning on one is harmless, and every one
+   * of the three states can be reached from every other: pressing 1 on a word
+   * marked known puts it back to unknown, which used to take a trip to the
+   * popup.
    *
    * Answers whether it did anything, because the key has to be taken away
-   * from the page when it did — YouTube reads the number keys as "jump to
-   * 30% of the video", and this must never also lose your place, whether or
-   * not a popup happens to be open.
+   * from the page when it did. YouTube reads the number keys as "jump to 30%
+   * of the video", and this must never also lose your place, whether or not a
+   * popup happens to be open.
    */
-  function markHover(e, kind) {
+  function markHover(e, wanted) {
     if (e.ctrlKey || e.altKey || e.metaKey) return false;
 
     const focused = document.activeElement;
     if (focused && (focused.isContentEditable ||
       /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return false;
 
-    // A popup already open for exactly this word is driven through its own
-    // button, so the button lights up too rather than only the page's
-    // marking updating out from under it.
-    if (ui && ui.host.style.display === 'block') {
-      const button = ui.card.querySelector('.entry .' + kind);
-      const wordEl = ui.card.querySelector('.entry .word');
-      if (button && button.setState && wordEl && wordEl.textContent === hoverWord) {
-        e.preventDefault();
-        e.stopPropagation();
-        button.setState(true);
-        return true;
-      }
-    }
-
     if (!hoverWord) return false;
     e.preventDefault();
     e.stopPropagation();
-    // syncState, inside applyState, is what records the new state — including
-    // for the cursor, so a second press of the same key is a no-op rather than
-    // a second count of the same word.
-    applyState(hoverWord, kind, true, hoverState);
+
+    // Already there. The key is still taken from the page, since the reason
+    // for taking it has nothing to do with whether anything changed.
+    const before = hoverState || 'unknown';
+    if (before === wanted) return true;
+
+    // Every move is one of two switches being thrown, and which one depends
+    // on where the word is coming from as much as where it is going: known to
+    // ignored turns known off by turning ignored on, but known to unknown has
+    // to turn known off itself.
+    // applyState, through syncState, is what records the new state, including
+    // for the cursor, so a second press of the same key does nothing rather
+    // than counting the same word twice.
+    if (wanted === 'unknown') applyState(hoverWord, before === 'known' ? 'know' : 'ignore', false, before);
+    else applyState(hoverWord, wanted === 'known' ? 'know' : 'ignore', true, before);
     return true;
   }
 
@@ -229,8 +227,8 @@
    * remembers the state it had when it was hovered, so marking a word known
    * through the popup and then pressing 3 on the same word counted it twice.
    * And the popup can list the same word more than once, since two separate
-   * dictionary entries can share a spelling — こと is both a particle and a
-   * noun — each with its own tick, each believing the word is still unknown.
+   * dictionary entries can share a spelling, こと is both a particle and a
+   * noun, each with its own tick, each believing the word is still unknown.
    *
    * Telling the bar about a change it has already counted is the bug in
    * both cases, so every button holding this word is corrected here, in the
@@ -256,7 +254,7 @@
   /**
    * A click on a plain word looks it up exactly as Shift would, without
    * needing Shift held down first. Links, buttons, form fields and anything
-   * already inside the popup are left alone — this only ever takes over a
+   * already inside the popup are left alone, this only ever takes over a
    * click that would otherwise have done nothing.
    */
   window.addEventListener('click', (e) => {
@@ -281,7 +279,7 @@
   // Anything that is not "reading the popup" closes it: clicking the page,
   // scrolling it, or taking the mouse out of the frame entirely. Scrolling and
   // clicking inside the popup itself are exempt, which is why these check the
-  // event's path — the popup lives in a shadow root, so a plain target check
+  // event's path, the popup lives in a shadow root, so a plain target check
   // would not recognise its own contents.
   window.addEventListener('mousedown', (e) => { if (!insidePopup(e)) hide(); }, true);
   window.addEventListener('scroll', (e) => { if (!insidePopup(e)) hide(); }, true);
@@ -313,8 +311,8 @@
       // Same test as plain hovering: has the cursor actually left the word
       // being shown. Comparing the surrounding text instead, which is what
       // this used to do, meant panning along a line with Shift held never
-      // looked like a change — reading outward from the cursor gives the
-      // same stretch of text for every character of it — so the popup sat on
+      // looked like a change, reading outward from the cursor gives the
+      // same stretch of text for every character of it, so the popup sat on
       // the first word of the line however far the mouse travelled.
       const settled = ui && ui.host.style.display === 'block';
       if (settled && inCurrentWord(found)) return;
@@ -379,7 +377,7 @@
     hoverState = stateOf(top.hits[0]);
 
     // The word may genuinely have begun before the character the cursor
-    // happened to land on — hovering anywhere inside ネカフェ still finds
+    // happened to land on, hovering anywhere inside ネカフェ still finds
     // and marks the whole word, not just whatever was directly underneath.
     const from = found.base + (typeof reply.start === 'number' ? reply.start : found.point);
     hoverBlock = found.block;
@@ -411,8 +409,8 @@
 
   /**
    * A quiet highlight under the word the cursor is on right now, using the
-   * same technique the unknown-word colouring uses — a Range and the CSS
-   * Custom Highlight API — rather than wrapping anything in a <span>, so
+   * same technique the unknown-word colouring uses, a Range and the CSS
+   * Custom Highlight API, rather than wrapping anything in a <span>, so
    * hovering never touches the page's own DOM.
    */
   function paintHover(node, offset, length) {
@@ -432,13 +430,13 @@
       CSS.highlights.set(HOVER_HIGHLIGHT, new Highlight(range));
     } catch (err) {
       // the page moved the text out from under this while it was being worked
-      // out — the next hover over it tries again.
+      // out, the next hover over it tries again.
     }
   }
 
   /**
    * Where a match of `length` characters starting at (node, offset) actually
-   * ends, which is not always the same text node it started in — 図書館 is
+   * ends, which is not always the same text node it started in, 図書館 is
    * routinely written as two adjacent <span>s, and the real dictionary match
    * can run past the end of the one the cursor happens to be over.
    */
@@ -471,7 +469,7 @@
   // -------------------------------------------------------------------------
 
   /**
-   * The word under the cursor — not just the character.
+   * The word under the cursor, not just the character.
    *
    * Pointing at フェ inside ネカフェ has to still find ネカフェ, not read
    * forward from フェ and land on some shorter, unrelated match that merely
@@ -515,7 +513,7 @@
   /**
    * Turn a caret position into the character actually being pointed at.
    *
-   * The browser gives us a caret position — a gap between two characters —
+   * The browser gives us a caret position, a gap between two characters, 
    * rather than a character, and it picks whichever gap is nearest. Point at
    * the right-hand half of 日 and you get the gap before 本, which would look up
    * the wrong word. So take the offset only if the pointer really sits inside
@@ -557,8 +555,8 @@
   /**
    * Every text node in the block the given node sits in, laid end to end as
    * one string, with a record of which stretch of that string came from
-   * which node. Sites break sentences across `<span>`s constantly — YouTube's
-   * captions are one span per line, ruby furigana is several per word — so a
+   * which node. Sites break sentences across `<span>`s constantly. YouTube's
+   * captions are one span per line, ruby furigana is several per word, so a
    * word has to be findable regardless of which element it happens to be
    * split across, in either direction from wherever the cursor lands in it.
    */
@@ -638,7 +636,8 @@
    *
    * Same walk as forwardText, but in both directions and without the sixteen
    * character limit: gather the block's text, find where we are in it, and cut
-   * back to the nearest full stop on either side.
+   * back to the nearest full stop on either side. A subtitle line is kept
+   * whole instead, full stops and all.
    */
   function sentenceAt(node, offset) {
     const block = blockAncestor(node);
@@ -661,9 +660,19 @@
 
     let start = index;
     let end = index;
-    while (start > 0 && !SENTENCE_END.test(text[start - 1])) start--;
-    while (end < text.length && !SENTENCE_END.test(text[end])) end++;
-    if (end < text.length) end++;          // keep the full stop itself
+    if (block.closest && block.closest('[data-lll-subtitle]')) {
+      // A subtitle is one thing said, and the whole of it is the context
+      // worth keeping. Cutting it at the nearest full stop is right for an
+      // article, where the paragraph around a sentence is somebody else's
+      // argument, and wrong here: the line is already short, it was written
+      // as a unit, and half of it on a card is half of what was said.
+      start = 0;
+      end = text.length;
+    } else {
+      while (start > 0 && !SENTENCE_END.test(text[start - 1])) start--;
+      while (end < text.length && !SENTENCE_END.test(text[end])) end++;
+      if (end < text.length) end++;        // keep the full stop itself
+    }
 
     const slice = text.slice(start, end);
     const lead = slice.length - slice.trimStart().length;
@@ -757,14 +766,14 @@
    * Read the page: what the bar says, and which words get marked.
    *
    * A video is measured against its transcript rather than against what is on
-   * screen — the point of the score is to say what is coming, and the page
+   * screen, the point of the score is to say what is coming, and the page
    * around the player is comments and menus, not the thing being watched. The
    * marking still goes on the page, because that is where the words are.
    *
    * These are two separate questions asked in the same breath, not one
    * question depending on the other. They used to share a single try block,
-   * which meant a stumble in the colouring — the page not being fully settled
-   * yet, a rectangle the browser refused to measure — aborted the score
+   * which meant a stumble in the colouring, the page not being fully settled
+   * yet, a rectangle the browser refused to measure, aborted the score
    * calculation too, before the score had even been asked for. The bar would
    * sit on "…" until the next unrelated reason to read the page came along,
    * which is exactly the "showed nothing, then later showed 72%" pattern:
@@ -799,7 +808,7 @@
           const score = await LLLHighlight.read();
           if (!transcript && score && !scored) { LLLBar.show(score); scored = true; }
         } catch (err) {
-          console.warn('LLL: could not colour this page —', err && err.message);
+          console.warn('LLL: could not colour this page:', err && err.message);
         }
       }
     } finally {
@@ -817,7 +826,7 @@
 
   async function lookup(text, at, where) {
     // Captured now rather than when "+" is clicked: on a page whose text keeps
-    // changing — subtitles, above all — the sentence may be gone by then. This
+    // changing, subtitles, above all, the sentence may be gone by then. This
     // is only ever provisional when `where.point` is set: the real word may
     // turn out to start earlier than wherever the cursor actually landed
     // inside it, and the sentence context has to move with it or the bold
@@ -859,7 +868,7 @@
     if (reply.status.state === 'loading') {
       showMessage(`Building dictionary… ${Math.round(reply.status.progress * 100)}%`, at);
     } else if (reply.status.state === 'error') {
-      showMessage('Dictionary failed to load — see the extension console.', at);
+      showMessage('Dictionary failed to load, see the extension console.', at);
     } else if (reply.groups && reply.groups.length) {
       showResults(reply.groups, at);
     } else {
@@ -890,7 +899,7 @@
 
     const card = document.createElement('div');
     card.className = 'card';
-    // Clicks inside must not reach the page — some sites treat any click as
+    // Clicks inside must not reach the page, some sites treat any click as
     // "close the lightbox" and would yank the text out from under the popup.
     card.addEventListener('mousedown', (e) => e.stopPropagation());
 
@@ -964,8 +973,8 @@
    *     top 5k · [1] · usually kana · na-adjective, noun
    *       1  kind; gentle; friendly
    *
-   * The word gets a line to itself. Everything secondary — how common it is,
-   * its pitch, what kind of word it is — goes on one muted line beneath, rather
+   * The word gets a line to itself. Everything secondary, how common it is,
+   * its pitch, what kind of word it is, goes on one muted line beneath, rather
    * than trailing after the headword where it competes with it. The definitions
    * then all start at the same place, which is what makes them scannable: with
    * the grammar labels inline, every line began somewhere different.
@@ -1027,18 +1036,18 @@
 
     const meta = [];
     if (hit.band) {
-      meta.push([hit.band, 'ranked #' + entry.q.toLocaleString('en-US') +
+      meta.push([hit.band, 'ranked #' + hit.q.toLocaleString('en-US') +
         ' in a corpus of Japanese media']);
     }
     if (typeof hit.pitch === 'number') {
       meta.push(['[' + hit.pitch + ']', hit.pitch === 0
-        ? 'flat — the pitch never drops'
+        ? 'flat, the pitch never drops'
         : 'the pitch drops after mora ' + hit.pitch]);
     }
     for (const code of hit.shared || []) meta.push([label(code), tags[code] || code]);
     // Only the part of speech every sense actually has in common goes on the
     // meta line. 勉強 is a transitive suru-verb for one sense and intransitive
-    // for another and plain "noun" for a third — showing the first sense's
+    // for another and plain "noun" for a third, showing the first sense's
     // combination as though it summed up the word would just be wrong for
     // the rest of them.
     const sharedPos = hit.sharedPos || [];
@@ -1083,7 +1092,7 @@
         // definition to copy would silently change what gets mined.
         if (String(window.getSelection())) return;
 
-        // Senses picked in a different entry do not carry over — a card is
+        // Senses picked in a different entry do not carry over, a card is
         // one word, and choosing a meaning of 語 must not leave a meaning of
         // 話 still marked chosen somewhere else in the popup, waiting to be
         // put on the same card by mistake.
@@ -1107,19 +1116,19 @@
   const STATES = {
     know: {
       glyph: '✓',
-      on: 'Known — click to unmark',
-      off: 'Mark as already known (or press 3)'
+      on: 'Known. Click to unmark, or press 1',
+      off: 'Mark as already known (or press 2)'
     },
     ignore: {
       glyph: '⊘',
-      on: 'Ignored — click to stop ignoring it',
-      off: 'Never mention this word again (or press 4)'
+      on: 'Ignored. Click to stop ignoring it, or press 1',
+      off: 'Never mention this word again (or press 3)'
     }
   };
 
   /**
    * The tick that says "I already know this word", and the ⊘ that says "never
-   * mention this one again" — a name, a piece of English, something the
+   * mention this one again", a name, a piece of English, something the
    * dictionary read wrongly. Both are the same button with a different
    * meaning, so they behave identically and there is one description of what
    * marking a word does.
@@ -1201,8 +1210,8 @@
 
   /**
    * A quick, non-blocking heads-up if this word is already in the collection.
-   * Duplicates are allowed — one sentence can easily teach three words, and
-   * mining the same word again later is not a mistake either — so this never
+   * Duplicates are allowed, one sentence can easily teach three words, and
+   * mining the same word again later is not a mistake either, so this never
    * stops the card being made; it only says so, and as early as possible.
    */
   async function warnIfDuplicate(entryEl, word) {
@@ -1217,7 +1226,7 @@
     if (reply && reply.ok && reply.result) {
       const note = document.createElement('div');
       note.className = 'note dup-note';
-      note.textContent = 'Already in your collection — adding it again too.';
+      note.textContent = 'Already in your collection, adding it again too.';
       entryEl.appendChild(note);
     }
   }
@@ -1274,8 +1283,8 @@
   }
 
   /**
-   * A JMdict tag in words. The codes are compact but opaque — "uk" tells you
-   * nothing until someone explains it — and this popup has room to say it.
+   * A JMdict tag in words. The codes are compact but opaque, "uk" tells you
+   * nothing until someone explains it, and this popup has room to say it.
    */
   function label(code) {
     if (LABELS[code]) return LABELS[code];

@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>PREVIEW — not your real LLL settings</title>
+<title>PREVIEW, not your real LLL settings</title>
 <!--
   A page for working on how the settings look, without reloading the extension
   in Firefox every time.
@@ -8,12 +8,12 @@
       node tools/serve.mjs   ->  http://localhost:8137/tools/options-preview.html
 
   It runs the real options.html, options.js and known.js. The markup is not
-  copied here — it is fetched from the extension itself, so this can never
+  copied here, it is fetched from the extension itself, so this can never
   drift out of step with what actually ships. The only fake parts are Anki,
   which is not running, and the stored word list, which lives in memory.
 
   Because it renders the real page it looks exactly like the real settings,
-  which is confusing enough to have caught somebody out already — hence the
+  which is confusing enough to have caught somebody out already, hence the
   banner. Nothing done here can reach the extension's own storage: this is an
   ordinary web page on localhost, and the word list below exists only until
   the tab is closed.
@@ -116,7 +116,7 @@ window.browser = {
   }
 };
 
-// The real page, markup and all, pulled in rather than copied — then its own
+// The real page, markup and all, pulled in rather than copied, then its own
 // scripts run on top of it exactly as they do in the extension.
 (async () => {
   const html = await (await fetch('../extension/options.html')).text();
@@ -131,11 +131,11 @@ window.browser = {
   const layout = page.querySelector('.layout');
   const warning = document.createElement('div');
   warning.className = 'preview-warning';
-  warning.innerHTML = '<b>Preview — made-up data.</b> ' +
+  warning.innerHTML = '<b>Preview, made-up data.</b> ' +
     '<span>This is not your settings and not your words. Nothing here is saved, ' +
     'and nothing here can reach the extension. Your real settings open from ' +
     'LLL&rsquo;s toolbar button, or the &#9881; on the bar at the top of a page.</span>';
-  // Above the sidebar and the panel both, not squeezed into either — the
+  // Above the sidebar and the panel both, not squeezed into either, the
   // layout below is a flex row, and a banner stuffed inside it would just
   // become a third column rather than a strip across the top.
   document.body.appendChild(warning);

@@ -1,5 +1,5 @@
 /*
- * LLL — lookup
+ * LLL, lookup
  *
  * Japanese does not put spaces between words, so we never actually know where
  * the word under the cursor ends. Instead we take the text starting at the
@@ -32,12 +32,19 @@ var LLLLookup = (function () {
 
   /**
    * Characters that can never begin a word, because they belong to the one
-   * before them: the small kana that turn ジ into ジャ, the sokuon っ, the
-   * long vowel mark ー, and the marks that mean "same again" like 々.
+   * before them: the small kana that turn ジ into ジャ, the long vowel mark ー,
+   * and the marks that mean "same again" like 々.
+   *
+   * The sokuon っ is deliberately not among them, though it looks like it
+   * belongs. って, the quotative particle, begins with one, and banning it
+   * outright is what turned それって into それっ and て: with no boundary
+   * allowed after それ, the only way through the sentence ran through a word
+   * nobody has ever said. Inside a word it needs no ban anyway, since 行っ is
+   * not a dictionary entry and never wins on its own.
    *
    * Without this, a word boundary is free to land in the middle of a single
    * sound. ユアジャパニーズ was being read as アジ ("horse mackerel"), パ and
-   * ニーズ ("needs") — three real dictionary entries, assembled by cutting ジャ
+   * ニーズ ("needs"), three real dictionary entries, assembled by cutting ジャ
    * in half, while a hover over the same text found ジャパニーズ perfectly
    * well. Anywhere a boundary is considered, it has to be a boundary a
    * Japanese reader would recognise.
@@ -45,7 +52,7 @@ var LLLLookup = (function () {
    * ヶ and ヵ are deliberately left out: 一ヶ月 really does have a word
    * starting at ヶ, so they are not purely attaching the way the rest are.
    */
-  var ATTACHING = /[ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮーｰゝゞヽヾ々〻]/;
+  var ATTACHING = /[ぁぃぅぇぉゃゅょゎァィゥェォャュョヮーｰゝゞヽヾ々〻]/;
 
   var MAX_GROUPS = 6;     // distinct lengths shown (1 expanded + the rest collapsed)
   var MAX_PER_GROUP = 4;  // homographs shown for a single length
@@ -55,9 +62,17 @@ var LLLLookup = (function () {
     return at > 0 && at < text.length && ATTACHING.test(text.charAt(at));
   }
 
-  async function search(text, db) {
-    if (!text) return [];
-
+  /**
+   * Every dictionary match that starts exactly where `text` starts, filed by
+   * how many characters it took: length to (entry id to hit).
+   *
+   * This is the raw material. Two very different things are built on it. The
+   * popup wants it dressed up: sorted, deduplicated, cut down to what fits on
+   * screen. The segmenter wants it plain, all of it, because a length the
+   * popup would have thrown away as uninteresting may still be the piece that
+   * makes the rest of the sentence come out right.
+   */
+  async function groupsAt(text, db) {
     // Collect every dictionary form worth asking about, remembering which
     // lengths of the original text each one could have come from.
     var byTerm = new Map();
@@ -89,20 +104,39 @@ var LLLLookup = (function () {
           if (!group) { group = new Map(); groups.set(info.length, group); }
 
           var existing = group.get(entry.id);
-          // Prefer the explanation that needed the fewest steps — 食べた is
+          // Prefer the explanation that needed the fewest steps, 食べた is
           // "past", not "past of the potential form of a verb that also exists".
           if (!existing || info.reasons.length < existing.reasons.length) {
             group.set(entry.id, Object.assign(
-              { entry: entry, reasons: info.reasons, matched: term },
+              { entry: entry, reasons: info.reasons, matched: term,
+                q: rankOf(entry, term) },
               displayForm(entry, term)));
           }
         }
       }
     });
 
+    return groups;
+  }
+
+  /**
+   * What to show for the text under the cursor: the matches starting here,
+   * longest first, dressed for the popup.
+   *
+   * `prefer`, when given, is the length the segmenter decided this word
+   * actually is, and it goes to the top whatever its length. The two have to
+   * agree: it would be a strange popup that answered a hover with a different
+   * word from the one the page had just marked under the same characters.
+   * Everything else stays on the list underneath, since the segmenter is
+   * making a judgement and not every judgement is right.
+   */
+  async function search(text, db, prefer) {
+    if (!text) return [];
+    var groups = await groupsAt(text, db);
+
     // Longest first, and each dictionary entry only once. Without that last
-    // rule, hovering 勉強しています would list 勉強 four times over — once for
-    // 勉強しています, 勉強してい, 勉強して and 勉強し — which is noise, not choice.
+    // rule, hovering 勉強しています would list 勉強 four times over, once for
+    // 勉強しています, 勉強してい, 勉強して and 勉強し, which is noise, not choice.
     // What the shorter matches are for is genuinely different words: 日本 sitting
     // under 日本語.
     var used = new Set();
@@ -110,7 +144,10 @@ var LLLLookup = (function () {
     var lengths = Array.from(groups.keys())
       .filter(function (len) { return !splitsCluster(text, len); })
       .sort(function (a, b) { return b - a; });
-    await demoteParticleTrap(text, groups, lengths, db);
+    if (prefer && lengths.indexOf(prefer) > 0) {
+      lengths.splice(lengths.indexOf(prefer), 1);
+      lengths.unshift(prefer);
+    }
 
     for (var g = 0; g < lengths.length && out.length < MAX_GROUPS; g++) {
       var hits = Array.from(groups.get(lengths[g]).values())
@@ -124,89 +161,278 @@ var LLLLookup = (function () {
     return out;
   }
 
-  /**
-   * Where the word covering one particular character in `text` actually
-   * begins — not necessarily `at` itself.
+  // -------------------------------------------------------------------------
+  // Reading a run of Japanese as a sequence of words
+  // -------------------------------------------------------------------------
+
+  /*
+   * Japanese is written without spaces, so before anything can be counted,
+   * looked up or coloured, somebody has to decide where one word stops and
+   * the next begins. That decision is the whole game, and taking the longest
+   * match at each position in turn, which is what this used to do, gets it
+   * wrong in a way that is hard to see coming: every step is locally sensible
+   * and the sentence still comes out as nonsense.
    *
-   * `search` only ever tries matches starting exactly where it is told to
-   * start, which is exactly right for a cursor that landed on the first
-   * character of a word and exactly wrong the rest of the time: pointing at
-   * フェ inside ネカフェ has no business finding フェ, but that is what
-   * happens if nothing is done. Every character from `at` back to where a
-   * word could plausibly have started is tried in turn, and whichever
-   * resulting match both reaches `at` and is longest overall wins — the same
-   * "longest wins" every other search in this file goes by. Ties keep the
-   * earliest start, which the loop order already gives for free.
+   * 種がある ("there is a seed") went in and came out as 種, があ, る,
+   * because があ happens to be a dictionary entry and taking it left る
+   * stranded. すごいですね came out as ご, いです, ね. それって became
+   * それっ, て. In every case a rare word was picked up early and the
+   * wreckage pushed to the end of the sentence, where nothing was left to
+   * complain.
+   *
+   * So the choice is not made one word at a time any more. The whole run of
+   * Japanese between two pieces of punctuation is laid out as every way it
+   * could possibly be cut up, each cut is priced, and the cheapest way
+   * through the lot wins. Backing a word here that leaves rubbish three
+   * characters later now costs what the rubbish costs, which is the point:
+   * があ is only cheap until you notice what it does to the rest of the
+   * sentence.
+   *
+   * Pricing a word, lower being better:
+   *
+   *   TOKEN_COST      paid once per word, so twelve words are not preferred
+   *                   over four when both fit.
+   *   rankCost(q)     how rare it is, on a log scale, because the difference
+   *                   between the 10th and the 1000th commonest word matters
+   *                   far more than the difference between the 40,000th and
+   *                   the 41,000th. Words in neither frequency list are
+   *                   priced as rarer than anything in them.
+   * There is deliberately no bonus for being long. "Longest match wins" comes
+   * out of this on its own and for the right reason: one word costs one
+   * TOKEN_COST and two cost two, so 日本語 beats 日本 plus 語 without anyone
+   * having to say that longer is better. Paying for length twice over is what
+   * made stretches of unreadable text look cheap.
+   *
+   * A stretch that matches nothing at all is priced by the same three terms,
+   * as though it were a single word of the worst rank there is, and becomes
+   * no word. That falls out about right: anything the frequency lists have
+   * heard of beats it, and anything they have not does not.
    */
+  var TOKEN_COST = 3;
+  var UNKNOWN_MAX = 8;          // longest stretch read as one unknown
+  var UNKNOWN_RANK = 60000;     // priced as rarer than the frequency lists reach
+  var UNKNOWN_PER = 4;          // and that much again for every extra character
+
+  /**
+   * What a word costs for being rare. Lower is commoner.
+   *
+   * A missing rank means the frequency lists have never heard of the word,
+   * which is not the same as it being infinitely rare: JMdict knows plenty of
+   * ordinary words the lists skip, and particles often have no rank at all.
+   * Anything unranked is priced as if it sat just past the end of the lists.
+   */
+  function rankCost(q) {
+    return Math.log(q > 0 && isFinite(q) ? q : UNKNOWN_RANK);
+  }
+
+  /**
+   * What one word costs, given how common it is and how much text it covers.
+   *
+   * A word the corpora have never heard of costs exactly what giving up on
+   * the same characters costs, and not a penny less. Priced any cheaper, a
+   * dictionary entry nobody has ever written beats honest ignorance, and a
+   * name gets quietly assembled out of whatever happens to overlap it:
+   * 僕もちえこさんも was read as 僕, もち, えこ, さん, も because えこ, a
+   * reading of 長子 that has surely never been used, was going for less than
+   * three characters of nothing. Priced level, the shorter answer still wins
+   * ties, so a real if unheard-of word like ネカフェ is still one word.
+   */
+  function wordCost(q, length) {
+    if (!isFinite(q) || q <= 0) return unknownCost(length);
+    return TOKEN_COST + rankCost(q);
+  }
+
+  /** What it costs to give up on `length` characters. */
+  function unknownCost(length) {
+    return TOKEN_COST + rankCost(UNKNOWN_RANK) + UNKNOWN_PER * (length - 1);
+  }
+
+  // How far either side of the cursor a single hover bothers to look. Reading
+  // a whole page does each run in one go, but a hover happens on every mouse
+  // movement and a run can be a paragraph. Sixty characters each way is far
+  // more than any word is long, so the answer under the cursor is the same one
+  // the full reading gives.
+  var WINDOW = 60;
+
+  var HIRAGANA = /[\u3041-\u309f]/;
+  var KATAKANA = /[\u30a1-\u30ff\uff66-\uff9f]/;
+
+  /** Are these two characters the same kind of writing? */
+  function sameScript(a, b) {
+    if (HIRAGANA.test(a) !== HIRAGANA.test(b)) return false;
+    if (KATAKANA.test(a) !== KATAKANA.test(b)) return false;
+    return true;
+  }
+
+  /**
+   * Where the run of Japanese containing `at` starts and stops. Punctuation,
+   * spaces and Latin letters end it: no Japanese word is written across them,
+   * so each run can be read on its own.
+   */
+  function runAround(text, at) {
+    var from = at, to = at;
+    while (from > 0 && LLLJapanese.test(text.charAt(from - 1))) from--;
+    while (to < text.length && LLLJapanese.test(text.charAt(to))) to++;
+    return { from: from, to: to };
+  }
+
+  /**
+   * Read `text` from `from` to `to`, which has to be one unbroken run of
+   * Japanese, and hand back the words in it.
+   *
+   * Every position is priced once, cheapest way through by the usual dynamic
+   * programme, and the winning path is walked back from the end. Text that
+   * matched nothing produces no word at all rather than a bad one.
+   */
+  async function segmentRun(text, from, to, db) {
+    var n = to - from;
+    if (n <= 0) return [];
+
+    var best = new Array(n + 1).fill(Infinity);
+    var backLength = new Array(n + 1).fill(0);
+    var backWord = new Array(n + 1).fill(false);
+    var groupsFor = new Array(n).fill(null);
+    best[0] = 0;
+
+    for (var i = 0; i < n; i++) {
+      if (best[i] === Infinity) continue;
+      var at = from + i;
+
+      // No word begins on a character that belongs to the one before it.
+      if (!splitsCluster(text, at)) {
+        var groups = await groupsAt(text.slice(at, at + MAX_SCAN + 1), db);
+        groupsFor[i] = groups;
+        var here = i;
+        groups.forEach(function (group, length) {
+          if (here + length > n) return;                          // past the end
+          if (splitsCluster(text, from + here + length)) return;  // ends mid-sound
+          var cost = best[here] + wordCost(bestQ(group), length);
+          if (cost < best[here + length]) {
+            best[here + length] = cost;
+            backLength[here + length] = length;
+            backWord[here + length] = true;
+          }
+        });
+      }
+
+      // The way through anything: a stretch the dictionary has never heard
+      // of, priced as one word of the worst rank there is rather than per
+      // character. A name is a name however long it is, and charging by the
+      // character is what let 僕もちえこさんも be read as 僕, もち, えこ, さん,
+      // も: three characters of nothing cost so much that any two entries
+      // overlapping them looked like a bargain. Priced this way, nothing in
+      // the frequency lists ever loses to it, and nothing outside them wins.
+      for (var skip = 1; skip <= UNKNOWN_MAX && i + skip <= n; skip++) {
+        // Only ever across one kind of writing. A stretch of nothing is
+        // cheaper per character the longer it runs, which is right for a
+        // name but lets a long one swallow the ordinary words on either
+        // side: 僕もちえこさんも went from being read badly to not being
+        // read at all, 僕 and も disappearing into the hole where ちえこ
+        // was. A change from kanji to kana is the one boundary that is
+        // visible without knowing any Japanese, so give up on the kana and
+        // keep the kanji.
+        if (skip > 1 && !sameScript(text.charAt(at + skip - 2), text.charAt(at + skip - 1))) break;
+        if (splitsCluster(text, at + skip)) continue;
+        var cost = best[i] + unknownCost(skip);
+        if (cost < best[i + skip]) {
+          best[i + skip] = cost;
+          backLength[i + skip] = skip;
+          backWord[i + skip] = false;
+        }
+      }
+    }
+
+    var out = [];
+    for (var end = n; end > 0;) {
+      var length = backLength[end];
+      var start = end - length;
+      if (backWord[end]) {
+        var group = groupsFor[start].get(length);
+        var hits = Array.from(group.values()).sort(byRelevance).slice(0, MAX_PER_GROUP);
+        out.push({ start: from + start, length: length, hits: hits });
+      }
+      end = start;
+    }
+    out.reverse();
+    return out;
+  }
+
+  /** Every word in `text`, wherever it is, run by run. */
+  async function segment(text, db) {
+    var out = [];
+    var i = 0;
+    var steps = 0;
+    while (i < text.length) {
+      if (!LLLJapanese.test(text.charAt(i))) { i++; continue; }
+      var run = runAround(text, i);
+      var words = await segmentRun(text, run.from, run.to, db);
+      for (var w = 0; w < words.length; w++) out.push(words[w]);
+      i = run.to;
+      // A whole page is thousands of searches in a row. Standing aside every
+      // so often lets whatever else is waiting, a hover being looked up above
+      // all, get a turn rather than wait behind the entire passage.
+      if ((++steps % 32) === 0) await pause();
+    }
+    return out;
+  }
+
+  /**
+   * Which word covers one particular character, and where it begins.
+   *
+   * A cursor lands wherever it lands, usually in the middle of a word, so what
+   * a hover asks is not "what starts here" but "what am I pointing at".
+   * Pointing at フェ inside ネカフェ has no business finding フェ. The answer
+   * comes from the same reading of the sentence the page is coloured from, cut
+   * to a window around the cursor for speed, so a hover and the marking under
+   * it can never disagree about what the word is.
+   *
+   * `length` is 0 when the character belongs to nothing the dictionary knows.
+   */
+  async function tokenAt(text, at, db) {
+    if (!LLLJapanese.test(text.charAt(at))) return { start: at, length: 0 };
+    var run = runAround(text, at);
+    var from = Math.max(run.from, at - WINDOW);
+    var to = Math.min(run.to, at + WINDOW);
+    var words = await segmentRun(text, from, to, db);
+    for (var i = 0; i < words.length; i++) {
+      var word = words[i];
+      if (word.start <= at && at < word.start + word.length) {
+        return { start: word.start, length: word.length };
+      }
+    }
+    return { start: at, length: 0 };
+  }
+
+  /** Where the word covering `at` begins. */
   async function wordAt(text, at, db) {
-    var bestStart = at;
-    var bestLength = 0;
-    var from = Math.max(0, at - MAX_SCAN + 1);
-    for (var start = from; start <= at; start++) {
-      if (splitsCluster(text, start)) continue;   // no word begins on a small kana
-      // One character more than can ever be matched, so that search can see
-      // what follows a candidate match and refuse to end in the middle of a
-      // sound. Matching itself is still capped at MAX_SCAN.
-      var groups = await search(text.slice(start, start + MAX_SCAN + 1), db);
-      if (!groups.length) continue;
-      var top = groups[0];
-      if (start + top.length <= at) continue;   // does not actually reach the pointed character
-      if (top.length > bestLength) { bestLength = top.length; bestStart = start; }
-    }
-    return bestStart;
+    return (await tokenAt(text, at, db)).start;
   }
 
   /**
-   * "Longest match wins" has one real trap: a common word plus a single
-   * trailing particle sometimes happens to also spell a genuine, much rarer
-   * dictionary entry. 今日は (2 characters, "today") plus は (the topic
-   * particle) spells the same three characters as 今日は the word, a dated
-   * way to write こんにちは ("hello") — real, in the dictionary, and almost
-   * never what someone actually meant by typing 今日 followed by は.
+   * How common this entry is when it is written the way the page writes it.
    *
-   * This does not change what is found, only which length is offered first —
-   * the longer reading is still right there under "other matches" (the popup
-   * calls that list "other" rather than "shorter" for exactly this reason:
-   * what ends up there is not always shorter). It fires
-   * only when the character being trimmed off is, on its own, a particle
-   * (checked with one small dictionary lookup rather than a hardcoded list of
-   * them, since the dictionary already knows), and only when doing so jumps
-   * to a dramatically more common word — a coincidence has to be a big one
-   * before it is worth overriding "longer is usually right".
+   * An entry that can be written more than one way carries a rank for each
+   * spelling, because they are not equally likely to be what is meant: 今日は
+   * is こんにちは, one of the commonest words in the language, but those three
+   * characters on a page are far more often 今日 followed by は. Whichever
+   * spelling matched is the one whose rank counts, and a spelling the corpora
+   * have never seen counts as unranked however common its neighbours are.
    */
-  async function demoteParticleTrap(text, groups, lengths, db) {
-    if (lengths.length < 2) return;
-    var longestLen = lengths[0];
-    var shorterLen = longestLen - 1;
-    if (lengths.indexOf(shorterLen) === -1) return;
-
-    // The groups built so far all start at position 0 of `text`, so the exact
-    // trailing character (at `shorterLen`, one past where the shorter match
-    // ends) has never been looked up on its own — it takes a fresh, tiny query.
-    var trailing = text[shorterLen];
-    if (!trailing) return;
-    var found = await db.getEntries([trailing]);
-    var candidates = found.get(trailing) || [];
-    var trailingIsParticle = candidates.some(function (entry) {
-      return entry.s.some(function (sense) { return sense.p.indexOf('prt') !== -1; });
-    });
-    if (!trailingIsParticle) return;
-
-    var longestQ = bestQ(groups.get(longestLen));
-    var shorterQ = bestQ(groups.get(shorterLen));
-    // The shorter reading has to be a genuinely common word on its own, and the
-    // longer one has to be dramatically rarer than it — not merely rarer,
-    // which is true of most longer words next to their own prefix.
-    if (shorterQ && shorterQ <= 5000 && longestQ > shorterQ * 15) {
-      lengths.splice(lengths.indexOf(shorterLen), 1);
-      lengths.unshift(shorterLen);
+  function rankOf(entry, matched) {
+    // Only the spellings that disagree with the entry are written down, so an
+    // absent one agrees. A spelling listed as 0 is one the corpora have never
+    // seen, which is a different thing from not being listed at all.
+    if (entry.qm && Object.prototype.hasOwnProperty.call(entry.qm, matched)) {
+      return entry.qm[matched];
     }
+    return entry.q || 0;
   }
 
+  /** The frequency rank of the commonest entry in a group of matches. */
   function bestQ(group) {
     var best = Infinity;
     group.forEach(function (hit) {
-      var q = hit.entry.q || Infinity;
+      var q = hit.q || Infinity;
       if (q < best) best = q;
     });
     return best;
@@ -231,15 +457,15 @@ var LLLLookup = (function () {
   /**
    * How this entry should be named on screen: the spelling and the reading.
    *
-   * Worked out here rather than in the popup so that everything downstream —
+   * Worked out here rather than in the popup so that everything downstream, 
    * what you read, what the pitch accent is looked up under, what lands on the
-   * card — agrees on what the word is.
+   * card, agrees on what the word is.
    *
    * An entry lists all its spellings, and printing the first is misleading: 本
    * also reads もと, and that entry leads with 元, so pointing at 本 would put a
    * kanji on screen you were not looking at. Only the first `kv` spellings are
-   * fit to show at all — JMdict files some purely so searches find them, like
-   * ます under 〼 — and where none is, the kana is the word.
+   * fit to show at all. JMdict files some purely so searches find them, like
+   * ます under 〼, and where none is, the kana is the word.
    */
   function displayForm(entry, matched) {
     // kv absent means data built before the field existed; showing every
@@ -252,7 +478,7 @@ var LLLLookup = (function () {
 
     // Matched via a reading, not a kanji spelling. A word tagged "usually
     // kana" should stay in kana rather than surface whichever kanji spelling
-    // happens to be listed first — コーヒー is "usually kana" over its own
+    // happens to be listed first, コーヒー is "usually kana" over its own
     // kanji spelling 珈琲, so hovering コーヒー should not display 珈琲.
     var usuallyKana = entry.s.some(function (sense) {
       return sense.m && sense.m.indexOf('uk') !== -1;
@@ -274,7 +500,7 @@ var LLLLookup = (function () {
    *
    * Part of speech needs this every bit as much as misc tags do. 勉強 is
    * "n,vs,vt" for one sense and "n,vs,vi" for another and plain "n" for a
-   * third — printing the first sense's combination as though it summed up the
+   * third, printing the first sense's combination as though it summed up the
    * whole word would simply be wrong for the other two.
    */
   function commonAcrossSenses(entry, field) {
@@ -294,7 +520,7 @@ var LLLLookup = (function () {
   //
   // A bare rank asks you to know the scale already: #7,261 means nothing unless
   // you have a feel for what #3,000 is like. And it claims a precision the data
-  // does not have — the gap between #100 and #400 is real, the gap between
+  // does not have, the gap between #100 and #400 is real, the gap between
   // #7,261 and #7,800 is noise. A round band says both things at once, and needs
   // no legend to read.
   var BANDS = [
@@ -323,17 +549,16 @@ var LLLLookup = (function () {
     if (a.reasons.length !== b.reasons.length) {
       var plain = a.reasons.length < b.reasons.length ? a : b;
       var inflected = plain === a ? b : a;
-      // 来た is, on paper, an interjection meaning "all right!" — spelled
+      // 来た is, on paper, an interjection meaning "all right!", spelled
       // exactly like that, needing no deinflection at all. It is also how the
       // past tense of 来る is written, one of the commonest verbs in the
       // language, which does need a step. Preferring the fewest steps is
       // right almost every time and completely wrong here, so a word nobody
       // ever writes does not get to win on a technicality over one everybody
-      // does. Same shape of judgement as demoteParticleTrap above: an
-      // enormous gap in how common two readings are outweighs a tidier
-      // derivation.
-      if ((plain.entry.q || Infinity) > TRAP_RARE &&
-          (inflected.entry.q || Infinity) <= TRAP_COMMON) {
+      // does: an enormous gap in how common two readings are outweighs a
+      // tidier derivation.
+      if ((plain.q || Infinity) > TRAP_RARE &&
+          (inflected.q || Infinity) <= TRAP_COMMON) {
         return plain === a ? 1 : -1;
       }
       return a.reasons.length - b.reasons.length;
@@ -345,7 +570,7 @@ var LLLLookup = (function () {
     // A real frequency rank beats JMdict's own priority markers, which are
     // coarse bands covering only the commonest 24,000 words. Entries the
     // frequency list has never heard of sort last, which is about right.
-    var aq = a.entry.q || Infinity, bq = b.entry.q || Infinity;
+    var aq = a.q || Infinity, bq = b.q || Infinity;
     if (aq !== bq) return aq - bq;
     if (a.entry.f !== b.entry.f) return b.entry.f - a.entry.f;
     return a.entry.id - b.entry.id;
@@ -359,13 +584,13 @@ var LLLLookup = (function () {
    *   1  this is one of its spellings, or it is normally written in kana
    *   2  we only reached it through its reading
    *
-   * Hovering は should find the topic particle first, not 葉 and 歯 and 羽 — those
+   * Hovering は should find the topic particle first, not 葉 and 歯 and 羽, those
    * are merely *pronounced* は. JMdict's frequency markers do not save you here:
    * the commonest function words often carry no marker at all, so they sink
    * below every kanji word that happens to share their sound.
    *
    * The middle tier matters as much as the top one. 本 also reads もと, and the
-   * もと entry is led by a different kanji (元) — so both entries are spelled 本,
+   * もと entry is led by a different kanji (元), so both entries are spelled 本,
    * but only one of them is *chiefly* spelled 本, and that is the one you meant.
    */
   function spellingRank(hit) {
@@ -390,7 +615,7 @@ var LLLLookup = (function () {
    *
    * Frequency alone gets の wrong. The possessive particle is listed under the
    * kanji 乃, which nobody writes, and JMdict scores it well below 野 ("field")
-   * — so the commonest word in the language loses to a rare noun that merely
+   *, so the commonest word in the language loses to a rare noun that merely
    * sounds the same. But particles are *always* written in kana, and a content
    * word almost never is, so kana plus a grammatical part of speech is a strong
    * enough signal to rank on. Point at the kanji 野 itself and this does not
@@ -411,11 +636,11 @@ var LLLLookup = (function () {
    * Read a passage from end to end and hand back the dictionary form of every
    * word in it, in order, the same word repeated as often as it is said.
    *
-   * This is not a separate piece of machinery — it is `search` itself, run
+   * This is not a separate piece of machinery, it is `search` itself, run
    * forward across a whole passage instead of stopping at the first word. At
    * each position it takes the longest match, deinflects it the same way a
    * hover would, and moves past however many characters that consumed, so
-   * 走っていました is recorded as 走る — the same dictionary form a hover on it
+   * 走っていました is recorded as 走る, the same dictionary form a hover on it
    * would have shown. Reading a passage once therefore teaches the word
    * regardless of which sentence it turned up conjugated in.
    *
@@ -441,50 +666,32 @@ var LLLLookup = (function () {
    * wherever it came from.
    */
   async function locateTokens(text, db) {
-    var tokens = [];
-    var i = 0;
-    var steps = 0;
-    while (i < text.length) {
-      // Skipping a character nothing matched can leave the next attempt
-      // standing on a small kana, which no word ever begins with.
-      if (!LLLJapanese.test(text[i]) || splitsCluster(text, i)) { i++; continue; }
-      // One character more than can ever be matched, so that search can see
-      // what follows a candidate match and refuse to end mid-sound.
-      var groups = await search(text.slice(i, i + MAX_SCAN + 1), db);
-      if (groups.length && groups[0].hits.length) {
-        var hit = groups[0].hits[0];
-        tokens.push({
-          word: hit.word, start: i, length: groups[0].length,
-          // Every reading these same characters could be, not only the best
-          // one. 来た is written identically whether it is the rare
-          // interjection or the past tense of 来る; 読み is both a noun in
-          // its own right and the stem of 読む. Someone who knows any one of
-          // the readings of what is actually written on the page is not
-          // missing anything, so all of them travel together and whoever
-          // counts them can ask about the whole set.
-          words: groups[0].hits.map(function (h) { return h.word; }),
-          // Whether JMdict itself tags this as an "expression" rather than a
-          // single word — the one fact that decides whether it is worth
-          // asking if a reader could piece it together from parts they
-          // already know. See decomposeKnown, below.
-          expression: isDecomposable(hit.entry)
-        });
-        i += groups[0].length;
-      } else {
-        i++;
-      }
-      // A whole page is thousands of searches in a row. Standing aside every so
-      // often lets whatever else is waiting — a hover being looked up, above
-      // all — get a turn, rather than being stuck behind the whole passage.
-      if ((++steps % 256) === 0) await pause();
-    }
-    return tokens;
+    var words = await segment(text, db);
+    return words.map(function (found) {
+      var hit = found.hits[0];
+      return {
+        word: hit.word, start: found.start, length: found.length,
+        // Every reading these same characters could be, not only the best
+        // one. 来た is written identically whether it is the rare
+        // interjection or the past tense of 来る; 読み is both a noun in its
+        // own right and the stem of 読む. Someone who knows any one of the
+        // readings of what is actually written on the page is not missing
+        // anything, so all of them travel together and whoever counts them
+        // can ask about the whole set.
+        words: found.hits.map(function (h) { return h.word; }),
+        // Whether JMdict itself tags this as an "expression" rather than a
+        // single word, the one fact that decides whether it is worth asking
+        // if a reader could piece it together from parts they already know.
+        // See decomposeKnown, below.
+        expression: isDecomposable(hit.entry)
+      };
+    });
   }
 
   /**
    * A phrase worth checking for decomposeKnown, below: JMdict tags it `exp`,
    * multiple words filed as one entry, and none of its senses are tagged
-   * `id` — an idiom, JMdict's own word for "the meaning is not what the
+   * `id`, an idiom, JMdict's own word for "the meaning is not what the
    * parts say". 「exp」 alone is not enough on its own to tell them apart:
    * 猫の手も借りたい ("desperately busy", literally "would even borrow a
    * cat's paws") is filed as `exp,adj-i` exactly like an ordinary transparent
@@ -501,8 +708,8 @@ var LLLLookup = (function () {
   }
 
   /**
-   * A genuine idiom specifically — both `exp` and JMdict's own `id` tag on
-   * the same sense — as opposed to merely "not decomposable", which is also
+   * A genuine idiom specifically, both `exp` and JMdict's own `id` tag on
+   * the same sense, as opposed to merely "not decomposable", which is also
    * true of every ordinary single word that was never a candidate for this in
    * the first place. decomposeKnown needs the narrower question: a step
    * partway through a breakdown that happens to consume everything left is
@@ -523,7 +730,7 @@ var LLLLookup = (function () {
    * separately known.
    *
    * JMdict lists a great many ordinary grammatical patterns as their own
-   * "expression" entries purely so they can be searched for — お元気ですか
+   * "expression" entries purely so they can be searched for, お元気ですか
    * ("how are you") is filed as one entry, but it is nothing more than the
    * polite prefix お, the word 元気, the copula です and the particle か, each
    * an entirely ordinary word someone may already know on its own. Marking
@@ -537,7 +744,7 @@ var LLLLookup = (function () {
    * word for word ("even a cat's paws would help") does not hand you its
    * actual meaning ("desperately busy") the way it does for a plain
    * grammatical pattern, which is exactly what isDecomposable, above, is for
-   * — this only ever runs where that says the whole entry is transparent,
+   *, this only ever runs where that says the whole entry is transparent,
    * and even then only ever replaces "known" with "known", never with
    * "understood"; a reader who knows all four pieces of お元気ですか still
    * sees the real phrase in the popup exactly as before.
@@ -549,7 +756,7 @@ var LLLLookup = (function () {
     //
     // Walking greedily and taking the longest match at each step, which is
     // how this first worked, is not good enough. ことがある breaks apart into
-    // こと, が and ある, all thoroughly ordinary words — but greedily, the
+    // こと, が and ある, all thoroughly ordinary words, but greedily, the
     // step after こと takes があ, a rare entry that happens to be two
     // characters long and so beats plain が, and from there the rest is
     // nonsense (り, ます) that could never all be known. Asking "is there any
@@ -566,15 +773,15 @@ var LLLLookup = (function () {
 
       // Checked here, not left to whoever calls this, so nothing can ever
       // mistakenly credit a genuine idiom by skipping the check upstream. An
-      // ordinary word that simply happens to reach exactly to the end — です
-      // often is the last piece of a breakdown — is not this; only a real
+      // ordinary word that simply happens to reach exactly to the end, です
+      // often is the last piece of a breakdown, is not this; only a real
       // idiom is.
       if (i === 0 && groups[0].length === remaining && isIdiom(groups[0].hits[0].entry)) return false;
 
       for (var g = 0; g < groups.length; g++) {
         var group = groups[g];
         // At the very first step, a match swallowing the whole span again is
-        // not a breakdown — it is the same answer restated, and would make
+        // not a breakdown, it is the same answer restated, and would make
         // this succeed immediately every time.
         if (i === 0 && group.length === remaining) continue;
         if (!knownAmong(group.hits, known)) continue;
@@ -619,7 +826,7 @@ var LLLLookup = (function () {
    * Counted per word said, not per distinct word: what "I understand 80% of
    * this" means is that four times in five, the next word is one you know.
    * `counts` comes back too, so that marking one word known afterwards can be
-   * reflected immediately — its count is exactly how much the total moves —
+   * reflected immediately, its count is exactly how much the total moves, 
    * without reading the whole passage a second time.
    *
    * Ignored words leave the question entirely rather than counting against
@@ -649,7 +856,7 @@ var LLLLookup = (function () {
   }
 
   /**
-   * Whether a reader knows what a token says — which is not quite the same as
+   * Whether a reader knows what a token says, which is not quite the same as
    * whether they have marked its best reading known.
    *
    * The same characters can be more than one word. 来た is the past tense of
@@ -672,6 +879,8 @@ var LLLLookup = (function () {
   return {
     search: search,
     wordAt: wordAt,
+    tokenAt: tokenAt,
+    segment: segment,
     displayForm: displayForm,
     frequencyBand: frequencyBand,
     sharedTags: sharedTags,

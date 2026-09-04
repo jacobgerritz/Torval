@@ -1,5 +1,5 @@
 /*
- * LLL — deinflection
+ * LLL, deinflection
  *
  * Japanese verbs and adjectives change shape depending on tense, politeness and
  * so on. A dictionary only ever lists the plain form ("食べる"), so before we can
@@ -17,13 +17,13 @@
  * would "deinflect" to 「少る」, but no such ichidan verb exists, so it is dropped.
  *
  * A few tags are internal bookkeeping rather than real JMdict tags:
- *   te   — a て-form, e.g. 食べて
- *   ta   — a た-form, e.g. 食べた
- *   masu — a ます-form, e.g. 食べます
+ *   te , a て-form, e.g. 食べて
+ *   ta , a た-form, e.g. 食べた
+ *   masu, a ます-form, e.g. 食べます
  * They let multi-step chains work (食べていました -> ... -> 食べる).
  *
  * `tin` is the list of types a rule accepts as input. An empty list means the
- * rule only applies to the word exactly as the user hovered it — nothing can be
+ * rule only applies to the word exactly as the user hovered it, nothing can be
  * conjugated further on top of it (you cannot conjugate an imperative).
  */
 
@@ -50,13 +50,13 @@ var LLLDeinflect = (function () {
     'v5b':   { u: 'ぶ', a: 'ば', i: 'び', e: 'べ', o: 'ぼ', te: 'んで', ta: 'んだ' },
     'v5m':   { u: 'む', a: 'ま', i: 'み', e: 'め', o: 'も', te: 'んで', ta: 'んだ' },
     'v5r':   { u: 'る', a: 'ら', i: 'り', e: 'れ', o: 'ろ', te: 'って', ta: 'った' },
-    // ある — behaves like v5r for everything we care about here.
+    // ある, behaves like v5r for everything we care about here.
     'v5r-i': { u: 'る', a: 'ら', i: 'り', e: 'れ', o: 'ろ', te: 'って', ta: 'った' },
-    // 行く — regular except its て/た forms are 行って / 行った, not 行いて.
+    // 行く, regular except its て/た forms are 行って / 行った, not 行いて.
     'v5k-s': { u: 'く', a: 'か', i: 'き', e: 'け', o: 'こ', te: 'って', ta: 'った' },
-    // 問う, 請う — て/た forms keep the う.
+    // 問う, 請う, て/た forms keep the う.
     'v5u-s': { u: 'う', a: 'わ', i: 'い', e: 'え', o: 'お', te: 'うて', ta: 'うた' },
-    // いらっしゃる, 下さる — the ます-stem is い, not り.
+    // いらっしゃる, 下さる, the ます-stem is い, not り.
     'v5aru': { u: 'る', a: 'ら', i: 'い', e: 'れ', o: 'ろ', te: 'って', ta: 'った' }
   };
 
@@ -91,7 +91,7 @@ var LLLDeinflect = (function () {
   });
 
   // ---------------------------------------------------------------------
-  // Ichidan (v1) — the easy ones. Drop る, add the ending.
+  // Ichidan (v1), the easy ones. Drop る, add the ending.
   // ---------------------------------------------------------------------
   ['v1', 'v1-s'].forEach(function (type) {
     var T = [type];
@@ -122,7 +122,7 @@ var LLLDeinflect = (function () {
   });
 
   // ---------------------------------------------------------------------
-  // する and 来る — the two genuinely irregular verbs.
+  // する and 来る, the two genuinely irregular verbs.
   //
   // Note the last する rule strips it entirely: 勉強して -> 勉強する -> 勉強.
   // JMdict lists 勉強 as a noun tagged "vs" (can take する) rather than listing
@@ -239,19 +239,24 @@ var LLLDeinflect = (function () {
   // ---------------------------------------------------------------------
   // Na-adjectives and the copula
   // ---------------------------------------------------------------------
-  var NA = ['adj-na', 'n'];
-  rule('です',         '', NA, NA, 'copula');
-  rule('でした',       '', NA, NA, 'copula, past');
-  rule('だった',       '', NA, NA, 'copula, past');
-  rule('である',       '', NA, NA, 'copula');
-  rule('じゃない',     '', NA, NA, 'copula, negative');
-  rule('ではない',     '', NA, NA, 'copula, negative');
-  rule('じゃなかった', '', NA, NA, 'copula, negative past');
+  // The copula does conjugate, as itself: でした is the past of です, だった
+  // the past of だ. That is a copula becoming another copula, which is a very
+  // different claim from a noun becoming one.
+  var COP = ['cop'];
+  rule('でした', 'です', COP, COP, 'past');
+  rule('だった', 'だ',   COP, COP, 'past');
+
+  // Nouns, though, are not here on purpose. です, だ, である and their negatives
+  // are words in their own right, not endings a noun grows, and treating them
+  // as endings meant every noun in the language could swallow whatever came
+  // after it: 科である read as 科, さです as 差, とです as と. Two of those are
+  // not even words anyone would say. Left alone, です is looked up as です,
+  // which is what it is, and the noun before it stays a noun.
 
   // な (attributive) and に (adverbial) are different from the copula rules
   // above them: any noun at all takes です or だった (猫です, 猫だった), but
   // taking な or に as part of its own grammar is a na-adjective's trick
-  // specifically, not a plain noun's — 元気 ("healthy") does it because it is
+  // specifically, not a plain noun's, 元気 ("healthy") does it because it is
   // tagged both adj-na and n, but 猫 or ネカフェ, tagged only n, do not: 猫な
   // and 猫に are not standard Japanese, only 猫だ and 猫に(as the particle)
   // are. Restricted to plain 'n' as well as 'adj-na', this rule allowed any
@@ -283,9 +288,9 @@ var LLLDeinflect = (function () {
    * The first result is always the word itself, untouched.
    *
    * Each result is { term, types, reasons }:
-   *   types   — null means "could be anything"; otherwise the word must have
+   *   types , null means "could be anything"; otherwise the word must have
    *             one of these JMdict part-of-speech tags for the guess to count.
-   *   reasons — how the dictionary form was built up into what the reader saw,
+   *   reasons, how the dictionary form was built up into what the reader saw,
    *             innermost first: 食べなかった gives ["negative", "past"], i.e.
    *             食べる -> 食べない -> 食べなかった.
    */

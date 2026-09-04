@@ -1,5 +1,5 @@
 /*
- * LLL — pitch accent build step
+ * LLL, pitch accent build step
  *
  *   node tools/build-pitch.mjs
  *
@@ -8,7 +8,7 @@
  * most authoritative source available for standard Tokyo accent, and is the same
  * data Yomitan and AJT Pitch Accent use.
  *
- * Each row is a word, a reading, and where the pitch drops — 0 meaning it never
+ * Each row is a word, a reading, and where the pitch drops, 0 meaning it never
  * does. A word can honestly have more than one accent (１ is both いち and ひと),
  * so they are kept as a list and the first is treated as the usual one.
  */

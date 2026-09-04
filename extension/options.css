@@ -1,4 +1,4 @@
-/* LLL — settings page. Same restraint as the popup, a little roomier. */
+/* LLL, settings page. Same restraint as the popup, a little roomier. */
 
 :root { color-scheme: dark; }
 
@@ -233,3 +233,17 @@ input[type="file"] {
 }
 
 .word-row .remove:hover { background: none; color: #d08a7a; }
+
+/* The two word lists share a page, since they are the same decision with
+   different answers and a word moves between them. A rule and a heading are
+   enough to say where one stops and the other starts. */
+.parting {
+  margin: 44px 0 4px;
+  padding-top: 28px;
+  border-top: 1px solid #26282d;
+}
+.parting.first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}

@@ -1,9 +1,9 @@
 /*
- * LLL — the comprehension bar
+ * LLL, the comprehension bar
  *
  * One number, across the top of the page: how much of what is in front of you
  * is made of words you already know. On a video that is the whole transcript,
- * not the part already watched — which is the point of it. Knowing that a
+ * not the part already watched, which is the point of it. Knowing that a
  * video is 92% words you know before starting it is what decides whether it is
  * worth watching at all, and no amount of reading it afterwards answers that.
  *
@@ -40,7 +40,7 @@ var LLLBar = (function () {
   var pendingTimer = null;
 
   // Read once, up front, so the very first paint already knows whether to
-  // start down — by the time a reading is ready to show (at the earliest,
+  // start down, by the time a reading is ready to show (at the earliest,
   // 1.5 seconds after the page itself loads), this has almost always already
   // resolved.
   api.storage.local.get('barPinned').then(function (stored) {
@@ -66,7 +66,7 @@ var LLLBar = (function () {
    *
    * Building the dictionary takes a minute the first time and reading a page
    * takes a moment every time, and until now both happened in complete
-   * silence — nothing on the page said anything at all, so the only thing to
+   * silence, nothing on the page said anything at all, so the only thing to
    * conclude was that nothing worked. The handle carries it, since that is
    * what is visible while the bar is tucked away: "LLL 42%" while the
    * dictionary is still being built, "LLL ·" while a page is being read.
@@ -78,7 +78,7 @@ var LLLBar = (function () {
     // Nothing has been put on the page yet, so wait a moment before doing so.
     // Most pages answer faster than this, and a page with no Japanese on it
     // should never get a handle in the corner that appears and then vanishes
-    // again — it should never get one at all.
+    // again, it should never get one at all.
     if (!pendingTimer) {
       pendingTimer = setTimeout(function () {
         pendingTimer = null;
@@ -162,7 +162,7 @@ var LLLBar = (function () {
     els.detail.textContent = data.known.toLocaleString('en-US') + ' of ' +
       data.total.toLocaleString('en-US') + ' words known';
     // Green when a text is comfortable, amber when it is a stretch, plain when
-    // it is out of reach — a colour read at a glance where a number needs
+    // it is out of reach, a colour read at a glance where a number needs
     // thinking about. The line at 90% is the usual one for reading without
     // stopping every sentence.
     els.score.className = 'score ' + (percent >= 90 ? 'easy' : percent >= 70 ? 'ok' : 'hard');
@@ -189,7 +189,7 @@ var LLLBar = (function () {
     els.bar.className = 'bar';
     // Unpinned, the bar is a hover panel: it stays down while the mouse is
     // anywhere on it, and only starts counting down to retract once the
-    // mouse actually leaves — so reading the detail text or reaching for a
+    // mouse actually leaves, so reading the detail text or reaching for a
     // button never gets cut short partway through.
     els.bar.addEventListener('mouseenter', cancelRetract);
     els.bar.addEventListener('mouseleave', scheduleRetract);
@@ -232,7 +232,7 @@ var LLLBar = (function () {
     setExpanded(pinned);
 
     // A video played full screen should be a video, not a video with a bar
-    // across it. The page's own reading is unaffected — it comes straight back
+    // across it. The page's own reading is unaffected, it comes straight back
     // on the way out.
     document.addEventListener('fullscreenchange', function () {
       if (data) host.style.display = document.fullscreenElement ? 'none' : 'block';
@@ -248,7 +248,7 @@ var LLLBar = (function () {
   function scheduleRetract() {
     if (pinned) return;
     cancelRetract();
-    // A short grace period, not an instant retract — moving the mouse across
+    // A short grace period, not an instant retract, moving the mouse across
     // the bar on the way to a button is not the same thing as leaving it.
     retractTimer = setTimeout(function () { setExpanded(false); }, 500);
   }
@@ -268,7 +268,7 @@ var LLLBar = (function () {
   function paintPin() {
     els.pin.classList.toggle('on', pinned);
     els.pin.title = pinned
-      ? 'Pinned open — click to let it tuck away again'
+      ? 'Pinned open, click to let it tuck away again'
       : 'Pin open, instead of tucking away when the mouse leaves';
   }
 
@@ -282,7 +282,7 @@ var LLLBar = (function () {
 
   // Same palette as the popup and the subtitles: one dark card colour, one
   // border, one bright text colour, everything else muted. Sized to be read
-  // at a glance rather than squinted at — the first version of this bar was
+  // at a glance rather than squinted at, the first version of this bar was
   // built to take up as little room as possible, which mostly meant it was
   // too small to actually see.
   var CSS = [
@@ -304,7 +304,7 @@ var LLLBar = (function () {
     '  padding: 0 14px;',
     '  background: #16171a; border-bottom: 1px solid #292b30;',
     '  font: 14px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
-    // Tucked above the top edge by default — the handle above is what stays
+    // Tucked above the top edge by default, the handle above is what stays
     // visible in that state, since it sits at the same coordinates but one
     // step behind the bar in the stacking order.
     '  transform: translateY(-100%); transition: transform .22s ease;',

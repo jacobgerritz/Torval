@@ -1,7 +1,7 @@
 # LLL
 
 A pop-up Japanese dictionary for Firefox. Hold **Shift** and point at a word;
-its meaning appears next to the cursor. Everything is on your own machine — the
+its meaning appears next to the cursor. Everything is on your own machine, the
 whole of JMdict, the dictionary Jisho is built from, lives in the browser. It
 works with the network off.
 
@@ -28,7 +28,7 @@ node tools/build-pitch.mjs
 Temporary Add-on…* and pick `extension/manifest.json`.
 
 The first time it runs, the extension spends a minute or so copying the
-dictionary into the browser's own storage — 218,000 entries and 465,000
+dictionary into the browser's own storage, 218,000 entries and 465,000
 searchable forms. A percentage shows on the toolbar button while it does, and
 until it reaches the end, hovering a word says so rather than answering.
 
@@ -62,8 +62,9 @@ that actually reaches it.
 | **Esc**, a click outside, a scroll | close |
 | **other matches** | other words that start at the same place |
 | **A** / **D** | step back and forward a subtitle line |
-| **3** | mark the word under the cursor as known, popup or not |
-| **4** | ignore it instead: never mention this one again |
+| **1** | mark the word under the cursor as one you do not know |
+| **2** | mark it as one you do, popup or not |
+| **3** | ignore it instead: never mention this one again |
 | **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
 | **✓** | mark as known, or unmark it |
@@ -75,14 +76,14 @@ instead, and it stays put, so you can move across and read it. A click never
 takes over a link, a button, a form field, or text you were dragging to
 select, so nothing about ordinary browsing changes.
 
-Tags that hold for the whole word — `uk`, "usually written in kana" — sit beside
+Tags that hold for the whole word, `uk`, "usually written in kana", sit beside
 it rather than against every definition. JMdict files them per sense, but a tag
 on *every* sense is describing the word, and 事 carrying "usually kana" ten times
 over says nothing ten times. Where a tag really is on only some senses it stays
 with them: 綺麗 is usually kana when it means "clean", not when it means "pretty",
 and that is worth knowing. Part of speech works the same way: 勉強 is a
 transitive suru-verb for one sense and intransitive for another and just a plain
-noun for a third, so only "noun" — what every sense actually agrees on — sits
+noun for a third, so only "noun", what every sense actually agrees on, sits
 beside the word; each sense's own line carries whatever it adds beyond that.
 
 Two small numbers follow the reading. The one in brackets is the **pitch
@@ -91,8 +92,8 @@ after; the diagram of it goes on the card rather than in the popup. The other
 is how **common** the word is: 読む is *top 1k*, 図書館 is *top 10k*.
 
 That is a band rather than a rank on purpose. A bare number asks you to know the
-scale already — #7,261 means nothing unless you have a feel for what #3,000 is
-like — and it claims a precision the data does not have. The gap between #100
+scale already, #7,261 means nothing unless you have a feel for what #3,000 is
+like, and it claims a precision the data does not have. The gap between #100
 and #400 is real; the gap between #7,261 and #7,800 is noise. A round band says
 both of those at once and needs no legend. The exact rank is on hover for when
 it matters. A word with no band at all is one neither corpus ever saw, which
@@ -106,7 +107,7 @@ rather than looking rare just because one of the two happens not to cover it.
 
 Point at the *first* character of a word. Japanese has no spaces, so the
 extension reads forward from wherever you are pointing and finds the longest
-thing that is a word — point at 日 in 日本語 and you get 日本語, not 日.
+thing that is a word, point at 日 in 日本語 and you get 日本語, not 日.
 
 Longest is not always right, and there is one well-known trap for it: a common
 word followed by a single particle can spell the same characters as a real,
@@ -123,7 +124,7 @@ It undoes conjugation on the way. 食べなかった is not in any dictionary, s
 walked back to 食べる and the steps taken are shown underneath, small and grey:
 *negative → past*.
 
-Only a real na-adjective takes な or に as part of its own grammar — 元気な
+Only a real na-adjective takes な or に as part of its own grammar, 元気な
 and 元気に are 元気 behaving adjectivally, since 元気 is tagged as one. A plain
 noun is not, so ネカフェに ("to the net cafe") is the word ネカフェ plus the
 ordinary particle に after it, not one long word ending in に; this used to be
@@ -139,7 +140,7 @@ computer.
 
 Open the settings from LLL's toolbar button and choose a deck and a note type.
 Both lists are read from Anki itself, so a name can never be slightly wrong.
-LLL then fills in the field mapping by guessing from the field names — a note
+LLL then fills in the field mapping by guessing from the field names, a note
 type with fields called *Target Word*, *Reading*, *Sentence* and *Definitions*
 needs no setting up at all. Anything it guesses wrongly is one dropdown away,
 and anything left blank stays empty on the card.
@@ -150,7 +151,7 @@ Four things can be put on a card:
 |---|---|
 | **Target word** | the dictionary form, so 食べなかった files under 食べる |
 | **Reading** | the kana |
-| **Sentence** | the whole sentence, with the word in bold |
+| **Sentence** | the whole sentence, with the word in bold. On a video this is the whole subtitle line, not the clause the word sits in: the line was written as one thing said, and half of it on a card is half of what was said |
 | **Definition** | every sense, numbered |
 | **Word audio** | a recording of the word, if one can be found |
 | **Pitch accent** | the accent diagram, drawn as an SVG |
@@ -159,33 +160,33 @@ Four things can be put on a card:
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
 mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
-recording instead — so LLL hashes what comes back and discards that one, leaving
+recording instead, so LLL hashes what comes back and discards that one, leaving
 the field empty rather than filling your collection with identical clips. Anki
 downloads and stores nothing itself; LLL passes it the file.
 
 Pitch accents come from **Kanjium**, which derives from the NHK accent
-dictionary and 大辞林 — the same data Yomitan and AJT Pitch Accent use. A word's
+dictionary and 大辞林, the same data Yomitan and AJT Pitch Accent use. A word's
 whole pattern follows from one number, where the pitch drops, and the diagram is
 drawn from that: a dot per mora, high or low. The hollow dot on the end is the
 particle that would follow, which is the only thing distinguishing 橋 (pitch
 drops after it) from 日本語 (it does not). It is drawn in `currentColor`, so it
 takes the colour of whatever card it lands on, night mode included.
 
-A reading alone is not enough to place an accent — 箸, 橋 and 端 are all はし with
-three different accents — so where the word cannot be identified the field is
+A reading alone is not enough to place an accent, 箸, 橋 and 端 are all はし with
+three different accents, so where the word cannot be identified the field is
 left empty rather than guessed at.
 
 The bold marks the word **as the page wrote it**, so a conjugated form is
-highlighted in full — 「<b>食べなかった</b>ので、お腹が空いた。」 — while the Target
+highlighted in full, 「<b>食べなかった</b>ので、お腹が空いた。」, while the Target
 Word field still says 食べる.
 
 Duplicates are allowed. A repeated word gets a small note the moment **+** is
-pressed, before the slower work of capturing the sentence even starts — but the
+pressed, before the slower work of capturing the sentence even starts, but the
 card is made either way. One sentence often teaches several words, and mining
 the same word again later is not a mistake either.
 
 By default a card carries every sense of the word. Clicking a sense before
-pressing **+** narrows it to the meanings you actually met — 語 is both "word;
+pressing **+** narrows it to the meanings you actually met, 語 is both "word;
 term" and "language", and you rarely want both. Clicking nothing means all of
 them, so the ordinary case needs no clicks. Picking several senses of the same
 word is fine, but a card is one word: choosing a sense in a different entry
@@ -197,26 +198,26 @@ from two different words onto one card.
 ## Subtitles, and mining from video
 
 LLL times YouTube's Japanese subtitles so it knows exactly when each line
-starts and ends — that timing is what lets a line be replayed and recorded
+starts and ends, that timing is what lets a line be replayed and recorded
 precisely, and what lets **A** and **D** jump between lines. **Keep YouTube's
 own captions turned on**; LLL needs a genuine one active to work at its best,
 for reasons covered below, and as a source of text to read either way. What
-you actually see is drawn by LLL itself, in the same look as the popup —
+you actually see is drawn by LLL itself, in the same look as the popup, 
 YouTube's own caption box is hidden underneath it, so a line always reads as
 LLL's.
 
-There are four ways it gets the timing, tried in the order below — each a
+There are four ways it gets the timing, tried in the order below, each a
 fallback for the one before it, not a choice between them. The first three all
 build a caption web address themselves, out of data YouTube's own page
 publishes; none of them ever produced anything, on any video tried, no matter
-how the request was made — a background-script fetch, a content-script fetch,
+how the request was made, a background-script fetch, a content-script fetch,
 a rewritten request header, an injected response header. What finally worked
 was not sending a better-formed request at all: it was not building the
 address in the first place.
 
 1. **Catch the address YouTube's own player already uses.** The address
    published in the page's own data is not, evidently, the one YouTube's own
-   player actually requests when it genuinely fetches a caption track — so no
+   player actually requests when it genuinely fetches a caption track, so no
    amount of asking more carefully for *that* address was ever going to work.
    LLL watches the page's own network traffic for the real request instead,
    which happens the moment a caption track is genuinely active in the native
@@ -227,14 +228,14 @@ address in the first place.
    Catching the right address turned out not to be enough on its own. Even
    that address, provably the one YouTube's own player had just used
    successfully, still came back with a 200 and nothing in it when refetched
-   from the content script — the same "blocked by OpaqueResponseBlocking"
+   from the content script, the same "blocked by OpaqueResponseBlocking"
    symptom from the very first attempt, which meant it was never really about
    which address was being asked for. Both fixes are needed together: LLL
    also adds the CORS permission the response never carries, using the same
    `webRequest` technique CORS-unblocking extensions use generally, scoped
    only to this one address.
 2. **Ask for the transcript the way "Show transcript" does.** Not the
-   closed-caption file — the separate panel YouTube's own player offers,
+   closed-caption file, the separate panel YouTube's own player offers,
    reached through a one-time token buried in the page's own data.
 3. **Ask YouTube for the closed-caption file directly.** The address LLL
    builds itself from the page's published data, tried as a fallback in case
@@ -243,14 +244,14 @@ address in the first place.
    watching it appear and disappear. This is what the simplest subtitle tools
    do, and it always works, because it is only reading what is already there.
    The real cost: a line is known only once it has actually been shown, so
-   nothing about the video is known ahead of watching it — **D** cannot jump
+   nothing about the video is known ahead of watching it, **D** cannot jump
    ahead into an unseen line, and nothing here can answer "how much of this
    video will I understand" before you have already watched it. Rewatching a
    line does not duplicate it; seeing the same text again near where it was
    last seen just refreshes its timing.
 
 Method 1 can arrive at any moment and supersede whichever of the others is
-currently in charge — including the on-screen fallback — since a genuine
+currently in charge, including the on-screen fallback, since a genuine
 transcript beats one assembled a line at a time regardless of when it turns
 up.
 
@@ -262,7 +263,7 @@ before, which is how you rewatch something you did not catch.
 offers with a button to try each one directly. Automatic fetching has too many
 ways to land on an empty response, or to pick an auto-generated track over a
 manual one that would have worked better, for that choice to always be made
-silently — this is the same request the automatic pass makes, just handed to
+silently, this is the same request the automatic pass makes, just handed to
 you instead of guessed at. Closing it does not bring it back until the next
 video loads. Whichever track LLL picked automatically is reported at the
 bottom of the list, so you can see at a glance whether it is worth trying
@@ -273,7 +274,7 @@ reveal mentioned below comes from.
 In the on-screen fallback specifically, auto-generated captions are often
 revealed a few words at a time as recognition catches up rather than appearing
 whole. LLL treats a growing or slightly revised line as the same line still
-being written, not a new one each time — otherwise both the audio and the
+being written, not a new one each time, otherwise both the audio and the
 timing would start wherever the last fragment happened to begin, not at the
 sentence's true start.
 
@@ -281,18 +282,18 @@ Pressing **+** on a word in a subtitle also puts on the card the frame you were
 looking at and the audio of that line. The frame is taken the instant you press
 it, before anything moves. The audio is taken by replaying the line: the video
 is sent back to the start of it, recorded to the end of it, and put back
-exactly as it was — same moment, same speed, same paused or playing.
+exactly as it was, same moment, same speed, same paused or playing.
 
 The line plays out loud while this happens, so you hear what is being put on
-the card rather than mining blind. It takes as long as the line does — a
-couple of seconds — and what comes out is exactly the line.
+the card rather than mining blind. It takes as long as the line does, a
+couple of seconds, and what comes out is exactly the line.
 
 Playback speed is forced to normal while it records, since a line captured at
 1.5× is a line spoken at 1.5×.
 
 **Content-protected video cannot be captured.** Netflix, Prime Video and Disney+
 hand their video to the browser's DRM layer, and both the frame and the audio
-come back empty — that is what the protection is for, not a limitation to be
+come back empty, that is what the protection is for, not a limitation to be
 worked around. Where capture is refused the card is still made, without media.
 
 Subtitles are YouTube-only for now.
@@ -301,20 +302,25 @@ Subtitles are YouTube-only for now.
 
 ## Known words
 
-The list of words you already know, kept under **Known words** in LLL's
-settings. Words get there two ways.
+The list of words you already know, kept under **Words** in LLL's settings,
+alongside the ignored list: they are the same decision with different answers,
+and a word moves between them, so they sit on one page. Words get on the known
+list two ways.
 
 **One at a time.** Every word in the popup has a **✓** beside its **+**. They
 are different questions: **+** means *teach me this*, **✓** means *I already
 have this*. The tick toggles, because the commonest mistake to make with it is
 pressing it on the wrong word.
 
-Or press **3** while pointing at the word, without reaching for the tick. Most
+Or press **2** while pointing at the word, without reaching for the tick. Most
 of what you meet while reading is something you already know, and saying so is
-the one thing done often enough that it should not cost a mouse movement. The
-number is **3** because that is where "known" sits in the scheme every other
-tool of this kind uses. Unlike the tick it only ever *sets* known — leaning on
-the key twice must be harmless — so unmarking stays a deliberate click.
+the one thing done often enough that it should not cost a mouse movement.
+
+The three keys run in the order the answers themselves run: **1** for a word
+you do not know, **2** for one you do, **3** for one to stop mentioning. They
+set rather than toggle, so leaning on one is harmless, and every state can be
+reached from every other: **1** on a word already marked known puts it back to
+unknown, which used to mean a trip to the popup.
 
 **In bulk.** Paste in something you have already read, or load a plain text
 file, and press **Add words from this text**.
@@ -322,7 +328,7 @@ file, and press **Add words from this text**.
 Nothing new is built to read that text: it runs through `extractWords`, the
 exact longest-match search a Shift-hover already uses, moved forward across a
 whole passage instead of stopping at the first word. 走っていました is recorded
-as 走る — the same dictionary form a hover on it would show — so reading a
+as 走る, the same dictionary form a hover on it would show, so reading a
 passage once teaches the word regardless of which sentence it turned up
 conjugated in, and running the same text through a second time adds nothing,
 since it is already known.
@@ -349,7 +355,7 @@ did not ask it to. Press **📌** to keep it down instead, the way it used to
 work; that choice is remembered.
 
 On a video that is measured against the **whole transcript**, not the part
-already watched — which is the entire point of the fight to get the transcript
+already watched, which is the entire point of the fight to get the transcript
 up front. Knowing a video is 87% words you know *before* starting it is what
 decides whether it is worth watching; reading it afterwards answers nothing.
 Everywhere else it is the page's own text.
@@ -370,9 +376,9 @@ handle says so rather than sitting there silently: "LLL 42%" the first time,
 when 218,000 entries are being copied into the browser's own database, and
 "LLL ·" for the moment a page takes to read.
 
-A grammatical pattern JMdict happens to file as one entry — お元気ですか
+A grammatical pattern JMdict happens to file as one entry, お元気ですか
 ("how are you") is nothing more than the honorific お, 元気, the copula です
-and the particle か — counts as known once every piece of it is, even though
+and the particle か, counts as known once every piece of it is, even though
 that exact four-word entry was never separately marked known itself. The same
 goes for ことがある. A true idiom, where the meaning genuinely is not the sum
 of its words, gets none of this: JMdict's own "id" tag is what tells the two
@@ -388,7 +394,7 @@ just because the dictionary also lists it separately.
 
 Some words are never going to be learned and should not be counted either
 way: names, pieces of English, things the dictionary read wrongly. Press **⊘**
-in the popup, or the **4** key, and the word leaves the question entirely —
+in the popup, or the **3** key, and the word leaves the question entirely, 
 not marked on the page, and out of the comprehension total rather than
 counting for or against it. Counting them unknown would say a page is harder
 than it is; counting them known would say the opposite; neither is true.
@@ -409,7 +415,7 @@ Two honest limits are worth knowing about. First, this is a vocabulary score,
 not a comprehension score in the full sense: understanding a sentence also
 takes grammar, and two sentences with the same known-word percentage are not
 always equally easy to follow. Second, a word the dictionary does not
-recognize at all — a name, a coined word, a typo — is left out of the count
+recognize at all, a name, a coined word, a typo, is left out of the count
 entirely rather than counted as unknown, since there is no dictionary entry it
 could be. On a video full of character names this reads a little higher than
 it should. Ignoring a word does the same thing deliberately, and for the same
@@ -437,6 +443,68 @@ side and ignored on the other, known wins, since the two lists still cannot
 both hold it.
 
 A file that is not one LLL wrote is refused rather than half-read.
+
+---
+
+## Where one word stops and the next begins
+
+Japanese is written without spaces, so before a single word can be counted,
+looked up or coloured, something has to decide where the words are. This is the
+hard part, and it is worth saying how it is done, because the obvious way is
+wrong in a way that takes a while to notice.
+
+The obvious way is to start at the left, take the longest thing in the
+dictionary, move past it and repeat. Every step is sensible. The sentence still
+comes out as nonsense: 種がある ("there is a seed") was read as 種, があ, る,
+because があ really is an entry, and taking it left る stranded with nothing to
+be. すごいですね came out as ご, いです, ね. The wreckage always lands at the end
+of the sentence, where there is nothing left to complain.
+
+So the sentence is read as a whole. Every run of Japanese between two pieces of
+punctuation is laid out as every way it could possibly be cut up, each way is
+priced, and the cheapest wins. A word costs a flat amount for being a word, plus
+more the rarer it is, on a log scale from two frequency lists. Backing があ now
+costs what る costs three characters later, which is what makes it lose.
+
+Two things follow from pricing it this way rather than by length:
+
+**Nothing wins on length alone.** "Longest match wins" falls out on its own,
+because one word costs one word and two cost two, so 日本語 still beats 日本
+plus 語. But 今日は, a spelling of こんにちは nobody uses, no longer beats 今日
+followed by は, and 来た is read as the past of 来る rather than as the
+interjection spelled the same way. Both of those used to need a rule of their
+own. Neither has one now.
+
+**A word nobody has written costs the same as no word at all.** Text the
+dictionary cannot account for is priced as a stretch of unknown, and a
+dictionary entry with no frequency behind it is priced exactly the same, never
+less. Otherwise an entry nobody has ever used beats honest ignorance and names
+get assembled out of the wreckage: 僕もちえこさんも was read as 僕, もち, えこ,
+さん, も, because えこ, a reading of 長子 that has surely never been written
+down, was going cheaper than three characters of nothing. A stretch of nothing
+also may not run across a change from kanji to kana, which is the one word
+boundary that is visible without knowing any Japanese.
+
+The same reading answers both questions the extension asks, which is why a hover
+and the colouring under it can never disagree: pointing at a character asks
+which word of the sentence it fell inside, and the popup leads with that word
+rather than with whatever happens to be longest.
+
+### The copula is a word
+
+です, だ, である and their negatives are words in their own right, not endings a
+noun grows, and LLL now reads them that way: 猫です is 猫 and です, 静かである is
+静か and である. Treating them as endings meant any noun could swallow whatever
+followed it, which produced 科である read as 科, さです as 差 and とです as と,
+two of which are not things anyone would say. The copula does still conjugate as
+itself, so でした is read as the past of です.
+
+### What it still gets wrong
+
+Names. ちえこ is not in any dictionary, and neither ちえ nor こさん being real
+words is something the pricing can see through. A person's name in the middle of
+a kana run is the case where a human uses さん as the clue and LLL does not. The
+ignore list, and the **3** key, exist partly for this.
 
 ---
 
@@ -481,49 +549,50 @@ were.
 
 A handful of files do the work. None of them is long.
 
-**`extension/deinflect.js`** — the grammar. A table of about 470 small rules,
+**`extension/deinflect.js`**: the grammar. A table of about 470 small rules,
 each saying "a word ending in X might really be a word ending in Y". Applied
 over and over, they turn any conjugated form back into the dictionary form.
 Every rule is tagged with the kind of word it applies to, so the nonsense
 answers get thrown away: 少ない could "become" the verb 少る, but no such verb
 exists, so it is dropped.
 
-**`extension/lookup.js`** — the search. Takes the text from the cursor, tries
-every length from sixteen characters down to one, deinflects each, and keeps
-whatever is really in the dictionary. Longest match wins; the shorter ones are
-offered below it.
+**`extension/lookup.js`**: the search, and the reading of a sentence into
+words. Takes a piece of text, tries every length from sixteen characters down
+to one at every position, deinflects each and keeps whatever is really in the
+dictionary. Which of those matches to believe is settled for the sentence as a
+whole rather than one word at a time; see "Where one word stops" below.
 
-**`extension/background.js`** — the dictionary itself. Runs once for the whole
+**`extension/background.js`**: the dictionary itself. Runs once for the whole
 browser and owns the database. Pages ask it questions by message.
 
-**`extension/content.js`** — the part on the page. Works out which character is
+**`extension/content.js`**: the part on the page. Works out which character is
 under the mouse, and draws the popup. The popup is built inside a *shadow root*,
 a sealed-off document of its own, so no website's styling can reach it and it
 looks the same everywhere.
 
-**`extension/anki.js`** — the Anki side. One HTTP request to your own machine.
+**`extension/anki.js`**: the Anki side. One HTTP request to your own machine.
 
-**`extension/pitch.js`** — pitch accents, and drawing them.
+**`extension/pitch.js`**: pitch accents, and drawing them.
 
-**`extension/subtitles.js`** — timing YouTube's subtitles, direct or off the screen.
+**`extension/subtitles.js`**: timing YouTube's subtitles, direct or off the screen.
 
-**`extension/video.js`** — replaying a line to record it, and grabbing the frame.
+**`extension/video.js`**: replaying a line to record it, and grabbing the frame.
 
-**`extension/bar.js`** — the comprehension bar across the top of the page.
+**`extension/bar.js`**: the comprehension bar across the top of the page.
 
-**`extension/highlight.js`** — marking the unknown words, without touching the
+**`extension/highlight.js`**: marking the unknown words, without touching the
 page's own DOM.
 
-**`extension/japanese.js`** — what counts as a Japanese character. One line, in
+**`extension/japanese.js`**: what counts as a Japanese character. One line, in
 a file of its own, because four separate parts of LLL have to agree on it.
 
-**`extension/options.js`** — the settings page, and switching between its
+**`extension/options.js`**: the settings page, and switching between its
 sections, listed down the left rather than across the top so which section you
 are in and how to get to the other one live in the same place.
 
-**`extension/known.js`** — the known-words tab: adding, browsing, forgetting.
+**`extension/known.js`**: the known-words tab: adding, browsing, forgetting.
 
-**`extension/popup.css`** — how it looks. The only file that decides that.
+**`extension/popup.css`**: how it looks. The only file that decides that.
 
 ### Working on the appearance
 
@@ -534,11 +603,11 @@ pages that run the real code against a handful of sample words:
 node tools/serve.mjs
 ```
 
-- <http://localhost:8137/tools/preview.html> — the popup and the bar.
-- <http://localhost:8137/tools/options-preview.html> — the settings page. It
+- <http://localhost:8137/tools/preview.html>, the popup and the bar.
+- <http://localhost:8137/tools/options-preview.html>, the settings page. It
   fetches `extension/options.html` rather than copying it, so it cannot drift
   out of step with what ships.
-- <http://localhost:8137/tools/video-preview.html> — subtitles and recording.
+- <http://localhost:8137/tools/video-preview.html>, subtitles and recording.
 
 Edit the CSS, refresh.
 
@@ -548,7 +617,7 @@ Edit the CSS, refresh.
 node --max-old-space-size=4096 tools/test.mjs
 ```
 
-Runs the real search code against the real dictionary — every godan verb ending,
+Runs the real search code against the real dictionary, every godan verb ending,
 the irregular verbs, adjectives, the copula, and the cases where the deinflector
 would otherwise invent words that do not exist.
 
@@ -588,4 +657,4 @@ data Jisho.org is built on. It is downloaded by the build script and is not
 stored in this repository; if you ever distribute a packaged copy of this
 extension, that copy carries the dictionary's licence with it.
 
-The code is MIT — see [LICENSE](LICENSE).
+The code is MIT, see [LICENSE](LICENSE).

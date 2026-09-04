@@ -1,5 +1,5 @@
 /*
- * LLL — tiny static file server, for the preview page only.
+ * LLL, tiny static file server, for the preview page only.
  *
  *   node tools/serve.mjs        then open http://localhost:8137/tools/preview.html
  *

@@ -7,8 +7,7 @@
   <nav class="sidebar">
     <h1>LLL</h1>
     <button class="tab" data-panel="anki">Anki</button>
-    <button class="tab" data-panel="known">Known words</button>
-    <button class="tab" data-panel="ignored">Ignored words</button>
+    <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="backup">Backup</button>
   </nav>
 
@@ -56,7 +55,8 @@
 
   <!-- ------------------------------------------------------------------ -->
 
-  <div class="panel" id="panel-known" hidden>
+  <div class="panel" id="panel-words" hidden>
+    <h2 class="parting first">Known words</h2>
     <div class="count" id="count">…</div>
     <p class="note count-note">
       What LLL measures a page against to say how much of it you would
@@ -67,8 +67,8 @@
       <h2>Add from a text</h2>
       <p class="note">
         Paste a text below, or load a plain text file into it. Every Japanese
-        word in it is deinflected the same way a hover looks one up —
-        たべました becomes 食べる — and whichever are not already here get
+        word in it is deinflected the same way a hover looks one up, so that
+        たべました becomes 食べる, and whichever are not already here get
         added. Running the same text through twice adds nothing the second time.
       </p>
 
@@ -87,8 +87,8 @@
     <section>
       <h2>Browse</h2>
       <p class="note">
-        Newest first. × takes a word back out — useful when one was added by
-        mistake, or turned out not to be as known as it looked.
+        Newest first. × takes a word back out, which is useful when one was
+        added by mistake, or turned out not to be as known as it looked.
       </p>
 
       <label class="search">
@@ -99,22 +99,18 @@
       <div id="list" class="words"></div>
       <p id="more" class="note more" hidden></p>
     </section>
-  </div>
 
-  <!-- ------------------------------------------------------------------ -->
-
-  <div class="panel" id="panel-ignored" hidden>
+    <h2 class="parting">Ignored words</h2>
     <div class="count" id="count-ignored">…</div>
     <p class="note count-note">
       Words you never want to be told about again: names, pieces of English,
       things the dictionary read wrongly. They are left unmarked on the page
       and taken out of the comprehension score altogether, rather than
       counting for or against it. Press ⊘ on any word in the popup, or
-      the 4 key, to put one here.
+      the 3 key, to put one here.
     </p>
 
     <section>
-      <h2>Browse</h2>
       <p class="note">
         Newest first. &times; takes a word back out, so it counts again.
       </p>

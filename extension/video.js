@@ -1,5 +1,5 @@
 /*
- * LLL — capturing from video
+ * LLL, capturing from video
  *
  * Two things come off the screen when you mine a line: the frame you were
  * looking at, and the line being spoken.
@@ -7,11 +7,11 @@
  * The frame is taken the instant you press "+", before anything else moves.
  *
  * The audio is taken by replaying the line. Knowing exactly when the line runs
- * from and to — which is why LLL fetches the subtitles itself — the video is
+ * from and to, which is why LLL fetches the subtitles itself, the video is
  * sent back to the start of it, recorded to the end of it, and put back where it
  * was: same moment, same speed, same paused or playing.
  *
- * The line plays out loud while this happens — you hear it the same as the
+ * The line plays out loud while this happens, you hear it the same as the
  * recording captures it, rather than mining blind. It takes as long as the
  * line does, and what comes out is exactly the line, with no guessing about
  * where the speech began.
@@ -33,7 +33,7 @@ var LLLVideo = (function () {
   // Seeking then playing does not start the sound instantly, and a recorder
   // started before it does captures the silence. So playback is resumed a
   // moment early and recording begins once the video has actually reached the
-  // line — the run-up is played, not recorded.
+  // line, the run-up is played, not recorded.
   var PREROLL_SECONDS = 0.6;
 
   var stream = null;
@@ -116,7 +116,7 @@ var LLLVideo = (function () {
 
   /**
    * Replay `start` to `end` and record it, then put the video back exactly as
-   * it was — same moment, same speed, same paused or playing.
+   * it was, same moment, same speed, same paused or playing.
    *
    * Speed is forced to normal for the duration: a line captured at 1.5x is a
    * line spoken at 1.5x, which is not what you want on a card.
@@ -143,7 +143,7 @@ var LLLVideo = (function () {
     var finished = new Promise(function (resolve) { recorder.onstop = resolve; });
 
     try {
-      // The line plays out loud while this records — that is deliberate, so
+      // The line plays out loud while this records, that is deliberate, so
       // you can hear what is being captured rather than mining blind.
       video.playbackRate = 1;
       video.currentTime = Math.max(0, start - PREROLL_SECONDS);
@@ -170,7 +170,7 @@ var LLLVideo = (function () {
 
   /**
    * Put the video back. Waits for the seek to actually land before resuming
-   * play or pause — setting currentTime does not take effect instantly, and
+   * play or pause, setting currentTime does not take effect instantly, and
    * calling play() before it does risks the browser starting playback from
    * wherever it still was, which would look like the recording had put you
    * back at the start of the clip rather than where you actually were.

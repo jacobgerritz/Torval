@@ -1,13 +1,13 @@
-# Raw downloads (JMdict, Kanjium accents) — fetched by the tools/build-* scripts
+# Raw downloads (JMdict, Kanjium accents), fetched by the tools/build-* scripts
 data/
 
-# Built dictionary and pitch data — regenerate with:
+# Built dictionary and pitch data, regenerate with:
 #   node tools/build-dict.mjs && node tools/build-pitch.mjs
 extension/data/
 
 node_modules/
 *.log
 
-# A third-party extension's source, kept locally for reference only — never
+# A third-party extension's source, kept locally for reference only, never
 # to be committed or redistributed as part of this repository.
 Seek Subtitles for YouTube/

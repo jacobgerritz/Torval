@@ -8,7 +8,7 @@
       node tools/serve.mjs   ->  http://localhost:8137/tools/video-preview.html
 
   A few seconds of canvas and tone are recorded once, up front, into an actual
-  webm — so the <video> below has a duration and can be seeked, which a live
+  webm, so the <video> below has a duration and can be seeked, which a live
   canvas stream cannot. The tone changes pitch every second, so a clip taken
   from 4s to 6s can be told apart from one taken from 1s to 3s by listening, or
   by looking at its frequencies.
@@ -81,7 +81,7 @@ window.ready = (async () => {
   video.currentTime = 1e6;
   await new Promise((r) => { video.onseeked = r; });
   video.currentTime = 0;
-  out.textContent = 'ready — ' + SECONDS + 's of video, seekable';
+  out.textContent = 'ready, ' + SECONDS + 's of video, seekable';
   return true;
 })();
 </script>

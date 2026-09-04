@@ -1,12 +1,12 @@
 /*
- * LLL — background
+ * LLL, background
  *
  * This is the part of the extension that owns the dictionary. It runs once for
  * the whole browser, not once per tab, which matters: 218,000 entries should be
  * loaded one time, not on every page you open.
  *
  * On first run it streams the JSON chunks built by tools/build-dict.mjs into
- * IndexedDB — the browser's own on-disk database. That takes a minute or so and
+ * IndexedDB, the browser's own on-disk database. That takes a minute or so and
  * only ever happens once. After that every lookup is a couple of disk reads.
  *
  * Pages talk to it by message: content.js sends the text under the cursor and
@@ -36,21 +36,21 @@ let status = { state: 'starting', progress: 0 };
 // ---------------------------------------------------------------------------
 
 /**
- * Every attempt at building this URL ourselves — from the page's own player
+ * Every attempt at building this URL ourselves, from the page's own player
  * object, from a freshly re-requested one, from the transcript panel's own
- * endpoint — came back with a 200 and nothing in it. All of them shared one
+ * endpoint, came back with a 200 and nothing in it. All of them shared one
  * thing: they used the `baseUrl` published in YouTube's own JSON data. The
  * one thing none of them tried was the actual address YouTube's own player
- * uses when it makes a genuine request for the track — which is not
+ * uses when it makes a genuine request for the track, which is not
  * guaranteed to be the same string, and evidently is not one.
  *
  * That real address only exists at the moment the player asks for it, so
  * rather than build it, this waits for it: `onBeforeRequest` sees every
  * request the page itself makes, YouTube's own included, and a real one for
  * captions turns up the moment the video actually has a caption track
- * active — which is exactly the state LLL already asks for. Once one is
+ * active, which is exactly the state LLL already asks for. Once one is
  * seen, it is handed to that tab's content script to fetch, plainly, with
- * nothing done to it — no special headers, no routing trick. If the address
+ * nothing done to it, no special headers, no routing trick. If the address
  * itself was always what was missing, nothing else needed to be.
  *
  * `&lll=1` marks LLL's own re-fetch of that address so it is not mistaken for
@@ -72,7 +72,7 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
 }
 
 /**
- * Catching the real address was not, on its own, enough — refetching it from
+ * Catching the real address was not, on its own, enough, refetching it from
  * the content script still came back with a 200 and nothing in it, the exact
  * same "blocked by OpaqueResponseBlocking" symptom seen from the very first
  * attempt in this whole saga. That means it was never about which address was
@@ -81,7 +81,7 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
  *
  * So both fixes are needed together, not one instead of the other. This adds
  * the CORS permission the response never carries, before the browser decides
- * whether the read is allowed — the same technique CORS-unblocking extensions
+ * whether the read is allowed, the same technique CORS-unblocking extensions
  * use generally, scoped only to the address LLL itself asks for again.
  */
 if (api.webRequest && api.webRequest.onHeadersReceived) {
@@ -125,7 +125,7 @@ api.runtime.onMessage.addListener((message) => {
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
     default:
       // Saying so out loud. A message with no case here simply never answers,
-      // and the caller's `await` sits there for ever — which is exactly how a
+      // and the caller's `await` sits there for ever, which is exactly how a
       // whole feature can be wired up, look right in every preview, and do
       // nothing at all once installed.
       if (message && message.type) console.warn('LLL: no handler for message', message.type);
@@ -145,7 +145,7 @@ async function guard(fn) {
 }
 
 /**
- * A quick, up-front answer to "do I already have this word?" — asked the
+ * A quick, up-front answer to "do I already have this word?", asked the
  * moment + is pressed, well before the slower work of capturing the sentence
  * audio even starts, so the answer is not stuck waiting behind it. This never
  * blocks the card being made; it is only a heads-up.
@@ -173,7 +173,7 @@ async function ankiAdd(note) {
 
 /**
  * `point`, when given, is the index of the character actually pointed at
- * within `text` — not necessarily where the word itself begins. A hover or a
+ * within `text`, not necessarily where the word itself begins. A hover or a
  * click lands wherever the cursor happens to be, which is the middle of a
  * word at least as often as the start of one, and reading forward only from
  * that exact character would find whatever shorter, unrelated thing merely
@@ -184,16 +184,22 @@ async function ankiAdd(note) {
  * cursor was.
  *
  * Left out entirely, `text` is searched exactly as given, from its own
- * start — what an explicit selection wants, since it was chosen on purpose.
+ * start, what an explicit selection wants, since it was chosen on purpose.
  */
 async function handleLookup(text, point) {
   if (status.state !== 'ready') return { status, groups: [] };
   try {
     await ready;
-    const start = typeof point === 'number'
-      ? await LLLLookup.wordAt(text, point, { getEntries })
-      : 0;
-    const groups = await LLLLookup.search(text.slice(start), { getEntries });
+    // Which word the cursor is in, decided by reading the sentence rather
+    // than by matching from wherever the pointer happens to sit. The length
+    // travels with it so the popup leads with the same word the page is
+    // marked with: 今日は暑い is 今日 and は, and a hover on it should not
+    // answer with the greeting just because the greeting is longer.
+    const at = typeof point === 'number'
+      ? await LLLLookup.tokenAt(text, point, { getEntries })
+      : { start: 0, length: 0 };
+    const start = at.start;
+    const groups = await LLLLookup.search(text.slice(start), { getEntries }, at.length);
     const known = await knownSet();
     const ignored = await ignoredSet();
     // The accent is one number per word and the table is already in memory, so
@@ -201,7 +207,7 @@ async function handleLookup(text, point) {
     for (const group of groups) {
       for (const hit of group.hits) {
         hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
-        hit.band = LLLLookup.frequencyBand(hit.entry.q);
+        hit.band = LLLLookup.frequencyBand(hit.q);
         hit.shared = LLLLookup.sharedTags(hit.entry);
         hit.sharedPos = LLLLookup.sharedPos(hit.entry);
         hit.known = known.has(hit.word);
@@ -220,7 +226,7 @@ async function handleLookup(text, point) {
  *
  * Reading a single hover asks about a few dozen terms; reading a whole page
  * asks about the same few thousand terms over and over, because that is what
- * a language is — は and する and こと turn up on nearly every line. Holding
+ * a language is, は and する and こと turn up on nearly every line. Holding
  * on to the answers for the length of one passage turns almost all of that
  * into no work at all, and is the difference between reading a page in under
  * a second and reading it in a minute.
@@ -246,12 +252,12 @@ function cachingReader() {
 
 function requireDictionary() {
   if (status.state !== 'ready') {
-    throw new Error('The dictionary is still loading — try again in a moment.');
+    throw new Error('The dictionary is still loading, try again in a moment.');
   }
   return ready;
 }
 
-/** Every dictionary word in a passage of text — see LLLLookup.extractWords. */
+/** Every dictionary word in a passage of text, see LLLLookup.extractWords. */
 async function extractWords(text) {
   await requireDictionary();
   return LLLLookup.extractWords(text, cachingReader());
@@ -261,8 +267,8 @@ async function extractWords(text) {
  * How much of this passage is made of words already known.
  *
  * `counts` is handed back along with the score so that marking one more word
- * known can move the number straight away — a word's count is exactly how much
- * the total shifts — rather than needing the whole page read again.
+ * known can move the number straight away, a word's count is exactly how much
+ * the total shifts, rather than needing the whole page read again.
  */
 async function comprehension(text) {
   await requireDictionary();
@@ -274,7 +280,7 @@ async function comprehension(text) {
 
 /**
  * The stored known set, plus any expression that is not itself marked known
- * but decomposes entirely into pieces that are — see decomposeKnown in
+ * but decomposes entirely into pieces that are, see decomposeKnown in
  * lookup.js for why this is restricted to entries JMdict tags as an
  * expression, and never touches ordinary vocabulary.
  *
@@ -295,18 +301,18 @@ async function effectiveKnown(text, tokens, reader, known) {
 }
 
 /**
- * The same reading, plus exactly where on the page each word was — what
+ * The same reading, plus exactly where on the page each word was, what
  * colouring the unknown words needs.
  *
  * Positions are grouped by word rather than listed one after another, because
  * every question asked of them afterwards is asked about a word: which places
  * to mark, and which places stop being marked the moment that word is ticked
  * as known. Each word's positions are a flat run of start, length, group,
- * repeated — a list of triples, without an object per one, because a dense
+ * repeated, a list of triples, without an object per one, because a dense
  * page has thousands of them and they are only ever read in order.
  *
  * `group` alternates 0 and 1 across the whole passage in reading order,
- * regardless of which word each occurrence belongs to — two words sitting
+ * regardless of which word each occurrence belongs to, two words sitting
  * right against each other with nothing marking where one ends and the next
  * begins (関東 then 沿岸部, touching) would otherwise look like a single
  * unbroken word. Painted in two slightly different shades, the seam between
@@ -323,8 +329,8 @@ async function wordPlaces(text) {
 
   const places = {};
   // Words that get no mark on the page. Two quite different reasons to be on
-  // this list — you know it, or you have said you never want to be told about
-  // it — but the page only ever asks the one question, so they arrive as one
+  // this list, you know it, or you have said you never want to be told about
+  // it, but the page only ever asks the one question, so they arrive as one
   // list rather than two the caller would have to merge itself.
   const unmarked = [];
   tokens.forEach((token, i) => {
@@ -353,7 +359,7 @@ async function wordPlaces(text) {
  * more useful than alphabetical.
  *
  *   known    you understand it, so it counts toward comprehension
- *   ignored  you never want to be told about it — a name, a piece of English,
+ *   ignored  you never want to be told about it, a name, a piece of English,
  *            something the dictionary read wrongly. It leaves the question
  *            entirely rather than counting either way, because counting it
  *            unknown would say a page is harder than it is and counting it
@@ -366,7 +372,7 @@ const KNOWN = 'knownWords';
 const IGNORED = 'ignoredWords';
 
 // Read once and held, because a lookup asks about them on every single hover.
-// Any write clears the copy — including one made from the settings page, which
+// Any write clears the copy, including one made from the settings page, which
 // storage.onChanged is what catches.
 const caches = {};
 
@@ -417,7 +423,7 @@ async function addKnownWords(words) {
 }
 
 /**
- * Put one word on a list or take it off — what the popup's ✓ and ⊘ do, and
+ * Put one word on a list or take it off, what the popup's ✓ and ⊘ do, and
  * what 3 and 4 do from the keyboard. Going on one list comes off the other,
  * since "I know this" and "never mention this again" cannot both be true.
  */
@@ -441,7 +447,7 @@ async function setWordOn(key, word, on) {
  * This is the part of LLL that cannot be rebuilt. The dictionary can be
  * downloaded again and the settings retyped in a minute, but a known list is
  * however many months of reading, and until now it existed in exactly one
- * place — this browser profile, belonging to an add-on that has to be loaded
+ * place, this browser profile, belonging to an add-on that has to be loaded
  * again by hand every time Firefox restarts.
  */
 async function exportWords() {
@@ -461,7 +467,7 @@ async function exportWords() {
  * on two machines can carry a file between them without either one winning.
  *
  * A word cannot be on both lists, so if a file somehow says otherwise, known
- * wins — it is the answer that costs less to be wrong about, since an ignored
+ * wins, it is the answer that costs less to be wrong about, since an ignored
  * word is one you have said you never want to see again.
  */
 async function importWords(data) {
@@ -580,7 +586,7 @@ async function start() {
  *
  * This has to survive being killed half way. Firefox shuts a background script
  * down when it looks idle, and grinding through a six megabyte chunk without
- * calling any browser API looks exactly like idling — so an import that had to
+ * calling any browser API looks exactly like idling, so an import that had to
  * run start to finish in one go could simply stop, with nothing to show for the
  * work already done.
  *
@@ -603,14 +609,14 @@ async function importDictionary(db, meta) {
     await save();
     console.log('LLL: building the dictionary');
   } else {
-    console.log(`LLL: resuming — ${progress.entries}/${meta.entryChunks} entry chunks,` +
+    console.log(`LLL: resuming, ${progress.entries}/${meta.entryChunks} entry chunks,` +
       ` ${progress.index}/${meta.indexChunks} index chunks already in`);
   }
 
   report(0);
 
   // Entry ids are positions in the build output, so the counter has to run
-  // unbroken across chunks — which is why it is part of the saved progress.
+  // unbroken across chunks, which is why it is part of the saved progress.
   for (let i = progress.entries; i < meta.entryChunks; i++) {
     const rows = await fetchJson(`data/entries-${pad(i)}.json`);
     let nextId = progress.nextId;
@@ -634,7 +640,7 @@ async function importDictionary(db, meta) {
   await run(db, STATE, 'readwrite', (store) => store.delete('import'));
   status = { state: 'ready', progress: 1 };
   setBadge('');
-  console.log(`LLL: dictionary ready — ${meta.entries} entries, ${meta.terms} forms`);
+  console.log(`LLL: dictionary ready, ${meta.entries} entries, ${meta.terms} forms`);
 
   function save() {
     return run(db, STATE, 'readwrite', (store) => store.put(progress, 'import'));
@@ -700,7 +706,7 @@ async function putAll(db, storeName, pairs, onProgress) {
 
 async function fetchJson(path) {
   const res = await fetch(api.runtime.getURL(path));
-  if (!res.ok) throw new Error(`cannot read ${path} (${res.status}) — run: node tools/build-dict.mjs`);
+  if (!res.ok) throw new Error(`cannot read ${path} (${res.status}), run: node tools/build-dict.mjs`);
   return res.json();
 }
 

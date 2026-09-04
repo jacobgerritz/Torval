@@ -1,20 +1,20 @@
 /*
- * LLL — timing YouTube's subtitles
+ * LLL, timing YouTube's subtitles
  *
- * The point of this file is not to show subtitles — YouTube already does that —
+ * The point of this file is not to show subtitles. YouTube already does that, 
  * it is to know exactly when each line starts and ends, which YouTube's own
  * captions never tell anyone. That timing is what lets a line be replayed and
  * recorded precisely, and what lets A and D jump between lines.
  *
- * Three ways of getting it, tried in order — each is a fallback for the one
+ * Three ways of getting it, tried in order, each is a fallback for the one
  * before it, not an alternative to pick between:
  *
  *   1. Ask for the transcript the way YouTube's own "Show transcript" button
- *      does. Not the closed-caption file — a separate panel with its own
+ *      does. Not the closed-caption file, a separate panel with its own
  *      endpoint, reached through a one-time token buried in the page's own
  *      data. This is what real people click, so YouTube has more reason to
  *      keep it answering reliably than a download link almost nobody uses by
- *      hand — and it is the only one of the three that has the whole video's
+ *      hand, and it is the only one of the three that has the whole video's
  *      lines ready before a single second has played, which matters for
  *      anything that needs to know the whole video up front, like comparing
  *      it against known words.
@@ -29,10 +29,10 @@
  *      "read a video's subtitles" tools do, and it always works, because it
  *      is just reading what is already on screen. The real cost: a line is
  *      only known once it has actually been shown, so nothing about the video
- *      is known ahead of watching it — D cannot jump to an unseen line, and
+ *      is known ahead of watching it. D cannot jump to an unseen line, and
  *      nothing here can tell you the whole video's vocabulary in advance.
  *
- * Either way, keep YouTube's own captions turned on — LLL needs a source of
+ * Either way, keep YouTube's own captions turned on. LLL needs a source of
  * text to read, whichever method supplies the timing. What is actually shown
  * on screen is drawn by LLL itself, in its own look, so a line always reads as
  * LLL's rather than being mistaken for YouTube's plain caption box.
@@ -73,7 +73,7 @@ var LLLSubtitles = (function () {
    * one address worth trying that everything else so far was not.
    *
    * This can arrive at any time and supersede whatever tier is currently in
-   * charge — including replacing the on-screen fallback outright, since a
+   * charge, including replacing the on-screen fallback outright, since a
    * genuine transcript beats one assembled a line at a time regardless of how
    * it was found.
    */
@@ -85,7 +85,7 @@ var LLLSubtitles = (function () {
 
   async function loadSeenTrack(url) {
     var id = videoId;
-    console.log('LLL: caught YouTube’s own subtitle request — trying it directly');
+    console.log('LLL: caught YouTube’s own subtitle request, trying it directly');
     // Tagged so the background script's own listener recognises this as LLL's
     // re-fetch of the address rather than a second genuine request, and does
     // not forward it straight back here again.
@@ -94,9 +94,9 @@ var LLLSubtitles = (function () {
     if (loaded && loaded.length) {
       cues = loaded;
       state = 'ready';
-      console.log('LLL:', cues.length, 'subtitle lines ready — YouTube’s own request, reused directly');
+      console.log('LLL:', cues.length, 'subtitle lines ready. YouTube’s own request, reused directly');
     } else {
-      console.warn('LLL: YouTube’s own subtitle address did not answer either — something deeper is blocking it.');
+      console.warn('LLL: YouTube’s own subtitle address did not answer either, something deeper is blocking it.');
     }
   }
 
@@ -107,7 +107,7 @@ var LLLSubtitles = (function () {
    */
   function keys(e) {
     // The line currently playing lives in `openCue`, not `cues`, until it
-    // ends — so this cannot require `cues` to be non-empty, or the very first
+    // ends, so this cannot require `cues` to be non-empty, or the very first
     // line of a video (still open, nothing committed yet) would silently
     // block A and D before step() ever got a chance to look at openCue too.
     if (!enabled || (!cues.length && !openCue) || !video) return;
@@ -134,17 +134,17 @@ var LLLSubtitles = (function () {
    * The line A or D should take you to from here, or null if there is none.
    *
    * In the on-screen fallback, the line currently being spoken is not in
-   * `cues` yet — it only gets recorded once it ends. Without also checking the
+   * `cues` yet, it only gets recorded once it ends. Without also checking the
    * one still in progress, D would work only until you pressed A once: from
    * the line before, there would be nothing later in `cues` to step forward
    * to, since the very next line is the one still open. This is the ordinary
-   * case, not a rare one — it happens every single time you rewind and then
+   * case, not a rare one, it happens every single time you rewind and then
    * want to come back.
    */
   function step(now, direction, current) {
     if (direction < 0) {
       // A little grace, so that pressing A part-way through a line takes you to
-      // the start of it — and pressing it again takes you to the line before.
+      // the start of it, and pressing it again takes you to the line before.
       for (var i = cues.length - 1; i >= 0; i--) {
         if (cues[i].start < now - 0.4) return cues[i];
       }
@@ -171,13 +171,13 @@ var LLLSubtitles = (function () {
       openCue = null;
       state = 'idle';
       attempts = 0;
-      console.log('LLL: video is now', id || '(none — not a watch page)');
+      console.log('LLL: video is now', id || '(none, not a watch page)');
     }
 
     // Keep trying for a while. This script starts before YouTube's player
     // exists, so the first look almost always finds nothing; giving up on that
     // would mean never loading subtitles at all. Once a definite answer comes
-    // back — ready, watching, or genuinely unavailable — this stops retrying.
+    // back, ready, watching, or genuinely unavailable, this stops retrying.
     if (id && state === 'idle' && attempts < MAX_LOOKUP_ATTEMPTS) {
       attempts++;
       load(id);
@@ -197,7 +197,7 @@ var LLLSubtitles = (function () {
     try {
       panel = await fetchViaTranscriptPanel(id);
     } catch (err) {
-      console.warn('LLL: could not read the transcript panel —', err && err.message);
+      console.warn('LLL: could not read the transcript panel:', err && err.message);
     }
     if (videoId !== id) return;         // navigated away while fetching
     if (panel && panel.length) {
@@ -211,13 +211,13 @@ var LLLSubtitles = (function () {
     try {
       tracks = await captionTracks(id);
     } catch (err) {
-      console.warn('LLL: could not read the track list —', err && err.message);
+      console.warn('LLL: could not read the track list:', err && err.message);
     }
 
     if (!tracks || !tracks.length) {
-      // Likely just early — the player has not finished setting itself up yet.
+      // Likely just early, the player has not finished setting itself up yet.
       // Only worth waiting for on the very first pass, before the transcript
-      // panel has had a real chance — if that already answered with nothing,
+      // panel has had a real chance, if that already answered with nothing,
       // retrying this on its own would just repeat the same silence.
       if (!panel && attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
       console.warn('LLL: gave up looking for subtitle tracks in this page’s player data.');
@@ -244,7 +244,7 @@ var LLLSubtitles = (function () {
       console.warn('LLL: YouTube would not hand over subtitle data for this video, ' +
         'in any format this tried.');
     } catch (err) {
-      console.warn('LLL: could not load subtitles —', err && err.message);
+      console.warn('LLL: could not load subtitles:', err && err.message);
     }
     fallBackToWatching();
   }
@@ -253,13 +253,13 @@ var LLLSubtitles = (function () {
    * The whole transcript, gotten the way YouTube's own "Show transcript"
    * button does: not the closed-caption file, but the panel behind it.
    *
-   * Two requests. The first — the same one that loads the page below the
-   * player — carries a one-time "params" token buried somewhere in it, under
+   * Two requests. The first, the same one that loads the page below the
+   * player, carries a one-time "params" token buried somewhere in it, under
    * a key called getTranscriptEndpoint; the second spends that token at a
    * dedicated endpoint and gets the actual lines back. Both fields are found
    * by searching the response for their key rather than assuming one exact
    * path to them, because that path is undocumented and has been seen to move
-   * before now — a name search survives that better than a fixed route in.
+   * before now, a name search survives that better than a fixed route in.
    *
    * This is worth trying ahead of the caption file, not just alongside it:
    * it is what real people actually click, so YouTube has more reason to keep
@@ -310,7 +310,7 @@ var LLLSubtitles = (function () {
         body: JSON.stringify(Object.assign({ context: context }, body))
       });
     } catch (err) {
-      console.warn('LLL:', endpoint, 'request failed —', err && err.message);
+      console.warn('LLL:', endpoint, 'request failed:', err && err.message);
       return null;
     }
     if (!res.ok) {
@@ -320,7 +320,7 @@ var LLLSubtitles = (function () {
     try {
       return await res.json();
     } catch (err) {
-      console.warn('LLL:', endpoint, 'response was not valid JSON —', err && err.message);
+      console.warn('LLL:', endpoint, 'response was not valid JSON:', err && err.message);
       return null;
     }
   }
@@ -366,7 +366,7 @@ var LLLSubtitles = (function () {
    *
    * json3 is the usual choice and what most subtitle tools ask for. YouTube's
    * own default format (plain timedtext XML) is tried next on the chance that
-   * only json3 is being withheld — seen happen once, though in the case that
+   * only json3 is being withheld, seen happen once, though in the case that
    * prompted this both came back empty.
    */
   async function fetchTrack(track) {
@@ -382,12 +382,12 @@ var LLLSubtitles = (function () {
       try {
         var cues = a.parse(text);
         if (cues.length) {
-          console.log('LLL: the', a.label, 'format answered —', cues.length, 'lines');
+          console.log('LLL: the', a.label, 'format answered:', cues.length, 'lines');
           return cues;
         }
         console.warn('LLL: the', a.label, 'format answered but had no lines in it.');
       } catch (err) {
-        console.warn('LLL: could not read the', a.label, 'response —', err && err.message);
+        console.warn('LLL: could not read the', a.label, 'response:', err && err.message);
       }
     }
     return null;
@@ -417,7 +417,7 @@ var LLLSubtitles = (function () {
   /**
    * Fetch the subtitle file directly. The response-side fix lives in
    * background.js's onHeadersReceived, which grants this the CORS permission
-   * YouTube's own response never carries — see the comment there for why
+   * YouTube's own response never carries, see the comment there for why
    * that is the correct layer to fix this at, rather than the request side.
    */
   async function request(url) {
@@ -425,7 +425,7 @@ var LLLSubtitles = (function () {
     try {
       res = await fetch(url);
     } catch (err) {
-      console.warn('LLL: subtitle request failed —', err && err.message);
+      console.warn('LLL: subtitle request failed:', err && err.message);
       return '';
     }
     if (!res.ok) {
@@ -436,10 +436,10 @@ var LLLSubtitles = (function () {
     if (!text) {
       if (res.redirected || res.url !== url) {
         console.warn('LLL: the request was redirected to', res.url,
-          '— something on this machine is very likely intercepting it, not YouTube.');
+          ',  something on this machine is very likely intercepting it, not YouTube.');
       } else {
         console.warn('LLL: subtitle request succeeded but the body was empty',
-          '(no redirect — this is YouTube itself, not a blocker).');
+          '(no redirect, this is YouTube itself, not a blocker).');
       }
     }
     return text;
@@ -481,8 +481,8 @@ var LLLSubtitles = (function () {
    *
    * The fresh request goes first on purpose. Every reliable transcript tool
    * checked while chasing down why YouTube would answer with a 200 and nothing
-   * in it — including the source of a long-established, actively maintained
-   * library for exactly this — asks YouTube for the player data again, right
+   * in it, including the source of a long-established, actively maintained
+   * library for exactly this, asks YouTube for the player data again, right
    * before fetching a caption file, rather than reusing whatever the page
    * already had sitting in it. The page's own copy was produced whenever the
    * player first loaded; if a caption URL is only valid for the request that
@@ -517,8 +517,8 @@ var LLLSubtitles = (function () {
   /**
    * Ask YouTube for this video's player data right now, the same call the page
    * itself makes on load, rather than reading a copy that could be minutes
-   * old. `ytcfg` is the page's own configuration object — the API key and
-   * client context every request on the page already uses — read the same way
+   * old. `ytcfg` is the page's own configuration object, the API key and
+   * client context every request on the page already uses, read the same way
    * the player object is: through `wrappedJSObject`.
    */
   async function freshCaptionTracks(id) {
@@ -533,7 +533,7 @@ var LLLSubtitles = (function () {
    * The API key every request on this page already uses.
    *
    * A silent failure here previously meant the fresh request was never really
-   * tried, and nothing said so — the code just quietly fell back to the stale
+   * tried, and nothing said so, the code just quietly fell back to the stale
    * copy, which looked identical in the console to the fresh path having been
    * attempted and lost. Every path here now says what happened.
    */
@@ -545,16 +545,16 @@ var LLLSubtitles = (function () {
         if (key) return { key: key, context: cfg.get('INNERTUBE_CONTEXT') };
       }
     } catch (err) {
-      console.warn('LLL: could not read ytcfg —', err && err.message);
+      console.warn('LLL: could not read ytcfg:', err && err.message);
     }
 
     // ytcfg was not reachable as a live object, or did not have a key on it.
-    // The same key sits in the page's own source as plain text — the same
+    // The same key sits in the page's own source as plain text, the same
     // fallback captionTracks already uses when the live objects come up empty.
     var match = document.documentElement.innerHTML.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
     if (match) return { key: match[1], context: null };
 
-    console.warn('LLL: could not find an API key anywhere on this page — cannot make a fresh request.');
+    console.warn('LLL: could not find an API key anywhere on this page, cannot make a fresh request.');
     return null;
   }
 
@@ -622,11 +622,11 @@ var LLLSubtitles = (function () {
   var observing = false;
   var observedContainer = null;
   var captionObserver = null;
-  var openCue = null;    // { start, text } — a line currently being timed
+  var openCue = null;    // { start, text }, a line currently being timed
 
   function fallBackToWatching() {
     state = 'watching';
-    console.log('LLL: reading captions off the screen instead of asking for the file — ' +
+    console.log('LLL: reading captions off the screen instead of asking for the file, ' +
       'make sure Japanese is the caption language turned on in the player.');
     startObserving();
   }
@@ -657,13 +657,13 @@ var LLLSubtitles = (function () {
 
   /**
    * Text changed on screen: close whatever line was open, open whatever is new
-   * — unless the new text is plainly the same line still being revealed.
+   *, unless the new text is plainly the same line still being revealed.
    *
    * Auto-generated captions are very often drawn incrementally, word by word,
    * as speech recognition catches up rather than appearing all at once. Toward
    * the end of a sentence, this looked like several unrelated short "lines" in
    * a row, and only the last fragment reached the one-second floor to be kept
-   * — so the recorded cue started wherever that last fragment began, not at
+   *, so the recorded cue started wherever that last fragment began, not at
    * the true start of the sentence. Recording 今回の動画では… came out starting
    * at 動画 for exactly this reason.
    */
@@ -710,7 +710,7 @@ var LLLSubtitles = (function () {
    * Add a freshly timed line into the ones seen so far.
    *
    * Rewatching a scene shows the same line again; without this it would appear
-   * a second time in `cues`, and A/D would stutter — stepping to what looks
+   * a second time in `cues`, and A/D would stutter, stepping to what looks
    * like a new line that says exactly what the one before it said. A line
    * recurring within a second of where it was seen last is treated as the same
    * one and its timing is simply refreshed. Kept sorted by start time, since
@@ -734,8 +734,8 @@ var LLLSubtitles = (function () {
   // -------------------------------------------------------------------------
 
   // Same palette as the popup: a dark card, one bright text colour, one border
-  // colour, the same font stack. Whatever supplied the timing — the fetched
-  // file or the screen itself — the line you actually see is always drawn by
+  // colour, the same font stack. Whatever supplied the timing, the fetched
+  // file or the screen itself, the line you actually see is always drawn by
   // LLL, so it never gets mistaken for YouTube's own plain caption box.
   var overlay = null;
   var overlayLine = null;
@@ -746,7 +746,7 @@ var LLLSubtitles = (function () {
 
     // YouTube's own caption box is hidden rather than touched any other way:
     // in the on-screen fallback its text is still being read as the source of
-    // the timing, so it has to go on updating — it just should not also be
+    // the timing, so it has to go on updating, it just should not also be
     // visible sitting underneath LLL's version of the same line.
     hideNative = document.createElement('style');
     hideNative.textContent =
@@ -762,8 +762,8 @@ var LLLSubtitles = (function () {
     ].join(';');
 
     overlayLine = document.createElement('span');
-    // The text itself must stay hoverable — that is the whole point of timing
-    // subtitles at all — even though the box around it should not swallow
+    // The text itself must stay hoverable, that is the whole point of timing
+    // subtitles at all, even though the box around it should not swallow
     // clicks meant for the player underneath.
     overlayLine.style.cssText = [
       'pointer-events:auto', 'user-select:text', 'cursor:default', 'max-width:88%',
@@ -781,7 +781,7 @@ var LLLSubtitles = (function () {
   /**
    * Whatever line is playing right now, drawn in LLL's own style.
    *
-   * In the on-screen fallback, a line only enters `cues` once it has ended —
+   * In the on-screen fallback, a line only enters `cues` once it has ended, 
    * its end time is not known until the next one begins. Without checking
    * `openCue` too, the overlay would always be exactly one line behind: it
    * would show nothing for whichever line is currently in progress.
