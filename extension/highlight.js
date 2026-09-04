@@ -27,12 +27,18 @@ var LLLHighlight = (function () {
 
   var api = globalThis.browser || globalThis.chrome;
 
-  // Two registrations rather than one. The page is read once and stays put; a
-  // video's subtitle line is replaced every few seconds, and re-reading the
-  // whole of YouTube each time a line changes would be absurd when the line
-  // itself is thirty characters.
-  var PAGE = 'lll-unknown';
-  var LINE = 'lll-unknown-line';
+  // Two registrations for the page, two for the line, rather than one of
+  // each. The page is read once and stays put; a video's subtitle line is
+  // replaced every few seconds, and re-reading the whole of YouTube each
+  // time a line changes would be absurd when the line itself is thirty
+  // characters. Each pair (A/B) is painted in a slightly different shade so
+  // that two unknown words sitting right against each other — no space, no
+  // punctuation, nothing marking where one ends and the next begins, which
+  // is ordinary in Japanese — still show a visible seam between them.
+  var PAGE_A = 'lll-unknown';
+  var PAGE_B = 'lll-unknown-alt';
+  var LINE_A = 'lll-unknown-line';
+  var LINE_B = 'lll-unknown-line-alt';
 
   var MAX_TEXT = 100000;    // characters read from one page
   var MAX_RANGES = 20000;   // marks painted at once, so a pathological page cannot hang
@@ -46,10 +52,9 @@ var LLLHighlight = (function () {
     ruby: 1, 'ruby-base': 1, 'ruby-text': 1
   };
 
-  var on = true;
   var started = false;
-  var pageRanges = new Map();   // word -> Range[] on the page itself
-  var lineRanges = new Map();   // word -> Range[] in the subtitle line showing now
+  var pageRanges = new Map();   // word -> {group, range}[] on the page itself
+  var lineRanges = new Map();   // word -> {group, range}[] in the subtitle line showing now
   var unknown = new Set();      // every word seen so far that is not known
   var lastLine = null;
 
@@ -60,7 +65,9 @@ var LLLHighlight = (function () {
   /**
    * Get ready to colour. Answers whether it can: an older Firefox has no way
    * to paint text without rewriting the page, and rewriting the page is not
-   * something to fall back on quietly.
+   * something to fall back on quietly. Where it can, it always does — this
+   * used to be optional, but a mark you can switch off is a mark you end up
+   * never seeing at the moment you most needed it.
    */
   async function start() {
     if (started) return supported();
@@ -71,30 +78,14 @@ var LLLHighlight = (function () {
       return false;
     }
     ensureStyle();
-    try {
-      var stored = await api.storage.local.get('colourUnknown');
-      on = stored.colourUnknown !== false;   // on unless turned off
-    } catch (err) { /* keep the default */ }
     watchLine();
     return true;
-  }
-
-  function isOn() { return on; }
-
-  async function toggle() {
-    on = !on;
-    try { await api.storage.local.set({ colourUnknown: on }); } catch (err) { /* not fatal */ }
-    apply();
-    return on;
   }
 
   /**
    * Read the page and work out what to mark. Answers with the score as well,
    * because this is the same passage the bar is asking about and there is no
    * sense reading a page twice to answer two questions about it.
-   *
-   * The reading happens whether or not colouring is switched on — the score
-   * is wanted either way — and only the painting is conditional.
    */
   async function read() {
     if (!supported()) return null;
@@ -185,13 +176,16 @@ var LLLHighlight = (function () {
       if (!Object.prototype.hasOwnProperty.call(result.places, word)) continue;
       if (result.knownHere.indexOf(word) === -1) unknown.add(word); else unknown.delete(word);
 
-      var pairs = result.places[word];
-      var ranges = [];
-      for (var i = 0; i + 1 < pairs.length && total < MAX_RANGES; i += 2) {
-        var range = rangeFor(found.pieces, pairs[i], pairs[i + 1]);
-        if (range) { ranges.push(range); total++; }
+      // start, length, group — see the comment on wordPlaces in background.js
+      // for why the alternating group travels with the position rather than
+      // being decided here.
+      var triples = result.places[word];
+      var marks = [];
+      for (var i = 0; i + 2 < triples.length && total < MAX_RANGES; i += 3) {
+        var range = rangeFor(found.pieces, triples[i], triples[i + 1]);
+        if (range) { marks.push({ group: triples[i + 2], range: range }); total++; }
       }
-      if (ranges.length) byWord.set(word, ranges);
+      if (marks.length) byWord.set(word, marks);
     }
     return byWord;
   }
@@ -233,20 +227,20 @@ var LLLHighlight = (function () {
 
   function apply() {
     if (!supported()) return;
-    paint(PAGE, pageRanges);
-    paint(LINE, lineRanges);
+    paint(PAGE_A, PAGE_B, pageRanges);
+    paint(LINE_A, LINE_B, lineRanges);
   }
 
-  function paint(name, byWord) {
+  function paint(nameA, nameB, byWord) {
     try {
-      if (!on) { CSS.highlights.delete(name); return; }
-      var highlight = new Highlight();
-      byWord.forEach(function (ranges, word) {
+      var a = new Highlight();
+      var b = new Highlight();
+      byWord.forEach(function (marks, word) {
         if (!unknown.has(word)) return;
-        for (var i = 0; i < ranges.length; i++) highlight.add(ranges[i]);
+        for (var i = 0; i < marks.length; i++) (marks[i].group ? b : a).add(marks[i].range);
       });
-      if (highlight.size) CSS.highlights.set(name, highlight);
-      else CSS.highlights.delete(name);
+      if (a.size) CSS.highlights.set(nameA, a); else CSS.highlights.delete(nameA);
+      if (b.size) CSS.highlights.set(nameB, b); else CSS.highlights.delete(nameB);
     } catch (err) {
       console.warn('LLL: could not colour the words —', err && err.message);
     }
@@ -258,16 +252,26 @@ var LLLHighlight = (function () {
    * with the faintest wash behind it reads on a white page and a black one
    * alike, and stays legible when most of a paragraph is marked, which is what
    * a page above your level looks like.
+   *
+   * The B shade is the same idea in a cooler tone, not a second warning colour
+   * of its own — it only has to read as "a different word", not "a different
+   * kind of thing".
    */
   function ensureStyle() {
     if (document.getElementById('lll-highlight-style')) return;
     var style = document.createElement('style');
     style.id = 'lll-highlight-style';
     style.textContent =
-      '::highlight(' + PAGE + '),::highlight(' + LINE + '){' +
+      '::highlight(' + PAGE_A + '),::highlight(' + LINE_A + '){' +
       'background-color:rgba(203,142,74,.16);' +
       'text-decoration:underline;' +
       'text-decoration-color:rgba(219,163,95,.85);' +
+      'text-decoration-thickness:2px;' +
+      'text-underline-offset:2px;}' +
+      '::highlight(' + PAGE_B + '),::highlight(' + LINE_B + '){' +
+      'background-color:rgba(148,163,203,.16);' +
+      'text-decoration:underline;' +
+      'text-decoration-color:rgba(163,178,219,.85);' +
       'text-decoration-thickness:2px;' +
       'text-underline-offset:2px;}';
     (document.head || document.documentElement).appendChild(style);
@@ -311,8 +315,6 @@ var LLLHighlight = (function () {
     start: start,
     read: read,
     mark: mark,
-    toggle: toggle,
-    isOn: isOn,
     supported: supported,
     // Exposed for the tests: turning a position in the gathered text back into
     // a place on the page is the part with the arithmetic in it.

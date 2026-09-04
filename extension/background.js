@@ -252,9 +252,18 @@ async function comprehension(text) {
  * Positions are grouped by word rather than listed one after another, because
  * every question asked of them afterwards is asked about a word: which places
  * to mark, and which places stop being marked the moment that word is ticked
- * as known. Each word's positions are a flat run of start, length, start,
- * length — a list of pairs, without an object per pair, because a dense page
- * has thousands of them and they are only ever read in order.
+ * as known. Each word's positions are a flat run of start, length, group,
+ * repeated — a list of triples, without an object per one, because a dense
+ * page has thousands of them and they are only ever read in order.
+ *
+ * `group` alternates 0 and 1 across the whole passage in reading order,
+ * regardless of which word each occurrence belongs to — two words sitting
+ * right against each other with nothing marking where one ends and the next
+ * begins (関東 then 沿岸部, touching) would otherwise look like a single
+ * unbroken word. Painted in two slightly different shades, the seam between
+ * them is visible even with no space to put it in. It is fixed at read time
+ * rather than recomputed when a word is later marked known, so ticking one
+ * word does not shuffle the colour of every unrelated word after it.
  */
 async function wordPlaces(text) {
   await requireDictionary();
@@ -263,13 +272,13 @@ async function wordPlaces(text) {
 
   const places = {};
   const knownHere = [];
-  for (const token of tokens) {
+  tokens.forEach((token, i) => {
     if (!places[token.word]) {
       places[token.word] = [];
       if (known.has(token.word)) knownHere.push(token.word);
     }
-    places[token.word].push(token.start, token.length);
-  }
+    places[token.word].push(token.start, token.length, i % 2);
+  });
 
   // The score comes back too. This is the same passage the bar is asking
   // about, and reading a page twice over to answer two questions about it

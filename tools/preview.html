@@ -131,13 +131,13 @@ window.browser = {
         const tokens = await LLLLookup.locateTokens(msg.text, db);
         const places = {};
         const knownHere = [];
-        for (const t of tokens) {
+        tokens.forEach((t, i) => {
           if (!places[t.word]) {
             places[t.word] = [];
             if (known.has(t.word)) knownHere.push(t.word);
           }
-          places[t.word].push(t.start, t.length);
-        }
+          places[t.word].push(t.start, t.length, i % 2);
+        });
         const score = LLLLookup.coverage(tokens.map((t) => t.word), known);
         return { ok: true, result: { ...score, places, knownHere } };
       }
