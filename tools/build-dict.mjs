@@ -21,13 +21,20 @@ const OUT = join(ROOT, 'extension', 'data');
 const SOURCE_URL = 'http://ftp.edrdg.org/pub/Nihongo/JMdict_e.gz';
 const CHUNK_BYTES = 4 * 1024 * 1024;
 
-// Word frequency, from JPDB's corpus of anime, manga, light novels and visual
-// novels — the Japanese people actually read for pleasure. A rank is attached to
-// each entry here rather than shipped as a file of its own, because one number
-// per entry costs nothing and saves the extension a whole second lookup.
+// Word frequency, blended from two corpora that read nothing alike. JPDB comes
+// from anime, manga, light novels and visual novels, the Japanese people
+// actually read for fun; BCCWJ comes from newspapers, books, magazines and the
+// web, a government-run sample of formal and everyday written Japanese. A word
+// common in casual speech but rare in print, or the other way round, only shows
+// up as ordinary once both are asked. A rank is attached to each entry here
+// rather than shipped as a file of its own, because one number per entry costs
+// nothing and saves the extension a whole second lookup.
 const FREQ_FILE = join(ROOT, 'data', 'jpdb-frequency.zip');
 const FREQ_URL = 'https://github.com/Kuuuube/yomitan-dictionaries/raw/main/' +
   'dictionaries/JPDB_v2.2_Frequency_Kana_2024-10-13.zip';
+const FREQ_FILE_2 = join(ROOT, 'data', 'bccwj-frequency.zip');
+const FREQ_URL_2 = 'https://github.com/Kuuuube/yomitan-dictionaries/raw/main/' +
+  'dictionaries/BCCWJ_SUW_LUW_combined.zip';
 
 // How much weight each JMdict priority marker carries. Only used for ordering
 // results, so the exact numbers matter less than their relative size.
@@ -76,22 +83,18 @@ async function main() {
 
   console.log(`  ${entries.length} entries, ${index.size} searchable forms`);
 
-  const frequency = await loadFrequency();
+  const frequency = await loadFrequency(FREQ_FILE, FREQ_URL);
+  const frequency2 = await loadFrequency(FREQ_FILE_2, FREQ_URL_2);
   let ranked = 0;
+  let blended = 0;
   for (const entry of entries) {
-    // A word can be written several ways with different ranks (見る is far
-    // commoner than 観る). Take the commonest, since that is the word.
-    let best = 0;
-    const forms = entry.k.length ? entry.k : entry.r;
-    for (const form of forms) {
-      for (const reading of entry.r) {
-        const rank = frequency.get(form + '\t' + reading) || frequency.get(form);
-        if (rank && (!best || rank < best)) best = rank;
-      }
-    }
-    if (best) { entry.q = best; ranked++; }
+    const jpdb = bestRank(entry, frequency);
+    const bccwj = bestRank(entry, frequency2);
+    entry.q = combineRanks(jpdb, bccwj);
+    if (entry.q) ranked++;
+    if (jpdb && bccwj) blended++;
   }
-  console.log(`  ${ranked} entries carry a frequency rank`);
+  console.log(`  ${ranked} entries carry a frequency rank (${blended} from both corpora)`);
 
   mkdirSync(OUT, { recursive: true });
   for (const f of readdirSync(OUT)) {
@@ -105,7 +108,7 @@ async function main() {
   writeFileSync(join(OUT, 'tags.json'), JSON.stringify(tags));
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({
     // Bumping this number makes the extension rebuild its database on next start.
-    version: 3,
+    version: 4,
     built: new Date().toISOString().slice(0, 10),
     entries: entries.length,
     terms: index.size,
@@ -118,25 +121,26 @@ async function main() {
 }
 
 /**
- * Read the JPDB frequency list into "word\treading" -> rank.
+ * Read a Yomitan-format frequency list into "word\treading" -> rank.
  *
- * The list gives two ranks per word: how often it appears at all, and how often
- * it appears written in kana. The kana one is marked with ㋕. For 日本語 those are
- * #4705 and #140824 — the second only says that people rarely write にほんご out
- * in kana, which is not what "how common is this word" means. So the plain rank
- * wins wherever there is one, and the kana rank is kept only for words that are
- * always kana anyway, like every particle.
+ * Both lists used here happen to share this format, so one reader does for
+ * both. Either can give two ranks per word: how often it appears at all, and
+ * how often it appears written in kana. The kana one is marked with ㋕. For
+ * 日本語 those are #4705 and #140824 — the second only says that people rarely
+ * write にほんご out in kana, which is not what "how common is this word"
+ * means. So the plain rank wins wherever there is one, and the kana rank is
+ * kept only for words that are always kana anyway, like every particle.
  */
-async function loadFrequency() {
-  if (!existsSync(FREQ_FILE)) {
-    mkdirSync(dirname(FREQ_FILE), { recursive: true });
-    console.log('Downloading frequency data from', FREQ_URL);
-    const res = await fetch(FREQ_URL);
+async function loadFrequency(file, url) {
+  if (!existsSync(file)) {
+    mkdirSync(dirname(file), { recursive: true });
+    console.log('Downloading frequency data from', url);
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`download failed: ${res.status}`);
-    writeFileSync(FREQ_FILE, Buffer.from(await res.arrayBuffer()));
+    writeFileSync(file, Buffer.from(await res.arrayBuffer()));
   }
 
-  const files = unzip(readFileSync(FREQ_FILE));
+  const files = unzip(readFileSync(file));
   const ranks = new Map();       // the plain rank
   const kanaOnly = new Map();    // the ㋕ rank, used only as a fallback
 
@@ -160,6 +164,41 @@ async function loadFrequency() {
   kanaOnly.forEach((value, key) => { if (!ranks.has(key)) ranks.set(key, value); });
   console.log(`  ${ranks.size} frequency ranks`);
   return ranks;
+}
+
+/**
+ * The best (lowest) rank one frequency list has for this entry, across every
+ * spelling and reading it carries. 見る is far commoner than 観る, so this
+ * takes the best any of an entry's forms achieves, since that is the word.
+ */
+function bestRank(entry, frequency) {
+  let best = 0;
+  const forms = entry.k.length ? entry.k : entry.r;
+  for (const form of forms) {
+    for (const reading of entry.r) {
+      const rank = frequency.get(form + '\t' + reading) || frequency.get(form);
+      if (rank && (!best || rank < best)) best = rank;
+    }
+  }
+  return best;
+}
+
+/**
+ * Two ranks for the same word, from corpora that do not agree on much, folded
+ * into one.
+ *
+ * A plain average would let a word that is common in one corpus and entirely
+ * absent from the other drag the number toward "rare", which is backwards —
+ * H (a light novel about a schoolgirl) not covering technical vocabulary a
+ * newspaper covers constantly says nothing about how common that vocabulary
+ * actually is. The harmonic mean instead rewards a word for doing well in
+ * either list, while still favouring one that both lists agree is common over
+ * one only a single list has heard of — two independent corpora agreeing on
+ * "this word is common" is stronger evidence than either alone.
+ */
+function combineRanks(a, b) {
+  if (a && b) return Math.round((2 * a * b) / (a + b));
+  return a || b || 0;
 }
 
 /**

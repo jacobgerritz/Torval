@@ -85,6 +85,7 @@ var LLLLookup = (function () {
     var used = new Set();
     var out = [];
     var lengths = Array.from(groups.keys()).sort(function (a, b) { return b - a; });
+    await demoteParticleTrap(text, groups, lengths, db);
 
     for (var g = 0; g < lengths.length && out.length < MAX_GROUPS; g++) {
       var hits = Array.from(groups.get(lengths[g]).values())
@@ -96,6 +97,60 @@ var LLLLookup = (function () {
       out.push({ length: lengths[g], surface: text.slice(0, lengths[g]), hits: hits });
     }
     return out;
+  }
+
+  /**
+   * "Longest match wins" has one real trap: a common word plus a single
+   * trailing particle sometimes happens to also spell a genuine, much rarer
+   * dictionary entry. 今日は (2 characters, "today") plus は (the topic
+   * particle) spells the same three characters as 今日は the word, a dated
+   * way to write こんにちは ("hello") — real, in the dictionary, and almost
+   * never what someone actually meant by typing 今日 followed by は.
+   *
+   * This does not change what is found, only which length is offered first —
+   * the longer reading is still right there under "shorter matches". It fires
+   * only when the character being trimmed off is, on its own, a particle
+   * (checked with one small dictionary lookup rather than a hardcoded list of
+   * them, since the dictionary already knows), and only when doing so jumps
+   * to a dramatically more common word — a coincidence has to be a big one
+   * before it is worth overriding "longer is usually right".
+   */
+  async function demoteParticleTrap(text, groups, lengths, db) {
+    if (lengths.length < 2) return;
+    var longestLen = lengths[0];
+    var shorterLen = longestLen - 1;
+    if (lengths.indexOf(shorterLen) === -1) return;
+
+    // The groups built so far all start at position 0 of `text`, so the exact
+    // trailing character (at `shorterLen`, one past where the shorter match
+    // ends) has never been looked up on its own — it takes a fresh, tiny query.
+    var trailing = text[shorterLen];
+    if (!trailing) return;
+    var found = await db.getEntries([trailing]);
+    var candidates = found.get(trailing) || [];
+    var trailingIsParticle = candidates.some(function (entry) {
+      return entry.s.some(function (sense) { return sense.p.indexOf('prt') !== -1; });
+    });
+    if (!trailingIsParticle) return;
+
+    var longestQ = bestQ(groups.get(longestLen));
+    var shorterQ = bestQ(groups.get(shorterLen));
+    // The shorter reading has to be a genuinely common word on its own, and the
+    // longer one has to be dramatically rarer than it — not merely rarer,
+    // which is true of most longer words next to their own prefix.
+    if (shorterQ && shorterQ <= 5000 && longestQ > shorterQ * 15) {
+      lengths.splice(lengths.indexOf(shorterLen), 1);
+      lengths.unshift(shorterLen);
+    }
+  }
+
+  function bestQ(group) {
+    var best = Infinity;
+    group.forEach(function (hit) {
+      var q = hit.entry.q || Infinity;
+      if (q < best) best = q;
+    });
+    return best;
   }
 
   /**

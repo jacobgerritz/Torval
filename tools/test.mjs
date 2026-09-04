@@ -165,6 +165,21 @@ const run = async () => {
   await contains('ありがとう', 'ありがとう');
   await contains('コーヒーを', 'コーヒー');
 
+  // --- a common word plus a trailing particle beating a rarer real word ---
+  // 今日 ("today") plus は (the topic particle) spells the same three
+  // characters as a genuine, much rarer JMdict entry: 今日は, a dated way to
+  // write こんにちは ("hello"). Longest-match-wins would pick the greeting
+  // every time, which is backwards for what someone actually typed.
+  await topMatch('今日は早く起きた', '今日', '今日');
+  // The rare reading is still there, just not first — "shorter matches" is
+  // exactly where it belongs, for the rare case someone did mean "hello".
+  await contains('今日は早く起きた', '今日は');
+  // A real compound should never be second-guessed just for ending in a
+  // particle-shaped kana — 図書館 is not rare next to 図書, so it stays first.
+  await topMatch('図書館で本を読む', '図書館', '図書館');
+  // 友達 (friend) is, if anything, commoner than 友 alone — nothing to demote.
+  await topMatch('友達と話した', '友達', '友達');
+
   // --- guarding against invented words ---------------------------------
   // 少ない is an adjective; the ichidan rule would make it the verb 少る.
   await excludes('少ない', '少る');
@@ -496,6 +511,18 @@ const run = async () => {
   }
   check('a word with no rank gets no band rather than "rare"',
     Lookup.frequencyBand(undefined) === '' && Lookup.frequencyBand(0) === '');
+
+  // --- frequency blended from two corpora ---------------------------------
+  // Every rank the extension ever sees already comes out of the build step
+  // blended from JPDB (anime, manga, visual novels) and BCCWJ (newspapers,
+  // books, the web) — this only checks that ordinary, everyday words still
+  // land solidly in the top bands once both have had a say, not any specific
+  // number, since the exact rank moves whenever either source is refreshed.
+  for (const [word, band] of [['本', 'top 1k'], ['車', 'top 1k'], ['食べる', 'top 1k'], ['人', 'top 1k']]) {
+    const hit = (await Lookup.search(word, db))[0].hits[0];
+    check(`${word} still reads as common once two corpora are blended`,
+      Lookup.frequencyBand(hit.entry.q) === band, 'got ' + Lookup.frequencyBand(hit.entry.q));
+  }
 
   // --- tags that belong to the word, not to one meaning ------------------
   // 事 is tagged "usually written in kana" on all ten of its senses. That is a
