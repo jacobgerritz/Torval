@@ -40,6 +40,7 @@
   <p>あの人はとても親切で、料理も上手です。</p>
   <p class="hint">English text should never trigger a lookup.</p>
   <p>昨日ネカフェに行った。</p>
+  <p>ユアジャパニーズ仲間みさです。</p>
 </main>
 
 <script src="../extension/japanese.js"></script>
@@ -76,7 +77,13 @@ const SAMPLE = [
   // No kanji spelling at all — for testing that hovering any character of a
   // multi-character word finds the whole word, not just wherever the cursor
   // happened to land inside it.
-  { k: [], kv: 0, q: 93550, r: ['ネカフェ'], f: 0, s: [{ p: ['n'], m: ['abbr'], g: ['Internet cafe'] }] }
+  { k: [], kv: 0, q: 93550, r: ['ネカフェ'], f: 0, s: [{ p: ['n'], m: ['abbr'], g: ['Internet cafe'] }] },
+  // A run of katakana with a small kana inside it, plus the two words a
+  // careless boundary used to manufacture out of it by cutting ジャ in half.
+  { k: [], kv: 0, q: 40000, r: ['ジャパニーズ'], f: 0, s: [{ p: ['n'], g: ['Japanese (people, language, style)'] }] },
+  { k: ['鰺'], kv: 1, q: 22000, r: ['アジ'], f: 0, s: [{ p: ['n'], m: ['uk'], g: ['horse mackerel'] }] },
+  { k: [], kv: 0, q: 30000, r: ['ニーズ'], f: 0, s: [{ p: ['n'], g: ['needs'] }] },
+  { k: ['仲間'], kv: 1, q: 900, r: ['なかま'], f: 50, s: [{ p: ['n'], g: ['companion', 'fellow', 'comrade'] }] }
 ];
 
 const entries = SAMPLE.map((e, id) => Object.assign(e, { id }));

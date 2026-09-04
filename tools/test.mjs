@@ -626,6 +626,47 @@ const run = async () => {
   check('an ordinary word is not flagged as an expression',
     plain.length === 1 && plain[0].expression === false, JSON.stringify(plain));
 
+  // --- a boundary must never cut a sound in half --------------------------
+  // ジャ is one sound written with two characters, and a word can no more
+  // begin at ャ than an English one can begin mid-letter. Left free to break
+  // there, the reader found three real dictionary entries by cutting ジャ
+  // apart: アジ ("horse mackerel"), パ and ニーズ ("needs").
+  const katakana = 'ユアジャパニーズ仲間みさです。';
+  const kTokens = await Lookup.locateTokens(katakana, db);
+  const kSurfaces = kTokens.map((t) => katakana.slice(t.start, t.start + t.length));
+  check('ジャパニーズ is read whole rather than split at the small kana',
+    kSurfaces.includes('ジャパニーズ'), JSON.stringify(kSurfaces));
+  check('no token is assembled by cutting ジャ in half',
+    !kSurfaces.includes('アジ') && !kSurfaces.includes('ニーズ'), JSON.stringify(kSurfaces));
+  check('the rest of the sentence still reads normally',
+    kSurfaces.includes('仲間'), JSON.stringify(kSurfaces));
+
+  // The same rule has to hold for what a hover finds, or the mark on the page
+  // and the popup would disagree about where the word even is.
+  for (let at = 2; at <= 7; at++) {
+    const start = await Lookup.wordAt(katakana, at, db);
+    const found = (await Lookup.search(katakana.slice(start), db))[0];
+    check(`pointing at character ${at} of ${katakana} finds ジャパニーズ`,
+      found && found.surface === 'ジャパニーズ', 'got ' + JSON.stringify(found && found.surface));
+  }
+
+  // Reading a passage and hovering it have to agree, word for word — they are
+  // what the marking on the page and the popup are each built from.
+  for (const token of kTokens) {
+    const start = await Lookup.wordAt(katakana, token.start, db);
+    check(`hovering the start of ${katakana.slice(token.start, token.start + token.length)} agrees with reading it`,
+      start === token.start, 'reading said ' + token.start + ', hovering said ' + start);
+  }
+
+  // A long vowel mark belongs to the character before it just as firmly.
+  const coffee = await Lookup.locateTokens('コーヒーを飲む', db);
+  check('コーヒー survives its long vowel marks',
+    coffee.some((t) => 'コーヒーを飲む'.slice(t.start, t.start + t.length) === 'コーヒー'),
+    JSON.stringify(coffee.map((t) => 'コーヒーを飲む'.slice(t.start, t.start + t.length))));
+
+  // And a small tsu: 学校 and 行った must not be broken at っ.
+  await topMatch('行った', '行った', '行く', 'past');
+
   // --- finding the word a pointed-at character actually belongs to --------
   // Pointing at フェ inside ネカフェ has to still find the whole word, not
   // read forward from フェ and land on something shorter and unrelated.
@@ -687,8 +728,11 @@ const run = async () => {
     asTokens(['本', 'ネカフェ', '車']), new Set(['本']), new Set(['ネカフェ']));
   check('an ignored word is taken out of the total, not counted either way',
     withIgnored.total === 2 && withIgnored.known === 1, JSON.stringify(withIgnored));
-  check('an ignored word is not even counted as having been said',
-    withIgnored.counts['ネカフェ'] === undefined, JSON.stringify(withIgnored.counts));
+  // Counted, but not scored. The count is what the bar needs in order to give
+  // the word back if it ever stops being ignored, and after a page has been
+  // read again that is the only record left that there were any of them.
+  check('an ignored word still records how often it was said',
+    withIgnored.counts['ネカフェ'] === 1, JSON.stringify(withIgnored.counts));
   check('ignoring every word leaves nothing to score, rather than scoring zero',
     Lookup.coverage(asTokens(['本']), new Set(), new Set(['本'])).total === 0);
   check('no ignored list at all is the same as an empty one',

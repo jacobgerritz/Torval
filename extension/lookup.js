@@ -29,8 +29,31 @@ var LLLLookup = (function () {
   'use strict';
 
   var MAX_SCAN = 16;      // longest span of text we will try to match
+
+  /**
+   * Characters that can never begin a word, because they belong to the one
+   * before them: the small kana that turn ジ into ジャ, the sokuon っ, the
+   * long vowel mark ー, and the marks that mean "same again" like 々.
+   *
+   * Without this, a word boundary is free to land in the middle of a single
+   * sound. ユアジャパニーズ was being read as アジ ("horse mackerel"), パ and
+   * ニーズ ("needs") — three real dictionary entries, assembled by cutting ジャ
+   * in half, while a hover over the same text found ジャパニーズ perfectly
+   * well. Anywhere a boundary is considered, it has to be a boundary a
+   * Japanese reader would recognise.
+   *
+   * ヶ and ヵ are deliberately left out: 一ヶ月 really does have a word
+   * starting at ヶ, so they are not purely attaching the way the rest are.
+   */
+  var ATTACHING = /[ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮーｰゝゞヽヾ々〻]/;
+
   var MAX_GROUPS = 6;     // distinct lengths shown (1 expanded + the rest collapsed)
   var MAX_PER_GROUP = 4;  // homographs shown for a single length
+
+  /** Would a boundary here cut a character away from the one it belongs to? */
+  function splitsCluster(text, at) {
+    return at > 0 && at < text.length && ATTACHING.test(text.charAt(at));
+  }
 
   async function search(text, db) {
     if (!text) return [];
@@ -84,7 +107,9 @@ var LLLLookup = (function () {
     // under 日本語.
     var used = new Set();
     var out = [];
-    var lengths = Array.from(groups.keys()).sort(function (a, b) { return b - a; });
+    var lengths = Array.from(groups.keys())
+      .filter(function (len) { return !splitsCluster(text, len); })
+      .sort(function (a, b) { return b - a; });
     await demoteParticleTrap(text, groups, lengths, db);
 
     for (var g = 0; g < lengths.length && out.length < MAX_GROUPS; g++) {
@@ -118,7 +143,11 @@ var LLLLookup = (function () {
     var bestLength = 0;
     var from = Math.max(0, at - MAX_SCAN + 1);
     for (var start = from; start <= at; start++) {
-      var groups = await search(text.slice(start, start + MAX_SCAN), db);
+      if (splitsCluster(text, start)) continue;   // no word begins on a small kana
+      // One character more than can ever be matched, so that search can see
+      // what follows a candidate match and refuse to end in the middle of a
+      // sound. Matching itself is still capped at MAX_SCAN.
+      var groups = await search(text.slice(start, start + MAX_SCAN + 1), db);
       if (!groups.length) continue;
       var top = groups[0];
       if (start + top.length <= at) continue;   // does not actually reach the pointed character
@@ -416,8 +445,12 @@ var LLLLookup = (function () {
     var i = 0;
     var steps = 0;
     while (i < text.length) {
-      if (!LLLJapanese.test(text[i])) { i++; continue; }
-      var groups = await search(text.slice(i, i + MAX_SCAN), db);
+      // Skipping a character nothing matched can leave the next attempt
+      // standing on a small kana, which no word ever begins with.
+      if (!LLLJapanese.test(text[i]) || splitsCluster(text, i)) { i++; continue; }
+      // One character more than can ever be matched, so that search can see
+      // what follows a candidate match and refuse to end mid-sound.
+      var groups = await search(text.slice(i, i + MAX_SCAN + 1), db);
       if (groups.length && groups[0].hits.length) {
         var hit = groups[0].hits[0];
         tokens.push({
@@ -601,9 +634,15 @@ var LLLLookup = (function () {
     var total = 0;
     for (var i = 0; i < tokens.length; i++) {
       var token = tokens[i];
+      // Counted even when ignored, and only then left out of the score. An
+      // ignored word still has to say how often it was said, because that is
+      // exactly the number to give back if it stops being ignored: dropping
+      // it here left the bar unable to restore a word once the page had been
+      // read again, since by then nothing remembered there had been eleven of
+      // them.
+      counts[token.word] = (counts[token.word] || 0) + 1;
       if (ignored && ignored.has(token.word)) continue;
       total++;
-      counts[token.word] = (counts[token.word] || 0) + 1;
       if (isKnown(token, known)) hits++;
     }
     return { total: total, known: hits, counts: counts };
