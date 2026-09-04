@@ -31,10 +31,14 @@ var LLLHighlight = (function () {
   // each. The page is read once and stays put; a video's subtitle line is
   // replaced every few seconds, and re-reading the whole of YouTube each
   // time a line changes would be absurd when the line itself is thirty
-  // characters. Each pair (A/B) is painted in a slightly different shade so
-  // that two unknown words sitting right against each other — no space, no
-  // punctuation, nothing marking where one ends and the next begins, which
-  // is ordinary in Japanese — still show a visible seam between them.
+  // characters. Each pair (A/B) shares the exact same colour — colour
+  // already means something else here, known against unknown, and giving two
+  // unknown words two different colours would look like a second, unrelated
+  // distinction. What alternates instead is the underline itself, solid
+  // against dashed, so that two unknown words sitting right against each
+  // other — no space, no punctuation, nothing marking where one ends and the
+  // next begins, which is ordinary in Japanese — still show a visible seam,
+  // without ever suggesting one of them is a different kind of thing.
   var PAGE_A = 'lll-unknown';
   var PAGE_B = 'lll-unknown-alt';
   var LINE_A = 'lll-unknown-line';
@@ -253,9 +257,12 @@ var LLLHighlight = (function () {
    * alike, and stays legible when most of a paragraph is marked, which is what
    * a page above your level looks like.
    *
-   * The B shade is the same idea in a cooler tone, not a second warning colour
-   * of its own — it only has to read as "a different word", not "a different
-   * kind of thing".
+   * A and B are the exact same colour. What tells two touching unknown words
+   * apart is the line itself, solid against dashed, the way a page break is
+   * shown without needing a second ink. Colour already carries a meaning
+   * here — known against unknown — and spending it twice, once for that and
+   * once for "which word is this", would read as two different questions
+   * being asked when there is only one.
    */
   function ensureStyle() {
     if (document.getElementById('lll-highlight-style')) return;
@@ -265,13 +272,15 @@ var LLLHighlight = (function () {
       '::highlight(' + PAGE_A + '),::highlight(' + LINE_A + '){' +
       'background-color:rgba(203,142,74,.16);' +
       'text-decoration:underline;' +
+      'text-decoration-style:solid;' +
       'text-decoration-color:rgba(219,163,95,.85);' +
       'text-decoration-thickness:2px;' +
       'text-underline-offset:2px;}' +
       '::highlight(' + PAGE_B + '),::highlight(' + LINE_B + '){' +
-      'background-color:rgba(148,163,203,.16);' +
+      'background-color:rgba(203,142,74,.16);' +
       'text-decoration:underline;' +
-      'text-decoration-color:rgba(163,178,219,.85);' +
+      'text-decoration-style:dashed;' +
+      'text-decoration-color:rgba(219,163,95,.85);' +
       'text-decoration-thickness:2px;' +
       'text-underline-offset:2px;}';
     (document.head || document.documentElement).appendChild(style);
@@ -287,28 +296,49 @@ var LLLHighlight = (function () {
    * seconds. Watching for the line to change costs one lookup of one element;
    * re-reading it costs whatever thirty characters cost, which is nothing.
    */
+  /**
+   * React the moment a line changes, rather than finding out up to a whole
+   * polling interval later. A poll every few hundred milliseconds sounds
+   * fast until it is sitting between a video and the marking of what is
+   * being said right now — a colour that lands visibly after the line has
+   * already been read is not doing its job. A MutationObserver fires on the
+   * same tick the subtitle's own text is written, so the only real delay
+   * left is the one round trip to look the line up.
+   */
   function watchLine() {
-    setInterval(async function () {
+    var observer = null;
+
+    // The overlay is created once, lazily, the first time a line is drawn —
+    // this waits for it to exist and then never has to look again.
+    var attach = setInterval(function () {
       var overlay = document.querySelector('[data-lll-subtitle]');
-      var text = overlay ? overlay.textContent : '';
-      if (text === lastLine) return;
-      lastLine = text;
+      if (!overlay) return;
+      clearInterval(attach);
+      observer = new MutationObserver(function () { checkLine(overlay); });
+      observer.observe(overlay, { characterData: true, childList: true, subtree: true });
+      checkLine(overlay);
+    }, 500);
+  }
 
-      if (!text) { lineRanges = new Map(); apply(); return; }
-      var found = gather(overlay, false);
-      if (!found.text) { lineRanges = new Map(); apply(); return; }
+  async function checkLine(overlay) {
+    var text = overlay.textContent;
+    if (text === lastLine) return;
+    lastLine = text;
 
-      var reply;
-      try {
-        reply = await api.runtime.sendMessage({ type: 'wordPlaces', text: found.text });
-      } catch (err) {
-        return;
-      }
-      if (!reply || !reply.ok) return;
-      if (overlay.textContent !== text) return;   // the line moved on while this was asked
-      lineRanges = build(found, reply.result);
-      apply();
-    }, 400);
+    if (!text) { lineRanges = new Map(); apply(); return; }
+    var found = gather(overlay, false);
+    if (!found.text) { lineRanges = new Map(); apply(); return; }
+
+    var reply;
+    try {
+      reply = await api.runtime.sendMessage({ type: 'wordPlaces', text: found.text });
+    } catch (err) {
+      return;
+    }
+    if (!reply || !reply.ok) return;
+    if (overlay.textContent !== text) return;   // the line moved on while this was asked
+    lineRanges = build(found, reply.result);
+    apply();
   }
 
   return {
