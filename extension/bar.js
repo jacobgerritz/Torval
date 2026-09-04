@@ -12,6 +12,10 @@
  * the top of the page rather than pushing it down: shifting a page's layout
  * from outside breaks fixed headers on a great many sites, and a bar you can
  * dismiss is a smaller intrusion than a page that no longer lines up.
+ *
+ * By default it stays out of the way: tucked above the top edge of the page,
+ * with only a small handle showing, and slides down when that handle is
+ * clicked. Pin it and it stays down instead, the way it always used to.
  */
 
 var LLLBar = (function () {
@@ -25,6 +29,19 @@ var LLLBar = (function () {
   var data = null;        // the last reading: { total, known, counts }
   var dismissed = false;
   var onRefresh = null;
+
+  var expanded = false;
+  var pinned = false;
+  var retractTimer = null;
+
+  // Read once, up front, so the very first paint already knows whether to
+  // start down — by the time a reading is ready to show (at the earliest,
+  // 1.5 seconds after the page itself loads), this has almost always already
+  // resolved.
+  var pinnedReady = api.storage.local.get('barPinned').then(function (stored) {
+    pinned = !!stored.barPinned;
+    if (host && pinned && !expanded) setExpanded(true);
+  }).catch(function () {});
 
   /**
    * Show a fresh reading. `counts` is how many times each word was said, kept
@@ -80,8 +97,20 @@ var LLLBar = (function () {
     var style = document.createElement('style');
     style.textContent = CSS;
 
-    var bar = document.createElement('div');
-    bar.className = 'bar';
+    els.handle = document.createElement('button');
+    els.handle.className = 'handle';
+    els.handle.textContent = 'LLL';
+    els.handle.title = 'Show how much of this page you understand';
+    els.handle.addEventListener('click', function () { setExpanded(!expanded); });
+
+    els.bar = document.createElement('div');
+    els.bar.className = 'bar';
+    // Unpinned, the bar is a hover panel: it stays down while the mouse is
+    // anywhere on it, and only starts counting down to retract once the
+    // mouse actually leaves — so reading the detail text or reaching for a
+    // button never gets cut short partway through.
+    els.bar.addEventListener('mouseenter', cancelRetract);
+    els.bar.addEventListener('mouseleave', scheduleRetract);
 
     var mark = document.createElement('span');
     mark.className = 'mark';
@@ -102,14 +131,19 @@ var LLLBar = (function () {
     var settings = button('⚙', 'LLL settings', function () {
       api.runtime.sendMessage({ type: 'openOptions' }).catch(function () {});
     });
+    els.pin = button('📌', '', function () { setPinned(!pinned); });
+    els.pin.className = 'pin';
     var close = button('×', 'Hide until this page is reloaded', function () {
       dismissed = true;
       host.style.display = 'none';
     });
 
-    bar.append(mark, els.score, els.detail, spacer, refresh, settings, close);
-    root.append(style, bar);
+    els.bar.append(mark, els.score, els.detail, spacer, refresh, settings, els.pin, close);
+    root.append(style, els.handle, els.bar);
     (document.body || document.documentElement).appendChild(host);
+
+    paintPin();
+    setExpanded(pinned);
 
     // A video played full screen should be a video, not a video with a bar
     // across it. The page's own reading is unaffected — it comes straight back
@@ -117,6 +151,39 @@ var LLLBar = (function () {
     document.addEventListener('fullscreenchange', function () {
       if (!dismissed && data) host.style.display = document.fullscreenElement ? 'none' : 'block';
     });
+  }
+
+  function setExpanded(value) {
+    expanded = value;
+    if (els.bar) els.bar.classList.toggle('expanded', expanded);
+    cancelRetract();
+  }
+
+  function scheduleRetract() {
+    if (pinned) return;
+    cancelRetract();
+    // A short grace period, not an instant retract — moving the mouse across
+    // the bar on the way to a button is not the same thing as leaving it.
+    retractTimer = setTimeout(function () { setExpanded(false); }, 500);
+  }
+
+  function cancelRetract() {
+    if (retractTimer) { clearTimeout(retractTimer); retractTimer = null; }
+  }
+
+  function setPinned(value) {
+    pinned = value;
+    try { api.storage.local.set({ barPinned: pinned }); } catch (err) { /* not fatal */ }
+    paintPin();
+    if (pinned) setExpanded(true);
+    else scheduleRetract();
+  }
+
+  function paintPin() {
+    els.pin.classList.toggle('on', pinned);
+    els.pin.title = pinned
+      ? 'Pinned open — click to let it tuck away again'
+      : 'Pin open, instead of tucking away when the mouse leaves';
   }
 
   function button(text, title, onClick) {
@@ -134,13 +201,25 @@ var LLLBar = (function () {
   // too small to actually see.
   var CSS = [
     ':host { all: initial; }',
+    '.handle {',
+    '  position: fixed; top: 0; right: 14px; z-index: 2147483645;',
+    '  padding: 3px 10px; margin: 0; border: 1px solid #292b30; border-top: 0; border-radius: 0 0 7px 7px;',
+    '  background: #16171a; font: 11px/1 -apple-system, "Segoe UI", sans-serif;',
+    '  letter-spacing: 0.06em; color: #6b7079; cursor: pointer;',
+    '}',
+    '.handle:hover { color: #dfe1e5; }',
     '.bar {',
     '  position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;',
     '  box-sizing: border-box; height: 40px; display: flex; align-items: center; gap: 14px;',
     '  padding: 0 14px;',
     '  background: #16171a; border-bottom: 1px solid #292b30;',
     '  font: 14px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
+    // Tucked above the top edge by default — the handle above is what stays
+    // visible in that state, since it sits at the same coordinates but one
+    // step behind the bar in the stacking order.
+    '  transform: translateY(-100%); transition: transform .22s ease;',
     '}',
+    '.bar.expanded { transform: translateY(0); }',
     '.mark { font-size: 12px; letter-spacing: 0.08em; color: #5a5f67; }',
     '.score { font-size: 17px; font-weight: 600; color: #f4f5f7; }',
     '.score.easy { color: #7fb488; }',
@@ -152,7 +231,10 @@ var LLLBar = (function () {
     '  padding: 4px 8px; background: none; border: 0; border-radius: 4px;',
     '  font: inherit; font-size: 16px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
-    'button:hover { background: #24262b; color: #dfe1e5; }'
+    'button:hover { background: #24262b; color: #dfe1e5; }',
+    '.pin { font-size: 13px; }',
+    '.pin.on { color: #dba35f; }',
+    '.pin.on:hover { color: #e6b578; }'
   ].join('\n');
 
   return {

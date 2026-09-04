@@ -48,13 +48,19 @@ Just hovering a Japanese word gives it a quiet highlight, so a page shows at a
 glance what LLL can help with. Click that word, or hold Shift and point at it,
 to actually open the dictionary.
 
+Wherever the cursor lands inside a word finds the whole word, not just
+whatever happens to start under it. Point at フェ in the middle of ネカフェ
+and the dictionary still shows ネカフェ, not フェ on its own: LLL tries every
+plausible starting point behind the cursor and keeps the longest real word
+that actually reaches it.
+
 | | |
 |---|---|
 | point at a word | a quiet highlight, no popup yet |
 | **click** a word, or **Shift** + point at it | open the dictionary |
 | **Shift** with text selected | look up the selection |
 | **Esc**, a click outside, a scroll | close |
-| **shorter matches** | other words that start at the same place |
+| **other matches** | other words that start at the same place |
 | **A** / **D** | step back and forward a subtitle line |
 | **3** | mark the word under the cursor as known, popup or not |
 | **click a sense** | put only that meaning on the card |
@@ -106,12 +112,20 @@ much rarer dictionary entry. 今日 ("today") plus は spells 今日は, a dated
 to write こんにちは ("hello"), and JMdict really does list it. Rather than
 always trusting length, LLL checks whether trimming off a trailing particle
 lands on a dramatically more common word, and if so shows that instead. The
-rare reading has not gone anywhere. It sits right there under "shorter
-matches" for the rare case that is genuinely what was meant.
+rare reading has not gone anywhere. It sits right there under "other matches"
+for the rare case that is genuinely what was meant. That list is labelled
+"other" rather than "shorter" for exactly this reason: what shows up there is
+not always shorter, just not the best guess.
 
 It undoes conjugation on the way. 食べなかった is not in any dictionary, so it is
 walked back to 食べる and the steps taken are shown underneath, small and grey:
 *negative → past*.
+
+Only a real na-adjective takes な or に as part of its own grammar — 元気な
+and 元気に are 元気 behaving adjectivally, since 元気 is tagged as one. A plain
+noun is not, so ネカフェに ("to the net cafe") is the word ネカフェ plus the
+ordinary particle に after it, not one long word ending in に; this used to be
+read as the latter, for any noun at all.
 
 ---
 
@@ -319,11 +333,18 @@ per word for the ones added by mistake.
 ## Comprehension
 
 A slim bar across the top of any page says how much of what is in front of you
-is made of words you already know.
+is made of words you already know. By default it stays out of the way: a
+small "LLL" handle sits in the top right corner, and clicking it slides the
+bar down.
 
 ```
-LLL   87%   1,204 of 1,383 words known                        ⟳  ⚙  ×
+LLL   87%   1,204 of 1,383 words known                    ⟳  ⚙  📌  ×
 ```
+
+Left unpinned, it is a hover panel: moving the mouse away tucks it back up
+after a moment, so it never sits permanently across the top of a page you
+did not ask it to. Press **📌** to keep it down instead, the way it used to
+work; that choice is remembered.
 
 On a video that is measured against the **whole transcript**, not the part
 already watched — which is the entire point of the fight to get the transcript
@@ -341,6 +362,13 @@ exactly how far the bar shifts, so nothing has to be read a second time.
 **⟳** reads the page again, **⚙** opens the settings, **×** hides the bar until
 the page is reloaded. It hides itself while a video is full screen, and never
 appears at all on a page with no Japanese on it.
+
+A grammatical pattern JMdict happens to file as one entry — お元気ですか
+("how are you") is nothing more than the honorific お, 元気, the copula です
+and the particle か — counts as known once every piece of it is, even though
+that exact four-word entry was never separately marked known itself. A true
+idiom, where the meaning genuinely is not the sum of its words, gets none of
+this: JMdict's own "id" tag is what tells the two apart.
 
 ### Does counting words this way actually make sense?
 
@@ -370,9 +398,12 @@ do not: every word not in your list gets a soft underline where it stands, and
 a video's subtitle line is re-marked as each line arrives.
 
 Two words sitting right next to each other with nothing between them, which is
-ordinary in Japanese, alternate between two close but distinct shades rather
-than sharing one unbroken underline, so 関東沿岸部 reads as 関東 next to 沿岸部
-rather than looking like one long unknown word.
+ordinary in Japanese, alternate between a solid and a dashed underline rather
+than sharing one unbroken line, so 関東沿岸部 reads as 関東 next to 沿岸部 rather
+than looking like one long unknown word. Both use the exact same colour: colour
+already means something here, known against unknown, and giving two unknown
+words two different colours would read as a second, unrelated distinction
+rather than the same one drawn twice.
 
 **Nothing on the page is altered to do it.** The obvious way to colour a word
 is to wrap it in a `<span>`, and that is how this has always been done. A
