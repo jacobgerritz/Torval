@@ -112,13 +112,19 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     case 'extractWords': return guard(() => extractWords(message.text));
     case 'comprehension': return guard(() => comprehension(message.text));
-    case 'knownWords':   return guard(() => knownWords());
+    case 'wordPlaces':   return guard(() => wordPlaces(message.text));
     case 'knownList':    return guard(() => knownList());
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
     case 'setKnown':     return guard(() => setKnown(message.word, message.known));
     case 'forgetWords':  return guard(() => forgetWords(message.words));
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
-    default:       return undefined;
+    default:
+      // Saying so out loud. A message with no case here simply never answers,
+      // and the caller's `await` sits there for ever — which is exactly how a
+      // whole feature can be wired up, look right in every preview, and do
+      // nothing at all once installed.
+      if (message && message.type) console.warn('LLL: no handler for message', message.type);
+      return undefined;
   }
 });
 
@@ -308,12 +314,6 @@ async function saveKnown(map) {
   await api.storage.local.set({ knownWords: map });
   knownCache = new Set(Object.keys(map));
   return Object.keys(map).length;
-}
-
-/** Every known word, and how many there are. */
-async function knownWords() {
-  const words = Array.from(await knownSet());
-  return { words, count: words.length };
 }
 
 /** The same list with the date each was learned, newest first, for browsing. */

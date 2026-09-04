@@ -855,6 +855,27 @@ const run = async () => {
   check('every position inside a node is found, whichever it is',
     [0, 1, 2, 3, 4, 6, 7, 8, 9].every((i) => at(i) !== null));
 
+  // --- every message has somewhere to go ---------------------------------
+  // A message with no case in the background script never answers, and the
+  // caller waits for ever. Nothing about that looks like a failure: the
+  // feature is simply silent. This shipped once, so it is checked now.
+  const sources = ['bar.js', 'content.js', 'highlight.js', 'known.js', 'options.js', 'subtitles.js']
+    .map((f) => readFileSync(join(ROOT, 'extension', f), 'utf8')).join(' ');
+  const backgroundSource = readFileSync(join(ROOT, 'extension', 'background.js'), 'utf8');
+
+  const asked = new Set([...sources.matchAll(/type:\s*'([a-zA-Z]+)'/g)].map((m) => m[1]));
+  const answered = new Set([...backgroundSource.matchAll(/case '([a-zA-Z]+)':/g)].map((m) => m[1]));
+  // Content scripts also talk to each other; the background is not asked about these.
+  for (const own of ['timedtextSeen']) asked.delete(own);
+
+  const unrouted = [...asked].filter((type) => !answered.has(type));
+  check('every message a page sends has a handler in the background script',
+    unrouted.length === 0, 'no handler for: ' + unrouted.join(', '));
+
+  const unused = [...answered].filter((type) => !asked.has(type) && type !== 'status');
+  check('the background script answers nothing nobody asks for',
+    unused.length === 0, 'never sent: ' + unused.join(', '));
+
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',
     Deinflect.deinflect('食べる')[0].term === '食べる');
