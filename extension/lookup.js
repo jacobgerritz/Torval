@@ -281,10 +281,34 @@ var LLLLookup = (function () {
     return 'rare';
   }
 
+  // How rare a word written exactly as it appears has to be, and how common
+  // the conjugated reading competing with it has to be, before "fewest steps
+  // wins" is overruled. Both have to hold: a merely-rarer word does not
+  // qualify, or every ordinary homograph would start losing to a verb.
+  var TRAP_RARE = 20000;
+  var TRAP_COMMON = 5000;
+
   function byRelevance(a, b) {
     // Uninflected first, then words actually spelled the way the page spells
     // them, then common words, then dictionary order.
-    if (a.reasons.length !== b.reasons.length) return a.reasons.length - b.reasons.length;
+    if (a.reasons.length !== b.reasons.length) {
+      var plain = a.reasons.length < b.reasons.length ? a : b;
+      var inflected = plain === a ? b : a;
+      // 来た is, on paper, an interjection meaning "all right!" — spelled
+      // exactly like that, needing no deinflection at all. It is also how the
+      // past tense of 来る is written, one of the commonest verbs in the
+      // language, which does need a step. Preferring the fewest steps is
+      // right almost every time and completely wrong here, so a word nobody
+      // ever writes does not get to win on a technicality over one everybody
+      // does. Same shape of judgement as demoteParticleTrap above: an
+      // enormous gap in how common two readings are outweighs a tidier
+      // derivation.
+      if ((plain.entry.q || Infinity) > TRAP_RARE &&
+          (inflected.entry.q || Infinity) <= TRAP_COMMON) {
+        return plain === a ? 1 : -1;
+      }
+      return a.reasons.length - b.reasons.length;
+    }
     var aw = spellingRank(a), bw = spellingRank(b);
     if (aw !== bw) return aw - bw;
     var af = isFunctionWord(a), bf = isFunctionWord(b);
@@ -398,6 +422,14 @@ var LLLLookup = (function () {
         var hit = groups[0].hits[0];
         tokens.push({
           word: hit.word, start: i, length: groups[0].length,
+          // Every reading these same characters could be, not only the best
+          // one. 来た is written identically whether it is the rare
+          // interjection or the past tense of 来る; 読み is both a noun in
+          // its own right and the stem of 読む. Someone who knows any one of
+          // the readings of what is actually written on the page is not
+          // missing anything, so all of them travel together and whoever
+          // counts them can ask about the whole set.
+          words: groups[0].hits.map(function (h) { return h.word; }),
           // Whether JMdict itself tags this as an "expression" rather than a
           // single word — the one fact that decides whether it is worth
           // asking if a reader could piece it together from parts they
@@ -478,33 +510,57 @@ var LLLLookup = (function () {
    * sees the real phrase in the popup exactly as before.
    */
   async function decomposeKnown(text, start, length, db, known) {
-    var i = 0;
-    while (i < length) {
+    // Every position reachable from the beginning of the span using nothing
+    // but known words, worked outward until either the far end is reached or
+    // the possibilities run out.
+    //
+    // Walking greedily and taking the longest match at each step, which is
+    // how this first worked, is not good enough. ことがある breaks apart into
+    // こと, が and ある, all thoroughly ordinary words — but greedily, the
+    // step after こと takes があ, a rare entry that happens to be two
+    // characters long and so beats plain が, and from there the rest is
+    // nonsense (り, ます) that could never all be known. Asking "is there any
+    // way through" instead of "does one particular way through work" costs
+    // nothing at this length and gets the answer right.
+    var reached = new Set([0]);
+    var queue = [0];
+
+    while (queue.length) {
+      var i = queue.shift();
       var remaining = length - i;
       var groups = await search(text.slice(start + i, start + length), db);
-      if (!groups.length || !groups[0].hits.length) return false;
+      if (!groups.length || !groups[0].hits.length) continue;
 
       // Checked here, not left to whoever calls this, so nothing can ever
-      // mistakenly credit a genuine idiom by skipping the check upstream: if
-      // the whole remaining span is itself one entry and JMdict tags it a
-      // true idiom, refusing happens right here, whether or not this is the
-      // first step. An ordinary word that simply happens to reach exactly to
-      // the end — です often is the last piece of a breakdown — is not this;
-      // only a real idiom is.
-      if (groups[0].length === remaining && isIdiom(groups[0].hits[0].entry)) return false;
+      // mistakenly credit a genuine idiom by skipping the check upstream. An
+      // ordinary word that simply happens to reach exactly to the end — です
+      // often is the last piece of a breakdown — is not this; only a real
+      // idiom is.
+      if (i === 0 && groups[0].length === remaining && isIdiom(groups[0].hits[0].entry)) return false;
 
-      // At the very first step specifically, a match that swallows the whole
-      // remaining span again is not a breakdown — it is the same answer
-      // restated, and would otherwise make this always immediately "succeed".
-      var candidates = i === 0
-        ? groups.filter(function (g) { return g.length < remaining; })
-        : groups;
-      if (!candidates.length || !candidates[0].hits.length) return false;
-      var top = candidates[0];
-      if (!known.has(top.hits[0].word)) return false;
-      i += top.length;
+      for (var g = 0; g < groups.length; g++) {
+        var group = groups[g];
+        // At the very first step, a match swallowing the whole span again is
+        // not a breakdown — it is the same answer restated, and would make
+        // this succeed immediately every time.
+        if (i === 0 && group.length === remaining) continue;
+        if (!knownAmong(group.hits, known)) continue;
+
+        var next = i + group.length;
+        if (next > length || reached.has(next)) continue;
+        if (next === length) return true;
+        reached.add(next);
+        queue.push(next);
+      }
     }
-    return true;
+    return false;
+  }
+
+  function knownAmong(hits, known) {
+    for (var i = 0; i < hits.length; i++) {
+      if (known.has(hits[i].word)) return true;
+    }
+    return false;
   }
 
   function pause() {
@@ -532,16 +588,46 @@ var LLLLookup = (function () {
    * `counts` comes back too, so that marking one word known afterwards can be
    * reflected immediately — its count is exactly how much the total moves —
    * without reading the whole passage a second time.
+   *
+   * Ignored words leave the question entirely rather than counting against
+   * it: a name, a piece of English, something the dictionary read wrongly.
+   * Counting those as unknown would say a page is harder than it is, and
+   * counting them as known would say the opposite; neither is true, so they
+   * come out of the total altogether.
    */
-  function coverage(tokens, known) {
+  function coverage(tokens, known, ignored) {
     var counts = {};
     var hits = 0;
+    var total = 0;
     for (var i = 0; i < tokens.length; i++) {
-      var word = tokens[i];
-      counts[word] = (counts[word] || 0) + 1;
-      if (known.has(word)) hits++;
+      var token = tokens[i];
+      if (ignored && ignored.has(token.word)) continue;
+      total++;
+      counts[token.word] = (counts[token.word] || 0) + 1;
+      if (isKnown(token, known)) hits++;
     }
-    return { total: tokens.length, known: hits, counts: counts };
+    return { total: total, known: hits, counts: counts };
+  }
+
+  /**
+   * Whether a reader knows what a token says — which is not quite the same as
+   * whether they have marked its best reading known.
+   *
+   * The same characters can be more than one word. 来た is the past tense of
+   * 来る and also, on paper, a rare interjection; 読み is the stem of 読む and
+   * also a noun meaning "reading". Knowing any one of the readings of what is
+   * actually written means nothing is missing, so any of them counts. The
+   * looseness this allows is real but small: it takes a homograph you know of
+   * a word you do not, in a place where the one you know does not fit, and by
+   * then the page has bigger problems than the count.
+   */
+  function isKnown(token, known) {
+    if (known.has(token.word)) return true;
+    var words = token.words || [];
+    for (var i = 0; i < words.length; i++) {
+      if (known.has(words[i])) return true;
+    }
+    return false;
   }
 
   return {
@@ -556,6 +642,7 @@ var LLLLookup = (function () {
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
     coverage: coverage,
+    isKnown: isKnown,
     MAX_SCAN: MAX_SCAN
   };
 })();

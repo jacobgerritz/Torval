@@ -666,17 +666,44 @@ const run = async () => {
   check('the unique list is the token list with the repeats folded away',
     (await Lookup.extractWords('食べました。食べました。', db)).filter((w) => w === '食べる').length === 1);
 
-  const cover = Lookup.coverage(['本', '本', '車', '人'], new Set(['本']));
+  // coverage works on the tokens themselves, since a token carries every
+  // reading its characters could be, not only the best one.
+  const asTokens = (words) => words.map((word) => ({ word, words: [word] }));
+
+  const cover = Lookup.coverage(asTokens(['本', '本', '車', '人']), new Set(['本']));
   check('coverage counts repeats, not distinct words',
     cover.total === 4 && cover.known === 2, JSON.stringify(cover));
   check('coverage reports how often each word was said, so one more known word moves it',
     cover.counts['本'] === 2 && cover.counts['車'] === 1, JSON.stringify(cover.counts));
   check('knowing nothing scores nothing, and is not an error',
-    Lookup.coverage(['本'], new Set()).known === 0);
+    Lookup.coverage(asTokens(['本']), new Set()).known === 0);
   check('an empty passage has nothing to score',
     Lookup.coverage([], new Set(['本'])).total === 0);
   check('knowing every word scores all of them',
-    Lookup.coverage(['本', '車'], new Set(['本', '車'])).known === 2);
+    Lookup.coverage(asTokens(['本', '車']), new Set(['本', '車'])).known === 2);
+
+  // --- ignored words leave the question rather than answering it wrongly ---
+  const withIgnored = Lookup.coverage(
+    asTokens(['本', 'ネカフェ', '車']), new Set(['本']), new Set(['ネカフェ']));
+  check('an ignored word is taken out of the total, not counted either way',
+    withIgnored.total === 2 && withIgnored.known === 1, JSON.stringify(withIgnored));
+  check('an ignored word is not even counted as having been said',
+    withIgnored.counts['ネカフェ'] === undefined, JSON.stringify(withIgnored.counts));
+  check('ignoring every word leaves nothing to score, rather than scoring zero',
+    Lookup.coverage(asTokens(['本']), new Set(), new Set(['本'])).total === 0);
+  check('no ignored list at all is the same as an empty one',
+    Lookup.coverage(asTokens(['本', '車']), new Set(['本'])).total === 2);
+
+  // --- any reading of what is written counts ------------------------------
+  // 来た is the past tense of 来る and also, on paper, a rare interjection;
+  // 読み is the stem of 読む and also a noun. Knowing either reading of what
+  // is actually on the page means nothing is missing.
+  check('a token counts as known through any of its readings',
+    Lookup.isKnown({ word: '来た', words: ['来た', '来る'] }, new Set(['来る'])));
+  check('a token with none of its readings known stays unknown',
+    !Lookup.isKnown({ word: '来た', words: ['来た', '来る'] }, new Set(['行く'])));
+  check('the best reading being known is enough on its own',
+    Lookup.isKnown({ word: '本', words: ['本'] }, new Set(['本'])));
 
   // --- where each word was, for colouring it -------------------------------
   // The positions have to land on exactly the characters the word covers, or
@@ -707,7 +734,7 @@ const run = async () => {
   // The count a word carries is exactly how far the bar moves when it is
   // marked known, which is what lets the popup's ✓ answer immediately instead
   // of reading the whole page again.
-  const passageTokens = await Lookup.extractTokens(passage, db);
+  const passageTokens = await Lookup.locateTokens(passage, db);
   const before = Lookup.coverage(passageTokens, new Set());
   const after = Lookup.coverage(passageTokens, new Set(['本']));
   check('marking one word known moves the score by exactly that word’s count',
@@ -963,7 +990,12 @@ const run = async () => {
   check('every message a page sends has a handler in the background script',
     unrouted.length === 0, 'no handler for: ' + unrouted.join(', '));
 
-  const unused = [...answered].filter((type) => !asked.has(type) && type !== 'status');
+  // The other direction is checked more loosely, against any quoted mention
+  // rather than only `type: '...'`. The known and ignored panels are the same
+  // code told which list it is looking at, so the name of the message travels
+  // in a config object and never appears next to the word "type" at all.
+  const mentioned = new Set([...sources.matchAll(/'([a-zA-Z]+)'/g)].map((m) => m[1]));
+  const unused = [...answered].filter((type) => !mentioned.has(type) && type !== 'status');
   check('the background script answers nothing nobody asks for',
     unused.length === 0, 'never sent: ' + unused.join(', '));
 

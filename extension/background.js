@@ -113,10 +113,13 @@ api.runtime.onMessage.addListener((message) => {
     case 'extractWords': return guard(() => extractWords(message.text));
     case 'comprehension': return guard(() => comprehension(message.text));
     case 'wordPlaces':   return guard(() => wordPlaces(message.text));
-    case 'knownList':    return guard(() => knownList());
+    case 'knownList':    return guard(() => wordList(KNOWN));
+    case 'ignoredList':  return guard(() => wordList(IGNORED));
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
-    case 'setKnown':     return guard(() => setKnown(message.word, message.known));
-    case 'forgetWords':  return guard(() => forgetWords(message.words));
+    case 'setKnown':     return guard(() => setWordOn(KNOWN, message.word, message.known));
+    case 'setIgnored':   return guard(() => setWordOn(IGNORED, message.word, message.ignored));
+    case 'forgetWords':  return guard(() => forgetFrom(KNOWN, message.words));
+    case 'forgetIgnored': return guard(() => forgetFrom(IGNORED, message.words));
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
     default:
       // Saying so out loud. A message with no case here simply never answers,
@@ -190,6 +193,7 @@ async function handleLookup(text, point) {
       : 0;
     const groups = await LLLLookup.search(text.slice(start), { getEntries });
     const known = await knownSet();
+    const ignored = await ignoredSet();
     // The accent is one number per word and the table is already in memory, so
     // it costs nothing to answer it here along with the definitions.
     for (const group of groups) {
@@ -199,6 +203,7 @@ async function handleLookup(text, point) {
         hit.shared = LLLLookup.sharedTags(hit.entry);
         hit.sharedPos = LLLLookup.sharedPos(hit.entry);
         hit.known = known.has(hit.word);
+        hit.ignored = ignored.has(hit.word);
       }
     }
     return { status, groups, start };
@@ -262,7 +267,7 @@ async function comprehension(text) {
   const reader = cachingReader();
   const tokens = await LLLLookup.locateTokens(text, reader);
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
-  return LLLLookup.coverage(tokens.map((t) => t.word), known);
+  return LLLLookup.coverage(tokens, known, await ignoredSet());
 }
 
 /**
@@ -312,13 +317,18 @@ async function wordPlaces(text) {
   const reader = cachingReader();
   const tokens = await LLLLookup.locateTokens(text, reader);
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
+  const ignored = await ignoredSet();
 
   const places = {};
-  const knownHere = [];
+  // Words that get no mark on the page. Two quite different reasons to be on
+  // this list — you know it, or you have said you never want to be told about
+  // it — but the page only ever asks the one question, so they arrive as one
+  // list rather than two the caller would have to merge itself.
+  const unmarked = [];
   tokens.forEach((token, i) => {
     if (!places[token.word]) {
       places[token.word] = [];
-      if (known.has(token.word)) knownHere.push(token.word);
+      if (ignored.has(token.word) || LLLLookup.isKnown(token, known)) unmarked.push(token.word);
     }
     places[token.word].push(token.start, token.length, i % 2);
   });
@@ -326,82 +336,111 @@ async function wordPlaces(text) {
   // The score comes back too. This is the same passage the bar is asking
   // about, and reading a page twice over to answer two questions about it
   // would be silly.
-  const score = LLLLookup.coverage(tokens.map((t) => t.word), known);
-  return { total: score.total, known: score.known, counts: score.counts, places, knownHere };
+  const score = LLLLookup.coverage(tokens, known, ignored);
+  return { total: score.total, known: score.known, counts: score.counts, places, unmarked };
 }
 
 // ---------------------------------------------------------------------------
-// Known words
+// Known and ignored words
 // ---------------------------------------------------------------------------
 
-// Stored as word -> when it was first marked known. Kept as an object rather
-// than a list because the question asked of it is almost always "is this one
-// in there", and because the date is what makes the list browsable in any
-// order more useful than alphabetical.
-let knownCache = null;   // Set of words, or null when it needs reading again
+/*
+ * Two lists of the same shape, word -> when it was put there. Objects rather
+ * than lists because the question asked of them is nearly always "is this one
+ * in there", and because the date is what makes them browsable in an order
+ * more useful than alphabetical.
+ *
+ *   known    you understand it, so it counts toward comprehension
+ *   ignored  you never want to be told about it — a name, a piece of English,
+ *            something the dictionary read wrongly. It leaves the question
+ *            entirely rather than counting either way, because counting it
+ *            unknown would say a page is harder than it is and counting it
+ *            known would say the opposite.
+ *
+ * A word is one or the other or neither, never both: putting it on one list
+ * takes it off the other.
+ */
+const KNOWN = 'knownWords';
+const IGNORED = 'ignoredWords';
 
-// Read once and held, because a lookup asks about it on every single hover.
-// Any write clears it — including one made from the settings page, which
+// Read once and held, because a lookup asks about them on every single hover.
+// Any write clears the copy — including one made from the settings page, which
 // storage.onChanged is what catches.
-async function knownSet() {
-  if (!knownCache) {
-    const stored = await api.storage.local.get('knownWords');
-    knownCache = new Set(Object.keys(stored.knownWords || {}));
+const caches = {};
+
+async function wordSet(key) {
+  if (!caches[key]) {
+    const stored = await api.storage.local.get(key);
+    caches[key] = new Set(Object.keys(stored[key] || {}));
   }
-  return knownCache;
+  return caches[key];
 }
+
+function knownSet() { return wordSet(KNOWN); }
+function ignoredSet() { return wordSet(IGNORED); }
 
 if (api.storage.onChanged) {
   api.storage.onChanged.addListener((changes) => {
-    if (changes.knownWords) knownCache = null;
+    for (const key of Object.keys(changes)) delete caches[key];
   });
 }
 
-async function knownMap() {
-  const stored = await api.storage.local.get('knownWords');
-  return stored.knownWords || {};
+async function wordMap(key) {
+  const stored = await api.storage.local.get(key);
+  return stored[key] || {};
 }
 
-async function saveKnown(map) {
-  await api.storage.local.set({ knownWords: map });
-  knownCache = new Set(Object.keys(map));
+async function saveWords(key, map) {
+  await api.storage.local.set({ [key]: map });
+  caches[key] = new Set(Object.keys(map));
   return Object.keys(map).length;
 }
 
-/** The same list with the date each was learned, newest first, for browsing. */
-async function knownList() {
-  const map = await knownMap();
+/** One list, with the date each word joined it, newest first, for browsing. */
+async function wordList(key) {
+  const map = await wordMap(key);
   return Object.keys(map)
     .map((word) => ({ word, added: map[word] }))
     .sort((a, b) => b.added - a.added);
 }
 
-/** Add words to the known set. Already-known ones are left alone. */
+/** Add words to the known list. Ones already on it are left alone. */
 async function addKnownWords(words) {
-  const map = await knownMap();
+  const map = await wordMap(KNOWN);
   let added = 0;
   for (const word of words) {
     if (!map[word]) { map[word] = Date.now(); added++; }
   }
-  return { added, total: await saveKnown(map) };
+  return { added, total: await saveWords(KNOWN, map) };
 }
 
-/** Mark one word known, or unmark it — what the popup's tick does. */
-async function setKnown(word, isKnown) {
-  const map = await knownMap();
-  if (isKnown) { if (!map[word]) map[word] = Date.now(); }
+/**
+ * Put one word on a list or take it off — what the popup's ✓ and ⊘ do, and
+ * what 3 and 4 do from the keyboard. Going on one list comes off the other,
+ * since "I know this" and "never mention this again" cannot both be true.
+ */
+async function setWordOn(key, word, on) {
+  const map = await wordMap(key);
+  if (on) { if (!map[word]) map[word] = Date.now(); }
   else delete map[word];
-  return { word, known: !!isKnown, total: await saveKnown(map) };
+  const total = await saveWords(key, map);
+
+  if (on) {
+    const other = key === KNOWN ? IGNORED : KNOWN;
+    const otherMap = await wordMap(other);
+    if (otherMap[word]) { delete otherMap[word]; await saveWords(other, otherMap); }
+  }
+  return { word, on: !!on, total };
 }
 
-/** Take words back out of the known set. */
-async function forgetWords(words) {
-  const map = await knownMap();
+/** Take words back off a list. */
+async function forgetFrom(key, words) {
+  const map = await wordMap(key);
   let removed = 0;
   for (const word of words) {
     if (map[word]) { delete map[word]; removed++; }
   }
-  return { removed, total: await saveKnown(map) };
+  return { removed, total: await saveWords(key, map) };
 }
 
 function loadTags() {
