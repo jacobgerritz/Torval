@@ -273,7 +273,7 @@
 
     let reply;
     try {
-      reply = await api.runtime.sendMessage({ type: 'lookup', text: found.text });
+      reply = await api.runtime.sendMessage({ type: 'lookup', text: found.text, point: found.point });
     } catch (err) {
       return;   // background restarting; the next hover will retry
     }
@@ -282,7 +282,14 @@
 
     const top = reply.groups[0];
     hoverWord = top.hits[0].word;
-    paintHover(found.node, found.offset, top.length);
+
+    // The word may genuinely have begun before the character the cursor
+    // happened to land on — hovering anywhere inside ネカフェ still finds
+    // and marks the whole word, not just whatever was directly underneath.
+    const start = typeof reply.start === 'number'
+      ? locateInPieces(found.pieces, found.base + reply.start)
+      : { node: found.node, offset: found.offset };
+    if (start) paintHover(start.node, start.offset, top.length);
   }
 
   function clearHover() {
@@ -360,14 +367,42 @@
   // Finding the text under the cursor
   // -------------------------------------------------------------------------
 
+  /**
+   * The word under the cursor — not just the character.
+   *
+   * Pointing at フェ inside ネカフェ has to still find ネカフェ, not read
+   * forward from フェ and land on some shorter, unrelated match that merely
+   * starts there. There is no way to know that from just one character
+   * though, which is why this reads the whole surrounding block rather than
+   * only forward from the point: `point` marks which character in the result
+   * was actually pointed at, and the background script tries every plausible
+   * starting point behind it to find whichever real word actually covers
+   * that character. `pieces` and `base` come along so that once the real
+   * answer is known, lookup() can place the sentence context at the word's
+   * true start rather than wherever the cursor happened to land inside it.
+   */
   function textAtPoint(x, y) {
     const caret = caretAt(x, y);
     if (!caret || caret.node.nodeType !== Node.TEXT_NODE) return null;
     if (SKIP_TAGS.has((caret.node.parentElement || {}).tagName)) return null;
     const offset = resolveCharacter(caret.node, caret.offset, x, y);
     if (offset === -1) return null;
-    const text = leadingJapanese(forwardText(caret.node, offset, MAX_SCAN));
-    return text ? { text, node: caret.node, offset } : null;
+
+    const block = blockPieces(caret.node);
+    const at = locateOffset(block.pieces, caret.node, offset);
+    if (at < 0 || !JAPANESE.test(block.text[at])) return null;
+
+    let start = at;
+    while (start > 0 && start > at - MAX_SCAN && JAPANESE.test(block.text[start - 1])) start--;
+    let end = at + 1;
+    while (end < block.text.length && end < at + MAX_SCAN && JAPANESE.test(block.text[end])) end++;
+
+    const loc = locateInPieces(block.pieces, start);
+    if (!loc) return null;
+    return {
+      text: block.text.slice(start, end), node: loc.node, offset: loc.offset,
+      point: at - start, pieces: block.pieces, base: start
+    };
   }
 
   /**
@@ -413,18 +448,14 @@
   }
 
   /**
-   * Read forward from a point in the text, following on into the next elements
-   * if needed. Sites break sentences across <span>s constantly — YouTube's
-   * captions are one span per line, ruby furigana is several per word — so
-   * stopping at the end of one text node would cut most words in half.
-   *
-   * We stop at the first block-level boundary, otherwise the next paragraph
-   * would get glued onto the end of this one.
+   * Every text node in the block the given node sits in, laid end to end as
+   * one string, with a record of which stretch of that string came from
+   * which node. Sites break sentences across `<span>`s constantly — YouTube's
+   * captions are one span per line, ruby furigana is several per word — so a
+   * word has to be findable regardless of which element it happens to be
+   * split across, in either direction from wherever the cursor lands in it.
    */
-  function forwardText(node, offset, limit) {
-    let text = node.data.slice(offset);
-    if (text.length >= limit) return text.slice(0, limit);
-
+  function blockPieces(node) {
     const block = blockAncestor(node);
     const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
       acceptNode(n) {
@@ -433,14 +464,36 @@
         return NodeFilter.FILTER_ACCEPT;
       }
     });
-    walker.currentNode = node;
-
-    let next;
-    while (text.length < limit && (next = walker.nextNode())) {
-      if (blockAncestor(next) !== block) break;
-      text += next.data;
+    const pieces = [];
+    let text = '';
+    let n;
+    while ((n = walker.nextNode())) {
+      pieces.push({ node: n, start: text.length, end: text.length + n.data.length });
+      text += n.data;
     }
-    return text.slice(0, limit);
+    return { pieces, text };
+  }
+
+  /** Where a known (node, offset) sits within blockPieces' combined text. */
+  function locateOffset(pieces, node, offset) {
+    for (const piece of pieces) {
+      if (piece.node === node) return piece.start + offset;
+    }
+    return -1;
+  }
+
+  /** The reverse: which (node, offset) a position in that combined text is. */
+  function locateInPieces(pieces, at) {
+    let low = 0;
+    let high = pieces.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      const piece = pieces[mid];
+      if (at < piece.start) high = mid - 1;
+      else if (at >= piece.end) low = mid + 1;
+      else return { node: piece.node, offset: at - piece.start };
+    }
+    return null;
   }
 
   function blockAncestor(node) {
@@ -619,16 +672,28 @@
   async function lookup(text, at, where) {
     lastQuery = text;
     // Captured now rather than when "+" is clicked: on a page whose text keeps
-    // changing — subtitles, above all — the sentence may be gone by then.
+    // changing — subtitles, above all — the sentence may be gone by then. This
+    // is only ever provisional when `where.point` is set: the real word may
+    // turn out to start earlier than wherever the cursor actually landed
+    // inside it, and the sentence context has to move with it or the bold
+    // in an exported card would land in the wrong place.
     context = where ? sentenceAt(where.node, where.offset) : null;
     const token = ++queryToken;
     let reply;
     try {
-      reply = await api.runtime.sendMessage({ type: 'lookup', text });
+      reply = await api.runtime.sendMessage({
+        type: 'lookup', text,
+        point: where && typeof where.point === 'number' ? where.point : undefined
+      });
     } catch (err) {
       return;   // background restarting; the next hover will retry
     }
     if (token !== queryToken || !reply) return;
+
+    if (where && where.pieces && typeof reply.start === 'number' && reply.start !== where.point) {
+      const loc = locateInPieces(where.pieces, where.base + reply.start);
+      if (loc) context = sentenceAt(loc.node, loc.offset);
+    }
 
     if (reply.status.state === 'loading') {
       showMessage(`Building dictionary… ${Math.round(reply.status.progress * 100)}%`, at);
@@ -702,7 +767,10 @@
 
       const toggle = document.createElement('button');
       toggle.className = 'toggle';
-      toggle.textContent = `${groups.length - 1} shorter ${groups.length === 2 ? 'match' : 'matches'}`;
+      // Not always literally shorter: the particle-trap check in lookup.js can
+      // put a longer reading down here too, when a much rarer entry is being
+      // passed over in favour of a common word plus an ordinary particle.
+      toggle.textContent = `${groups.length - 1} other ${groups.length === 2 ? 'match' : 'matches'}`;
       toggle.addEventListener('click', () => {
         rest.hidden = !rest.hidden;
         toggle.classList.toggle('open', !rest.hidden);
