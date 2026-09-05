@@ -170,9 +170,13 @@
     if (focused && (focused.isContentEditable ||
       /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return false;
 
-    if (!hoverWord) return false;
+    // Taken from the page whether or not there is a word to mark. YouTube
+    // reads the number keys as "jump to 30% of the video", and a key that
+    // sometimes marks a word and sometimes throws away your place in a
+    // video is worse than either on its own.
     e.preventDefault();
     e.stopPropagation();
+    if (!hoverWord) return true;
 
     // Already there. The key is still taken from the page, since the reason
     // for taking it has nothing to do with whether anything changed.
@@ -212,7 +216,14 @@
     return api.runtime.sendMessage(message).then((reply) => {
       if (!reply || !reply.ok) return false;
       if (typeof LLLBar !== 'undefined') LLLBar.restate(word, before, after);
-      if (typeof LLLHighlight !== 'undefined') LLLHighlight.setMarked(word, after === 'unknown');
+      if (typeof LLLHighlight !== 'undefined') {
+        LLLHighlight.setMarked(word, after === 'unknown');
+        // The subtitle showing now is drawn from ranges of its own, made
+        // when the line arrived. Asking for them again is one short message
+        // and it cannot be wrong, whereas repainting the ranges already
+        // held is only right while the player has left them alone.
+        LLLHighlight.refreshLine();
+      }
       syncState(word, after);
       return true;
     }).catch(() => false);
@@ -263,6 +274,9 @@
     if (isInteractive(e.target)) return;
     const found = textAtPoint(e.clientX, e.clientY);
     if (!found) return;
+    // The second click on a word already being shown is a click to be done
+    // with it. mousedown has closed it; leaving it closed is the whole job.
+    if (wasOpen && inCurrentWord(found)) { wasOpen = false; return; }
     lookup(found.text, { x: e.clientX, y: e.clientY }, found);
   }, true);
 
@@ -281,7 +295,16 @@
   // clicking inside the popup itself are exempt, which is why these check the
   // event's path, the popup lives in a shadow root, so a plain target check
   // would not recognise its own contents.
-  window.addEventListener('mousedown', (e) => { if (!insidePopup(e)) hide(); }, true);
+  // A click always closes the popup on the way down, so by the time the
+  // click itself arrives there is nothing left to say whether it was open.
+  // That is remembered here, and it is what makes clicking the same word
+  // twice close the popup rather than close and immediately reopen it.
+  let wasOpen = false;
+  window.addEventListener('mousedown', (e) => {
+    if (insidePopup(e)) return;
+    wasOpen = !!ui && ui.host.style.display === 'block';
+    hide();
+  }, true);
   window.addEventListener('scroll', (e) => { if (!insidePopup(e)) hide(); }, true);
   document.addEventListener('mouseleave', () => { hide(); clearHover(); });
 
@@ -730,11 +753,18 @@
     // worth measuring the moment they do.
     if (typeof LLLSubtitles !== 'undefined') {
       let seen = -1;
+      let last = 0;
       setInterval(() => {
         const now = LLLSubtitles.count();
-        if (now === seen) return;
+        if (!now || now === seen) return;
+        // Lines arrive one at a time, and a whole transcript takes real
+        // work to read. Doing it again for every line kept the background
+        // busy enough that hovering a subtitle waited half a second for an
+        // answer, and moved the number by a fraction of a percent.
+        if (Date.now() - last < 20000) return;
         seen = now;
-        if (now) readPage();
+        last = Date.now();
+        readPage();
       }, 2000);
     }
   }

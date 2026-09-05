@@ -61,6 +61,7 @@ var LLLHighlight = (function () {
   var lineRanges = new Map();   // word -> {group, range}[] in the subtitle line showing now
   var unknown = new Set();      // every word seen so far that is not known
   var lastLine = null;
+  var lineOverlay = null;   // the subtitle box, once it exists
 
   function supported() {
     return typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight === 'function';
@@ -319,10 +320,25 @@ var LLLHighlight = (function () {
       var overlay = document.querySelector('[data-lll-subtitle]');
       if (!overlay) return;
       clearInterval(attach);
+      lineOverlay = overlay;
       observer = new MutationObserver(function () { checkLine(overlay); });
       observer.observe(overlay, { characterData: true, childList: true, subtree: true });
       checkLine(overlay);
     }, 500);
+  }
+
+  /**
+   * Work the subtitle line out again from scratch.
+   *
+   * Marking a word known or unknown changes what should be coloured, and the
+   * line has its own ranges, made when it arrived and only good while the
+   * player leaves them alone. Rebuilding them is one short message about one
+   * short line, and it is right every time.
+   */
+  function refreshLine() {
+    if (!lineOverlay) return;
+    lastLine = null;
+    checkLine(lineOverlay);
   }
 
   async function checkLine(overlay) {
@@ -350,6 +366,7 @@ var LLLHighlight = (function () {
     start: start,
     read: read,
     setMarked: setMarked,
+    refreshLine: refreshLine,
     supported: supported,
     // Exposed for the tests: turning a position in the gathered text back into
     // a place on the page is the part with the arithmetic in it.

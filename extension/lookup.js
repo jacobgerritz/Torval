@@ -62,19 +62,28 @@ var LLLLookup = (function () {
     return at > 0 && at < text.length && ATTACHING.test(text.charAt(at));
   }
 
-  /**
-   * Every dictionary match that starts exactly where `text` starts, filed by
-   * how many characters it took: length to (entry id to hit).
+  /*
+   * Finding what starts at one place in the text is two jobs, and they are
+   * kept apart because the expensive one can be shared. Working out what to
+   * ask the dictionary is deinflection and nothing else. Asking it is a trip
+   * to a database, and a trip costs about the same whether it carries one
+   * question or a thousand, so a whole sentence goes in one trip rather than
+   * one trip per character.
    *
-   * This is the raw material. Two very different things are built on it. The
-   * popup wants it dressed up: sorted, deduplicated, cut down to what fits on
+   * What comes back is the raw material for two very different things. The
+   * popup wants it dressed up: sorted, deduplicated, cut to what fits on
    * screen. The segmenter wants it plain, all of it, because a length the
-   * popup would have thrown away as uninteresting may still be the piece that
-   * makes the rest of the sentence come out right.
+   * popup would throw away as uninteresting may be the piece that makes the
+   * rest of the sentence come out right.
    */
-  async function groupsAt(text, db) {
-    // Collect every dictionary form worth asking about, remembering which
-    // lengths of the original text each one could have come from.
+
+  /**
+   * Every dictionary form worth asking about for the text starting here,
+   * remembering which lengths of the original text each one could have come
+   * from. Deinflection only, no dictionary: this is the half of the work
+   * that can be done for a whole sentence before anything is looked up.
+   */
+  function termsAt(text) {
     var byTerm = new Map();
     var scan = Math.min(text.length, MAX_SCAN);
     for (var len = scan; len >= 1; len--) {
@@ -86,14 +95,16 @@ var LLLLookup = (function () {
         list.push({ length: len, types: c.types, reasons: c.reasons });
       }
     }
+    return byTerm;
+  }
 
-    // One database round trip for all of them.
-    var found = await db.getEntries(Array.from(byTerm.keys()));
-
+  /** What the dictionary answered, filed by how many characters it took. */
+  function groupsFrom(byTerm, found) {
     // length -> (entry id -> hit)
     var groups = new Map();
-    found.forEach(function (entries, term) {
-      var infos = byTerm.get(term);
+    byTerm.forEach(function (infos, term) {
+      var entries = found.get(term);
+      if (!entries) return;
       for (var a = 0; a < entries.length; a++) {
         var entry = entries[a];
         for (var b = 0; b < infos.length; b++) {
@@ -115,8 +126,13 @@ var LLLLookup = (function () {
         }
       }
     });
-
     return groups;
+  }
+
+  /** Both halves, for one place in the text. */
+  async function groupsAt(text, db) {
+    var byTerm = termsAt(text);
+    return groupsFrom(byTerm, await db.getEntries(Array.from(byTerm.keys())));
   }
 
   /**
@@ -294,13 +310,28 @@ var LLLLookup = (function () {
     var groupsFor = new Array(n).fill(null);
     best[0] = 0;
 
+    // Everything the dictionary is going to be asked about this run, asked
+    // at once. One trip to the database costs about the same as a thousand
+    // questions in it, and this used to make one trip per character: a hover
+    // on a subtitle sat through thirty of them before it could answer, which
+    // is why hovering a line felt slow when hovering a page did not.
+    var termsFor = new Array(n).fill(null);
+    var asking = new Set();
+    for (var t = 0; t < n; t++) {
+      if (splitsCluster(text, from + t)) continue;
+      var terms = termsAt(text.slice(from + t, from + t + MAX_SCAN + 1));
+      termsFor[t] = terms;
+      terms.forEach(function (infos, term) { asking.add(term); });
+    }
+    var answer = await db.getEntries(Array.from(asking));
+
     for (var i = 0; i < n; i++) {
       if (best[i] === Infinity) continue;
       var at = from + i;
 
       // No word begins on a character that belongs to the one before it.
-      if (!splitsCluster(text, at)) {
-        var groups = await groupsAt(text.slice(at, at + MAX_SCAN + 1), db);
+      if (termsFor[i]) {
+        var groups = groupsFrom(termsFor[i], answer);
         groupsFor[i] = groups;
         var here = i;
         groups.forEach(function (group, length) {
@@ -368,9 +399,9 @@ var LLLLookup = (function () {
       var words = await segmentRun(text, run.from, run.to, db);
       for (var w = 0; w < words.length; w++) out.push(words[w]);
       i = run.to;
-      // A whole page is thousands of searches in a row. Standing aside every
-      // so often lets whatever else is waiting, a hover being looked up above
-      // all, get a turn rather than wait behind the entire passage.
+      // A page is a lot of sentences in a row. Standing aside every so often
+      // lets whatever else is waiting, a hover being looked up above all, get
+      // a turn rather than wait behind the entire passage.
       if ((++steps % 32) === 0) await pause();
     }
     return out;

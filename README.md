@@ -58,6 +58,7 @@ that actually reaches it.
 |---|---|
 | point at a word | a quiet highlight, no popup yet |
 | **click** a word, or **Shift** + point at it | open the dictionary |
+| **click** it again | close it |
 | **Shift** with text selected | look up the selection |
 | **Esc**, a click outside, a scroll | close |
 | **other matches** | other words that start at the same place |
@@ -69,6 +70,11 @@ that actually reaches it.
 | **+** | add the word to Anki |
 | **✓** | mark as known, or unmark it |
 | **⊘** | ignore, or stop ignoring |
+
+**1**, **2** and **3** are taken from the page whether or not a word is under
+the cursor, since YouTube reads them as "jump to 30% of the video" and a key
+that sometimes marks a word and sometimes throws away your place is worse than
+either on its own.
 
 While Shift is held the popup follows whatever you point at, and closes if you
 point at something that is not a word. Let go of Shift, or click a word
