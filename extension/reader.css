@@ -1,0 +1,86 @@
+/*
+ * LLL, the reader
+ *
+ * A book page and nothing else. The width is set by the text rather than by
+ * the window, since a line of Japanese running the full width of a monitor is
+ * unreadable however good the dictionary behind it is.
+ */
+
+:root { color-scheme: dark; }
+
+body {
+  margin: 0;
+  background: #0f1012;
+  color: #d7d9dd;
+  font: 15px/1.6 -apple-system, "Segoe UI", sans-serif;
+}
+
+.chrome {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  /* Room on the right for the comprehension bar's own handle. */
+  padding: 10px 130px 10px 20px;
+  background: #131417;
+  border-bottom: 1px solid #212328;
+}
+
+.title {
+  max-width: 340px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 600;
+  color: #eceef1;
+}
+
+.spacer { flex: 1; }
+
+select, button, .open span {
+  padding: 7px 12px;
+  background: #202227;
+  border: 1px solid #2c2f35;
+  border-radius: 7px;
+  color: #d7d9dd;
+  font: inherit;
+  cursor: pointer;
+}
+select { max-width: 320px; }
+button:hover, .open span:hover, select:hover { background: #2a2d33; }
+button:disabled { opacity: 0.35; cursor: default; }
+
+.open input { display: none; }
+
+article {
+  max-width: 34em;
+  margin: 0 auto;
+  padding: 48px 24px 160px;
+  font-size: 20px;
+  line-height: 2;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+}
+
+article p { margin: 0 0 1.4em; }
+article h1, article h2, article h3 {
+  margin: 2em 0 1em;
+  font-size: 1.15em;
+  color: #eceef1;
+}
+
+.empty {
+  max-width: 34em;
+  margin: 22vh auto 0;
+  padding: 0 24px;
+  text-align: center;
+  color: #8b8f97;
+}
+.empty b { color: #d7d9dd; }
+.note { font-size: 13px; color: #8b8f97; }
+.note.error { color: #e0a2a2; }
+
+/* Dragging a file anywhere over the page is the same as opening it. */
+body.dropping { outline: 2px dashed #dba35f; outline-offset: -10px; }

@@ -1088,7 +1088,8 @@ const run = async () => {
   // A message with no case in the background script never answers, and the
   // caller waits for ever. Nothing about that looks like a failure: the
   // feature is simply silent. This shipped once, so it is checked now.
-  const sources = ['bar.js', 'content.js', 'highlight.js', 'known.js', 'options.js', 'subtitles.js']
+  const sources = ['bar.js', 'content.js', 'highlight.js', 'known.js', 'options.js',
+    'reader.js', 'subtitles.js']
     .map((f) => readFileSync(join(ROOT, 'extension', f), 'utf8')).join(' ');
   const backgroundSource = readFileSync(join(ROOT, 'extension', 'background.js'), 'utf8');
 

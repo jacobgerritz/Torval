@@ -8,6 +8,7 @@
     <h1>LLL</h1>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="words">Words</button>
+    <button class="tab" data-panel="reader">Reader</button>
     <button class="tab" data-panel="backup">Backup</button>
   </nav>
 
@@ -59,17 +60,13 @@
     <h2 class="parting first">Known words</h2>
     <div class="count" id="count">…</div>
     <p class="note count-note">
-      What LLL measures a page against to say how much of it you would
-      understand. Press ✓ on any word in the popup to add it here.
+      What a page is measured against. Press ✓ in the popup, or 2.
     </p>
 
     <section>
       <h2>Add from a text</h2>
       <p class="note">
-        Paste a text below, or load a plain text file into it. Every Japanese
-        word in it is deinflected the same way a hover looks one up, so that
-        たべました becomes 食べる, and whichever are not already here get
-        added. Running the same text through twice adds nothing the second time.
+        Something you have already read. たべました is added as 食べる.
       </p>
 
       <textarea id="text" rows="8" spellcheck="false"
@@ -86,11 +83,6 @@
 
     <section>
       <h2>Browse</h2>
-      <p class="note">
-        Newest first. × takes a word back out, which is useful when one was
-        added by mistake, or turned out not to be as known as it looked.
-      </p>
-
       <label class="search">
         <span>Search</span>
         <input id="search" type="search" placeholder="食べる" spellcheck="false">
@@ -103,18 +95,11 @@
     <h2 class="parting">Ignored words</h2>
     <div class="count" id="count-ignored">…</div>
     <p class="note count-note">
-      Words you never want to be told about again: names, pieces of English,
-      things the dictionary read wrongly. They are left unmarked on the page
-      and taken out of the comprehension score altogether, rather than
-      counting for or against it. Press ⊘ on any word in the popup, or
-      the 3 key, to put one here.
+      Names, English, misreadings. Left out of the score entirely rather
+      than counting either way. Press ⊘ in the popup, or 3.
     </p>
 
     <section>
-      <p class="note">
-        Newest first. &times; takes a word back out, so it counts again.
-      </p>
-
       <label class="search">
         <span>Search</span>
         <input id="search-ignored" type="search" placeholder="ネカフェ" spellcheck="false">
@@ -127,16 +112,27 @@
 
   <!-- ------------------------------------------------------------------ -->
 
+  <div class="panel" id="panel-reader" hidden>
+    <section>
+      <h2>Read a book in LLL</h2>
+      <p class="note">
+        An epub or a txt file, read in a tab of its own, with hovering,
+        marking and the comprehension bar working as they do on any page.
+      </p>
+      <p class="row">
+        <button id="open-reader" class="primary">Open the reader</button>
+      </p>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
   <div class="panel" id="panel-backup" hidden>
     <section>
       <h2>Save a copy</h2>
       <p class="note">
-        Every word you have marked known or ignored, in one file. This is the
-        part of LLL that cannot be rebuilt: the dictionary downloads again in
-        a minute and the Anki settings are a minute of typing, but a known
-        list is however many months of reading, and it lives in one browser
-        profile belonging to an add-on that has to be loaded again by hand
-        every time Firefox restarts. Worth keeping a copy somewhere.
+        Both lists in one file. The only part of LLL that cannot be rebuilt,
+        and it lives in one browser profile.
       </p>
       <p class="row">
         <button id="save-words" class="primary">Save my words to a file</button>
@@ -147,10 +143,7 @@
     <section>
       <h2>Load a copy back</h2>
       <p class="note">
-        Adds what is in the file to what is already here; nothing is removed
-        and nothing is overwritten. Restoring an old copy can only ever give
-        words back, never take away ones learned since, so carrying a file
-        between two machines works in either direction.
+        Adds to what is here. Nothing is removed, so an old copy is safe.
       </p>
       <p class="row">
         <input type="file" id="load-words" accept=".json,application/json">

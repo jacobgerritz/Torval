@@ -717,6 +717,12 @@
     if (typeof LLLHighlight !== 'undefined') await LLLHighlight.start();
 
     LLLBar.onRefresh(() => { lastTranscript = ''; readPage(); });
+
+    // A page that replaces its own text can say so, and the reader does
+    // every time it turns to a new chapter. Watching every page for changes
+    // instead would mean an observer on the whole document of every site
+    // open in the browser, to catch a case that almost none of them have.
+    document.addEventListener('lll-reread', () => { lastTranscript = ''; readPage(); });
     await waitForDictionary();
     setTimeout(readPage, 1500);   // let the page finish putting itself together
 

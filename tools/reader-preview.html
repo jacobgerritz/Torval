@@ -1,0 +1,105 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PREVIEW, not your real LLL reader</title>
+<!--
+  A page for working on the reader without reloading the extension in Firefox
+  every time.
+
+      node tools/serve.mjs   ->  http://localhost:8137/tools/reader-preview.html
+
+  It runs the real reader.html, reader.js and the page scripts LLL loads into
+  a book. tools/sample.epub is a small two chapter book to drop on it, ruby
+  and all, built by tools/make-epub.mjs. The markup is fetched from the extension rather than copied, so this
+  cannot drift out of step with what ships. The fake parts are the dictionary,
+  which is not running here, and the storage the book is kept in, which lives
+  in memory until the tab is closed.
+-->
+
+<style>
+  .preview-warning {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    z-index: 20;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 8px 20px;
+    background: #4a2c22;
+    border-top: 1px solid #6b3f30;
+    color: #f0d5c6;
+    font: 13px/1.5 -apple-system, "Segoe UI", sans-serif;
+  }
+  .preview-warning b { color: #fff; }
+</style>
+
+<script>
+// The book is kept in this tab's own session storage rather than in the
+// extension's. It survives a reload, so coming back to a book can be tried
+// here, and it is gone when the tab closes.
+const stored = JSON.parse(sessionStorage.getItem("lll-preview-store") || "{}");
+const remember = () => {
+  try { sessionStorage.setItem("lll-preview-store", JSON.stringify(stored)); } catch (e) {}
+};
+const known = new Set();
+const ignored = new Set();
+
+window.browser = {
+  storage: {
+    local: {
+      async get(key) { return key in stored ? { [key]: stored[key] } : {}; },
+      async set(values) { Object.assign(stored, values); remember(); }
+    },
+    onChanged: { addListener() {} }
+  },
+  runtime: {
+    id: 'preview',
+    getURL(path) { return '../extension/' + path; },
+    openOptionsPage() {},
+    async sendMessage(msg) {
+      switch (msg.type) {
+        case 'status': return { status: { state: 'ready', progress: 1 } };
+        case 'tags': return {};
+        case 'lookup': return { status: { state: 'ready' }, groups: [], start: 0 };
+        case 'comprehension': return { ok: true, result: { total: 0, known: 0, counts: {} } };
+        case 'wordPlaces':
+          return { ok: true, result: { total: 0, known: 0, counts: {}, places: {}, unmarked: [] } };
+        case 'setKnown': return { ok: true, result: { word: msg.word, on: msg.known } };
+        case 'setIgnored': return { ok: true, result: { word: msg.word, on: msg.ignored } };
+        default: return { ok: true, result: null };
+      }
+    }
+  }
+};
+
+// The real page, markup and scripts, pulled in rather than copied.
+(async () => {
+  const html = await (await fetch('../extension/reader.html')).text();
+  const page = new DOMParser().parseFromString(html, 'text/html');
+
+  for (const link of page.querySelectorAll('link[rel="stylesheet"]')) {
+    const clone = document.createElement('link');
+    clone.rel = 'stylesheet';
+    clone.href = '../extension/' + link.getAttribute('href');
+    document.head.appendChild(clone);
+  }
+  for (const node of [...page.body.children]) {
+    if (node.tagName !== 'SCRIPT') document.body.appendChild(node);
+  }
+
+  const warning = document.createElement('div');
+  warning.className = 'preview-warning';
+  warning.innerHTML = '<b>Preview.</b> No dictionary is running here, so nothing ' +
+    'is looked up or scored. The book is forgotten when this tab closes.';
+  document.body.appendChild(warning);
+
+  for (const script of page.querySelectorAll('script')) {
+    await new Promise((resolve, reject) => {
+      const clone = document.createElement('script');
+      clone.src = '../extension/' + script.getAttribute('src');
+      clone.onload = resolve;
+      clone.onerror = reject;
+      document.body.appendChild(clone);
+    });
+  }
+})();
+</script>

@@ -65,6 +65,7 @@ window.browser = {
   },
   runtime: {
     id: 'preview',
+    getURL(path) { return '../extension/' + path; },
     openOptionsPage() {},
     async sendMessage(msg) {
       switch (msg.type) {

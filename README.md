@@ -338,6 +338,27 @@ per word for the ones added by mistake.
 
 ---
 
+## Reading a book
+
+**Reader** in LLL's settings opens a page that takes an **epub** or a **txt**
+file and shows it as an ordinary web page. That is the whole trick: the reader
+loads the same scripts LLL puts on any website, so hovering, the popup, the
+marking and the comprehension bar work on a book exactly as they do on a page,
+with no second copy of anything.
+
+An epub is a zip of XHTML files plus a list saying what order to read them in.
+LLL reads that list, takes the text out of each file, and shows one chapter at
+a time. Furigana is thrown away rather than kept: left in, every word would
+arrive with its reading glued to it and 食べる would come out as 食た べる,
+matching nothing. A chapter longer than about twelve thousand characters is cut
+into parts, both because that is a long way to scroll and because reading a
+page end to end for a score should take a moment rather than a minute.
+
+The book and your place in it are kept in the browser's storage, so closing the
+tab does not lose either. One book at a time: a library is a different feature.
+
+---
+
 ## Comprehension
 
 A slim bar across the top of any page says how much of what is in front of you
@@ -562,6 +583,10 @@ to one at every position, deinflects each and keeps whatever is really in the
 dictionary. Which of those matches to believe is settled for the sentence as a
 whole rather than one word at a time; see "Where one word stops" below.
 
+**`extension/reader.js`**: the reader. Unpacks an epub, finds the chapters and
+puts their text on the page. Knows nothing about dictionaries; the page it
+builds is read by the same scripts as any other.
+
 **`extension/background.js`**: the dictionary itself. Runs once for the whole
 browser and owns the database. Pages ask it questions by message.
 
@@ -607,6 +632,9 @@ node tools/serve.mjs
 - <http://localhost:8137/tools/options-preview.html>, the settings page. It
   fetches `extension/options.html` rather than copying it, so it cannot drift
   out of step with what ships.
+- <http://localhost:8137/tools/reader-preview.html>, the book reader. Drop
+  `tools/sample.epub` on it, a two chapter book with ruby in it, rebuilt with
+  `node tools/make-epub.mjs tools/sample.epub`.
 - <http://localhost:8137/tools/video-preview.html>, subtitles and recording.
 
 Edit the CSS, refresh.

@@ -1,0 +1,29 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>LLL reader</title>
+<link rel="stylesheet" href="reader.css">
+
+<header class="chrome">
+  <span class="title" id="title">LLL reader</span>
+  <select id="chapters" hidden></select>
+  <span class="spacer"></span>
+  <button id="prev" hidden title="Previous chapter">‹</button>
+  <button id="next" hidden title="Next chapter">›</button>
+  <label class="open">
+    <span>Open a book</span>
+    <input type="file" id="book" accept=".epub,.txt,text/plain,application/epub+zip">
+  </label>
+</header>
+
+<article id="page" lang="ja"></article>
+
+<div class="empty" id="empty">
+  <p>Drop an <b>epub</b> or <b>txt</b> file here, or open one above.</p>
+  <p class="note" id="trouble"></p>
+</div>
+
+<script src="japanese.js"></script>
+<script src="bar.js"></script>
+<script src="highlight.js"></script>
+<script src="content.js"></script>
+<script src="reader.js"></script>

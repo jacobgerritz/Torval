@@ -149,3 +149,14 @@ function fail(message) {
   statusText.textContent = message;
   statusText.className = 'error';
 }
+
+// The reader is a page rather than a panel, since it is a place to be
+// rather than a setting to change.
+const reader = document.getElementById('open-reader');
+if (reader) {
+  reader.addEventListener('click', () => {
+    const url = api.runtime.getURL('reader.html');
+    if (api.tabs && api.tabs.create) api.tabs.create({ url });
+    else window.open(url, '_blank');
+  });
+}
