@@ -274,9 +274,15 @@
     if (isInteractive(e.target)) return;
     const found = textAtPoint(e.clientX, e.clientY);
     if (!found) return;
-    // The second click on a word already being shown is a click to be done
+    // A second click on the word already being shown is a click to be done
     // with it. mousedown has closed it; leaving it closed is the whole job.
-    if (wasOpen && inCurrentWord(found)) { wasOpen = false; return; }
+    // It has to be that word, not merely some word: clicking a new one while
+    // a popup is open should open the new one, and comparing against
+    // whatever the cursor happens to be over got that wrong.
+    const same = dismissed && found.block === dismissed.block &&
+      found.at >= dismissed.from && found.at < dismissed.to;
+    dismissed = null;
+    if (same) return;
     lookup(found.text, { x: e.clientX, y: e.clientY }, found);
   }, true);
 
@@ -296,13 +302,13 @@
   // event's path, the popup lives in a shadow root, so a plain target check
   // would not recognise its own contents.
   // A click always closes the popup on the way down, so by the time the
-  // click itself arrives there is nothing left to say whether it was open.
+  // click itself arrives there is nothing left to say what it was showing.
   // That is remembered here, and it is what makes clicking the same word
   // twice close the popup rather than close and immediately reopen it.
-  let wasOpen = false;
+  let dismissed = null;
   window.addEventListener('mousedown', (e) => {
     if (insidePopup(e)) return;
-    wasOpen = !!ui && ui.host.style.display === 'block';
+    dismissed = ui && ui.host.style.display === 'block' ? shown : null;
     hide();
   }, true);
   window.addEventListener('scroll', (e) => { if (!insidePopup(e)) hide(); }, true);
@@ -880,7 +886,14 @@
     }
     if (token !== queryToken || !reply) return;
 
-    if (where && where.pieces && typeof reply.start === 'number' && reply.start !== where.point) {
+    // Put the sentence context on the word itself. The node above is only
+    // where the sixteen characters sent to be looked up begin, which is up to
+    // sixteen characters before the word and was never the right place: a card
+    // mined from 友達と図書館で本を読んでいました came back with 友達と図書館で
+    // in bold instead of 読んでいました. This used to run only when the word
+    // began somewhere other than the pointer, which is a different question
+    // and true far less often.
+    if (where && where.pieces && typeof reply.start === 'number') {
       const loc = locateInPieces(where.pieces, where.base + reply.start);
       if (loc) context = sentenceAt(loc.node, loc.offset);
     }
@@ -899,6 +912,10 @@
       hoverTo = from + top.length;
       hoverWord = top.hits[0].word;
       hoverState = stateOf(top.hits[0]);
+      // Which word the popup is about to be showing, which is not the same
+      // question as which word the cursor is over: the mouse moves on and
+      // the popup stays put.
+      shown = { block: where.block, from: from, to: from + top.length };
     }
 
     if (reply.status.state === 'loading') {
@@ -947,7 +964,11 @@
 
   function hide() {
     if (ui) ui.host.style.display = 'none';
+    shown = null;
   }
+
+  // The word the popup is showing, while it is showing one.
+  let shown = null;
 
   async function showMessage(text, at) {
     const { card } = await build();
