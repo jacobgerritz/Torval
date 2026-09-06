@@ -658,6 +658,39 @@ const run = async () => {
     }
   }
 
+  // --- one question per hover, and the last sentence remembered ----------
+  // A hover reads the sentence to find the word, and the popup is dressed
+  // from what that reading already found rather than asking again. Moving
+  // along a line asks the same question of the same sentence, so the reading
+  // is kept; the danger in keeping it is answering about the wrong sentence.
+  {
+    const line = '今日は暑いですね。';
+    for (const at of [0, 2, 3, 6]) {
+      const found = await Lookup.tokenAt(line, at, db);
+      const asked = await Lookup.search(line.slice(found.start), db, found.length);
+      const hovered = await Lookup.hover(line, at, db);
+      check('hovering character ' + at + ' says the same as asking twice would',
+        hovered.start === found.start && hovered.length === found.length &&
+        JSON.stringify(hovered.groups.map((g) => g.surface)) ===
+          JSON.stringify(asked.map((g) => g.surface)),
+        JSON.stringify(hovered.groups.map((g) => g.surface)));
+    }
+
+    // A different sentence, straight after, must not be answered from the
+    // one before it.
+    const other = await Lookup.hover('本を読みました。', 3, db);
+    check('the next sentence is read afresh',
+      other.groups.length > 0 && other.groups[0].hits[0].word === '読む',
+      JSON.stringify(other.groups[0] && other.groups[0].hits[0].word));
+
+    // And back again, which is the case a remembered sentence gets wrong if
+    // it is keyed on anything less than the text itself.
+    const back = await Lookup.hover(line, 0, db);
+    check('and the first one still reads the same on return',
+      back.start === 0 && back.groups[0].surface === '今日',
+      JSON.stringify(back.groups[0] && back.groups[0].surface));
+  }
+
   // --- crediting a transparent phrase for parts already known -------------
   // お元気ですか ("how are you") is filed in JMdict as one "exp" entry, but it
   // is nothing more than the honorific お, 元気, the copula です and the

@@ -148,7 +148,12 @@ var LLLLookup = (function () {
    */
   async function search(text, db, prefer) {
     if (!text) return [];
-    var groups = await groupsAt(text, db);
+    return present(await groupsAt(text, db), text, prefer);
+  }
+
+  /** The same, for matches that have already been found. */
+  function present(groups, text, prefer) {
+    if (!groups) return [];
 
     // Longest first, and each dictionary entry only once. Without that last
     // rule, hovering 勉強しています would list 勉強 four times over, once for
@@ -302,7 +307,7 @@ var LLLLookup = (function () {
    */
   async function segmentRun(text, from, to, db) {
     var n = to - from;
-    if (n <= 0) return [];
+    if (n <= 0) return { words: [], groupsFor: [], from: from };
 
     var best = new Array(n + 1).fill(Infinity);
     var backLength = new Array(n + 1).fill(0);
@@ -385,7 +390,10 @@ var LLLLookup = (function () {
       end = start;
     }
     out.reverse();
-    return out;
+    // The matches themselves travel with the answer. A hover wants the ones
+    // at the word it landed on, and asking the dictionary for them a second
+    // time would be paying twice for the same question.
+    return { words: out, groupsFor: groupsFor, from: from };
   }
 
   /** Every word in `text`, wherever it is, run by run. */
@@ -396,8 +404,8 @@ var LLLLookup = (function () {
     while (i < text.length) {
       if (!LLLJapanese.test(text.charAt(i))) { i++; continue; }
       var run = runAround(text, i);
-      var words = await segmentRun(text, run.from, run.to, db);
-      for (var w = 0; w < words.length; w++) out.push(words[w]);
+      var read = await segmentRun(text, run.from, run.to, db);
+      for (var w = 0; w < read.words.length; w++) out.push(read.words[w]);
       i = run.to;
       // A page is a lot of sentences in a row. Standing aside every so often
       // lets whatever else is waiting, a hover being looked up above all, get
@@ -424,14 +432,51 @@ var LLLLookup = (function () {
     var run = runAround(text, at);
     var from = Math.max(run.from, at - WINDOW);
     var to = Math.min(run.to, at + WINDOW);
-    var words = await segmentRun(text, from, to, db);
+
+    // Moving the cursor one character along a sentence asks the same
+    // question about the same sentence, and the answer cannot have changed:
+    // where the words are does not depend on which one is being pointed at.
+    // So the last sentence read is kept, and running an eye along a subtitle
+    // line costs one reading rather than one per character. The key carries
+    // one character past the end, because what follows a run decides whether
+    // a word may end where the run does.
+    var key = text.slice(from, to + 1);
+    var read;
+    if (lastRun.db === db && lastRun.from === from && lastRun.key === key) {
+      read = lastRun.read;
+    } else {
+      read = await segmentRun(text, from, to, db);
+      lastRun = { db: db, from: from, key: key, read: read };
+    }
+
+    var words = read.words;
     for (var i = 0; i < words.length; i++) {
       var word = words[i];
       if (word.start <= at && at < word.start + word.length) {
-        return { start: word.start, length: word.length };
+        return { start: word.start, length: word.length,
+          groups: read.groupsFor[word.start - read.from] };
       }
     }
-    return { start: at, length: 0 };
+    // Nothing the dictionary knows covers this character, but something may
+    // still start on it, and the popup is allowed to say so.
+    return { start: at, length: 0, groups: read.groupsFor[at - read.from] };
+  }
+
+  // The last sentence read, kept for the next hover. One is enough: hovering
+  // moves along a line, not between two of them.
+  var lastRun = { db: null, from: -1, key: null, read: null };
+
+  /**
+   * Everything a hover needs: which word the cursor is in, and what to show
+   * for it. One question rather than two, so the matches the reading already
+   * found are the ones the popup is dressed from.
+   */
+  async function hover(text, at, db) {
+    var found = await tokenAt(text, at, db);
+    var groups = found.groups
+      ? present(found.groups, text.slice(found.start), found.length)
+      : await search(text.slice(found.start), db, found.length);
+    return { start: found.start, length: found.length, groups: groups };
   }
 
   /** Where the word covering `at` begins. */
@@ -911,6 +956,7 @@ var LLLLookup = (function () {
     search: search,
     wordAt: wordAt,
     tokenAt: tokenAt,
+    hover: hover,
     segment: segment,
     displayForm: displayForm,
     frequencyBand: frequencyBand,

@@ -59,7 +59,16 @@ let stored = { ankiConfig: { deck: '日本語::Mining', model: 'LLL', tags: ['ll
 window.browser = {
   storage: {
     local: {
-      async get(key) { return key in stored ? { [key]: stored[key] } : {}; },
+      async get(keys) {
+        // Same shapes the real storage takes: one name, a list of them, or an
+        // object of defaults.
+        const names = keys === null || keys === undefined ? Object.keys(stored)
+          : typeof keys === "string" ? [keys]
+          : Array.isArray(keys) ? keys : Object.keys(keys);
+        const out = {};
+        for (const name of names) if (name in stored) out[name] = stored[name];
+        return out;
+      },
       async set(values) { Object.assign(stored, values); }
     }
   },

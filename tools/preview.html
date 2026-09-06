@@ -166,11 +166,11 @@ window.browser = {
         return { ok: true, result: { ...score, places, unmarked } };
       }
       if (msg.type === 'lookup') {
-        const at = typeof msg.point === 'number'
-          ? await LLLLookup.tokenAt(msg.text, msg.point, db)
-          : { start: 0, length: 0 };
-        const start = at.start;
-        const groups = await LLLLookup.search(msg.text.slice(start), db, at.length);
+        const found = typeof msg.point === 'number'
+          ? await LLLLookup.hover(msg.text, msg.point, db)
+          : { start: 0, groups: await LLLLookup.search(msg.text, db) };
+        const start = found.start;
+        const groups = found.groups;
         // The real background script attaches the accent from the pitch data;
         // here a handful of known ones stand in.
         const ACCENTS = { 日本語: 0, 勉強: 0, 新しい: 4, 図書館: 2, 読む: 1, 食べる: 2, 本: 1, 人: 0, 車: 0, 買う: 0 };

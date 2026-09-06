@@ -21,6 +21,7 @@
 (function () {
   const api = globalThis.browser || globalThis.chrome;
   const KEY = 'book';
+  const PLACE = 'bookAt';
 
   // Longest chapter shown in one go. Some epubs are a whole novel in a single
   // file, which is a page nobody wants to scroll and a lot to read through.
@@ -38,6 +39,7 @@
   };
 
   let book = null;
+  let showing = 0;   // which chapter, kept here rather than in the book
 
   start();
 
@@ -47,8 +49,8 @@
       els.file.value = '';
     });
     els.chapters.addEventListener('change', () => show(Number(els.chapters.value)));
-    els.prev.addEventListener('click', () => show(book.at - 1));
-    els.next.addEventListener('click', () => show(book.at + 1));
+    els.prev.addEventListener('click', () => show(showing - 1));
+    els.next.addEventListener('click', () => show(showing + 1));
 
     document.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -62,10 +64,10 @@
       if (file) load(file);
     });
 
-    const stored = await api.storage.local.get(KEY);
+    const stored = await api.storage.local.get([KEY, PLACE]);
     if (stored && stored[KEY]) {
       book = stored[KEY];
-      show(book.at || 0);
+      show(stored[PLACE] || 0);
     }
   }
 
@@ -75,8 +77,8 @@
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
       const read = isEpub ? await readEpub(file) : await readText(file);
       if (!read.chapters.length) throw new Error('There is no text in that file.');
-      book = { title: read.title || file.name, chapters: read.chapters, at: 0 };
-      await keep();
+      book = { title: read.title || file.name, chapters: read.chapters };
+      await api.storage.local.set({ [KEY]: book, [PLACE]: 0 }).catch(tooBig);
       show(0);
     } catch (err) {
       say(err.message, true);
@@ -91,7 +93,7 @@
     if (!book) return;
     const at = Math.max(0, Math.min(book.chapters.length - 1, index));
     const chapter = book.chapters[at];
-    book.at = at;
+    showing = at;
 
     els.page.textContent = '';
     if (chapter.title) {
@@ -124,7 +126,10 @@
     els.chapters.value = String(at);
 
     window.scrollTo(0, 0);
-    keep();
+    // Only the place, not the book. A novel is a few megabytes, and writing
+    // all of it out again to record that you turned a page is a lot of work
+    // to record one number.
+    api.storage.local.set({ [PLACE]: at }).catch(() => {});
     // The page has been replaced, so whatever was measured and marked on it
     // belongs to the last chapter. content.js listens for this.
     document.dispatchEvent(new CustomEvent('lll-reread'));
@@ -136,15 +141,11 @@
     els.trouble.textContent = text;
   }
 
-  async function keep() {
-    // A long book is a few megabytes, which is what unlimitedStorage is for.
-    // If it will not fit anyway, the book still reads; it just will not be
-    // there tomorrow.
-    try {
-      await api.storage.local.set({ [KEY]: book });
-    } catch (err) {
-      say('That book is too big to remember, but it will read fine now.', true);
-    }
+  // A long book is a few megabytes, which is what unlimitedStorage is for.
+  // If it will not fit anyway, the book still reads; it just will not be
+  // there tomorrow.
+  function tooBig() {
+    say('That book is too big to remember, but it will read fine now.', true);
   }
 
   // -------------------------------------------------------------------------

@@ -195,11 +195,11 @@ async function handleLookup(text, point) {
     // travels with it so the popup leads with the same word the page is
     // marked with: 今日は暑い is 今日 and は, and a hover on it should not
     // answer with the greeting just because the greeting is longer.
-    const at = typeof point === 'number'
-      ? await LLLLookup.tokenAt(text, point, { getEntries })
-      : { start: 0, length: 0 };
-    const start = at.start;
-    const groups = await LLLLookup.search(text.slice(start), { getEntries }, at.length);
+    const found = typeof point === 'number'
+      ? await LLLLookup.hover(text, point, hoverReader)
+      : { start: 0, groups: await LLLLookup.search(text, hoverReader) };
+    const start = found.start;
+    const groups = found.groups;
     const known = await knownSet();
     const ignored = await ignoredSet();
     // The accent is one number per word and the table is already in memory, so
@@ -231,12 +231,19 @@ async function handleLookup(text, point) {
  * into no work at all, and is the difference between reading a page in under
  * a second and reading it in a minute.
  */
+// How many terms a reader holds before it starts again. A page read is over
+// long before this matters; the one kept for hovering would otherwise grow
+// for as long as the browser is open. Forgetting everything at once is
+// cruder than forgetting the oldest, and costs one slow hover an hour.
+const CACHE_LIMIT = 20000;
+
 function cachingReader() {
   const cache = new Map();
   return {
     async getEntries(terms) {
       const missing = terms.filter((term) => !cache.has(term));
       if (missing.length) {
+        if (cache.size > CACHE_LIMIT) cache.clear();
         const found = await getEntries(missing);
         for (const term of missing) cache.set(term, found.get(term) || null);
       }
@@ -249,6 +256,12 @@ function cachingReader() {
     }
   };
 }
+
+// Hovering asks about the same words over and over: the same line as the
+// cursor moves along it, and the same handful of particles on every line
+// after that. One reader kept for all of them turns nearly every hover into
+// no database work at all.
+const hoverReader = cachingReader();
 
 function requireDictionary() {
   if (status.state !== 'ready') {
@@ -525,26 +538,44 @@ function loadTags() {
  * holds the entries themselves. Storing it this way means a word with three
  * spellings is kept once, not three times.
  */
+/**
+ * Look up a batch of terms: which entries each one names, then the entries.
+ *
+ * Both halves ride in one transaction. They have to happen in order, since
+ * the entry numbers are not known until the index has answered, but a
+ * transaction stays open as long as requests keep being made inside it, so
+ * the second half can be started from the first half's results. Two
+ * transactions would mean paying the setup twice for one question.
+ */
 async function getEntries(terms) {
   const db = await ready;
 
   const idsByTerm = new Map();
-  await run(db, INDEX, 'readonly', (store) => {
-    for (const term of terms) {
-      const req = store.get(term);
-      req.onsuccess = () => { if (req.result) idsByTerm.set(term, req.result); };
-    }
-  });
-
-  const wanted = new Set();
-  idsByTerm.forEach((ids) => ids.forEach((id) => wanted.add(id)));
-
   const byId = new Map();
-  await run(db, ENTRIES, 'readonly', (store) => {
-    wanted.forEach((id) => {
-      const req = store.get(id);
-      req.onsuccess = () => { if (req.result) byId.set(id, req.result); };
-    });
+
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction([INDEX, ENTRIES], 'readonly');
+    const index = tx.objectStore(INDEX);
+    const entries = tx.objectStore(ENTRIES);
+    const asked = new Set();
+
+    for (const term of terms) {
+      const req = index.get(term);
+      req.onsuccess = () => {
+        if (!req.result) return;
+        idsByTerm.set(term, req.result);
+        for (const id of req.result) {
+          if (asked.has(id)) continue;
+          asked.add(id);
+          const entry = entries.get(id);
+          entry.onsuccess = () => { if (entry.result) byId.set(id, entry.result); };
+        }
+      };
+    }
+
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
   });
 
   const out = new Map();
