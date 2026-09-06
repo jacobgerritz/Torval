@@ -371,7 +371,9 @@ way to scroll and because reading a page end to end for a score should take a
 moment rather than a minute.
 
 The book and your place in it are kept in the browser's storage, so closing the
-tab does not lose either. One book at a time: a library is a different feature.
+tab loses neither. Your place is the chapter and how far down it you had read,
+since a chapter is several screens. One book at a time: a library is a
+different feature.
 
 ---
 

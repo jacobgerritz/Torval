@@ -22,6 +22,7 @@
   const api = globalThis.browser || globalThis.chrome;
   const KEY = 'book';
   const PLACE = 'bookAt';
+  const DOWN = 'bookScroll';
 
   // Longest chapter shown in one go. Some epubs are a whole novel in a single
   // file, which is a page nobody wants to scroll and a lot to read through.
@@ -40,6 +41,7 @@
 
   let book = null;
   let showing = 0;   // which chapter, kept here rather than in the book
+  let saving = null; // the timer that writes where you are down
 
   start();
 
@@ -57,6 +59,17 @@
       document.body.classList.add('dropping');
     });
     document.addEventListener('dragleave', () => document.body.classList.remove('dropping'));
+
+    // A chapter is a good few screens, so the chapter alone is not where you
+    // were. Written down a moment after you stop moving rather than on every
+    // scroll event, which fires all the way down the page.
+    window.addEventListener('scroll', () => {
+      if (!book) return;
+      clearTimeout(saving);
+      saving = setTimeout(() => {
+        api.storage.local.set({ [DOWN]: window.scrollY }).catch(() => {});
+      }, 400);
+    });
     document.addEventListener('drop', (e) => {
       e.preventDefault();
       document.body.classList.remove('dropping');
@@ -64,10 +77,10 @@
       if (file) load(file);
     });
 
-    const stored = await api.storage.local.get([KEY, PLACE]);
+    const stored = await api.storage.local.get([KEY, PLACE, DOWN]);
     if (stored && stored[KEY]) {
       book = stored[KEY];
-      show(stored[PLACE] || 0);
+      show(stored[PLACE] || 0, stored[DOWN] || 0);
     }
   }
 
@@ -89,7 +102,7 @@
   // Showing it
   // -------------------------------------------------------------------------
 
-  function show(index) {
+  function show(index, down) {
     if (!book) return;
     const at = Math.max(0, Math.min(book.chapters.length - 1, index));
     const chapter = book.chapters[at];
@@ -125,11 +138,14 @@
     }
     els.chapters.value = String(at);
 
-    window.scrollTo(0, 0);
+    // Turning to a chapter starts at the top of it. Coming back to the book
+    // starts where you stopped reading.
+    window.scrollTo(0, down || 0);
     // Only the place, not the book. A novel is a few megabytes, and writing
     // all of it out again to record that you turned a page is a lot of work
     // to record one number.
-    api.storage.local.set({ [PLACE]: at }).catch(() => {});
+    clearTimeout(saving);
+    api.storage.local.set({ [PLACE]: at, [DOWN]: down || 0 }).catch(() => {});
     // The page has been replaced, so whatever was measured and marked on it
     // belongs to the last chapter. content.js listens for this.
     document.dispatchEvent(new CustomEvent('lll-reread'));

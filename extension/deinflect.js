@@ -272,6 +272,7 @@ var LLLDeinflect = (function () {
   var byEnding = new Map();
   var emptyFrom = [];
   rules.forEach(function (r) {
+    r.tkey = ' ' + r.tout.join(',');
     if (r.from === '') { emptyFrom.push(r); return; }
     var list = byEnding.get(r.from);
     if (!list) { list = []; byEnding.set(r.from, list); }
@@ -317,7 +318,7 @@ var LLLDeinflect = (function () {
         var next = cur.term.slice(0, cur.term.length - r.from.length) + r.to;
         if (next.length === 0 || next.length > 40 || next === cur.term) continue;
 
-        var key = next + ' ' + r.tout.join(',');
+        var key = next + r.tkey;
         if (seen.has(key)) continue;
         seen.add(key);
 
