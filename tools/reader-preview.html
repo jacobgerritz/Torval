@@ -98,7 +98,13 @@ window.browser = {
   const warning = document.createElement('div');
   warning.className = 'preview-warning';
   warning.innerHTML = '<b>Preview.</b> No dictionary is running here, so nothing ' +
-    'is looked up or scored. The book is forgotten when this tab closes.';
+    'is looked up or scored. The book is forgotten when this tab closes. ';
+  const run = document.createElement('button');
+  run.textContent = 'Check it against the sample books';
+  run.style.cssText = 'margin-left:6px;font:inherit;cursor:pointer';
+  const said = document.createElement('span');
+  run.onclick = () => check(said);
+  warning.append(run, said);
   document.body.appendChild(warning);
 
   for (const script of page.querySelectorAll('script')) {
@@ -111,4 +117,75 @@ window.browser = {
     });
   }
 })();
+
+// ---------------------------------------------------------------------------
+// What the sample books are for
+//
+// Every one of these is something a real epub does that the reader once got
+// wrong. They run on a button rather than on load, so opening this page to
+// try a book of your own does not replace it with a fixture.
+// ---------------------------------------------------------------------------
+
+async function check(said) {
+  const failures = [];
+  let passed = 0;
+  const is = (name, got, want) => {
+    const a = JSON.stringify(got);
+    const b = JSON.stringify(want);
+    if (a === b) passed++;
+    else failures.push(name + ": " + a + " wanted " + b);
+  };
+
+  const open = async (path) => {
+    const bytes = await (await fetch(path + '?t=' + Date.now())).arrayBuffer();
+    const input = document.getElementById('book');
+    const carry = new DataTransfer();
+    carry.items.add(new File([bytes], path.split('/').pop(), { type: 'application/epub+zip' }));
+    input.files = carry.files;
+    input.dispatchEvent(new Event('change'));
+    await new Promise((r) => setTimeout(r, 700));
+    const chapters = [];
+    const picker = document.getElementById('chapters');
+    const count = Math.max(1, picker.options.length);
+    for (let i = 0; i < count; i++) {
+      picker.value = String(i);
+      picker.dispatchEvent(new Event('change'));
+      await new Promise((r) => setTimeout(r, 120));
+      chapters.push({
+        name: picker.options.length ? picker.options[i].textContent.replace(/^\d+\. /, '') : '',
+        paragraphs: [...document.getElementById('page').querySelectorAll('p')].map((p) => p.textContent)
+      });
+    }
+    return { title: document.getElementById('title').textContent, chapters };
+  };
+
+  said.textContent = ' running…';
+  try {
+    const plain = await open('sample.epub');
+    is('plain: the title comes from the metadata', plain.title, '種の話');
+    is('plain: both chapters, named by their headings',
+      plain.chapters.map((c) => c.name), ['第一章', '第二章']);
+    is('plain: furigana is thrown away, not read as text',
+      plain.chapters[0].paragraphs, ['種がある。', '単子葉植物の一つの科である。']);
+    is('plain: a chapter in a subdirectory is found',
+      plain.chapters[1].paragraphs, ['すごいですね。', '猫です。']);
+
+    const awkward = await open('sample-awkward.epub');
+    is('awkward: the title comes from the metadata', awkward.title, 'むかしの話');
+    is('awkward: chapters are named by the toc.ncx, and the cover is dropped',
+      awkward.chapters.map((c) => c.name), ['はじめに', 'второй', 'Section 3']);
+    is('awkward: a paragraph inside a blockquote is read once, not twice',
+      awkward.chapters[0].paragraphs, ['種がある。', '猫です。']);
+    is('awkward: a chapter built out of bare divs keeps its paragraphs',
+      awkward.chapters[1].paragraphs, ['すごいですね。', '本を読みました。']);
+    is('awkward: line breaks end a paragraph',
+      awkward.chapters[2].paragraphs, ['今日は暑いですね。', '台湾に行きました。']);
+  } catch (err) {
+    failures.push('threw: ' + err.message);
+  }
+
+  said.textContent = failures.length ? ' ' + failures.length + ' failed of ' +
+    (passed + failures.length) + ': ' + failures.join(' | ') : ' all ' + passed + ' checks passed';
+  said.style.color = failures.length ? '#ffb3a7' : '#bfe3bf';
+}
 </script>

@@ -354,11 +354,21 @@ with no second copy of anything.
 
 An epub is a zip of XHTML files plus a list saying what order to read them in.
 LLL reads that list, takes the text out of each file, and shows one chapter at
-a time. Furigana is thrown away rather than kept: left in, every word would
-arrive with its reading glued to it and 食べる would come out as 食た べる,
-matching nothing. A chapter longer than about twelve thousand characters is cut
-into parts, both because that is a long way to scroll and because reading a
-page end to end for a score should take a moment rather than a minute.
+a time, named by the book's own table of contents. Most books do not repeat
+the chapter name inside the chapter, so without reading the contents a book
+opens as Section 1, Section 2, Section 3, which is no way to find your place.
+EPUB 3 keeps that list in a nav document and EPUB 2 in a `toc.ncx`, and books
+in the wild are still mostly the second kind.
+
+Furigana is thrown away rather than kept: left in, every word would arrive with
+its reading glued to it and 食べる would come out as 食た べる, matching
+nothing. Text is taken from the innermost blocks only, since a paragraph inside
+a blockquote sits in two of them and would otherwise be read, shown and counted
+twice. Books built out of bare `<div>`s or nothing but line breaks are common
+enough to be handled the same way as ordinary paragraphs. A chapter longer than
+about twelve thousand characters is cut into parts, both because that is a long
+way to scroll and because reading a page end to end for a score should take a
+moment rather than a minute.
 
 The book and your place in it are kept in the browser's storage, so closing the
 tab does not lose either. One book at a time: a library is a different feature.
@@ -638,9 +648,15 @@ node tools/serve.mjs
 - <http://localhost:8137/tools/options-preview.html>, the settings page. It
   fetches `extension/options.html` rather than copying it, so it cannot drift
   out of step with what ships.
-- <http://localhost:8137/tools/reader-preview.html>, the book reader. Drop
-  `tools/sample.epub` on it, a two chapter book with ruby in it, rebuilt with
-  `node tools/make-epub.mjs tools/sample.epub`.
+- <http://localhost:8137/tools/reader-preview.html>, the book reader. It comes
+  with two sample books and a button that checks the reader against both.
+  `sample.epub` is what an epub looks like when everything goes right;
+  `sample-awkward.epub` is what they look like in the wild, with the chapter
+  names only in a `toc.ncx`, no headings in the text, paragraphs wrapped in a
+  blockquote, a chapter of bare divs, a chapter of line breaks, a space in a
+  filename, an uncompressed entry and a wordless cover. Rebuild them with
+  `node tools/make-epub.mjs tools/sample.epub plain` and
+  `node tools/make-epub.mjs tools/sample-awkward.epub awkward`.
 - <http://localhost:8137/tools/video-preview.html>, subtitles and recording.
 
 Edit the CSS, refresh.

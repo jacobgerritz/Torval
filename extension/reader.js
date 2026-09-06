@@ -189,17 +189,81 @@
       hrefs.set(item.getAttribute('id'), item.getAttribute('href'));
     }
 
+    const named = await tableOfContents(files, opf, base);
+
     const chapters = [];
     for (const ref of opf.querySelectorAll('spine itemref')) {
       const href = hrefs.get(ref.getAttribute('idref'));
       if (!href) continue;
-      const page = await xml(files, resolve(base, href), 'text/html');
+      const path = resolve(base, href);
+      const page = await xml(files, path, 'text/html');
       if (!page) continue;
       const found = paragraphsOf(page);
+      // Covers and blank pages have nothing to read and get no chapter.
       if (!found.paragraphs.length) continue;
-      for (const part of split(found.paragraphs, found.title)) chapters.push(part);
+      const name = named.get(path) || found.title;
+      for (const part of split(found.paragraphs, name)) chapters.push(part);
     }
     return { title, chapters };
+  }
+
+  /**
+   * Every kind of element a book keeps its text in.
+   *
+   * <div> is on the list because a great many books are built out of nothing
+   * else, and leaving it off meant those came out as one paragraph the
+   * length of the chapter.
+   */
+  const BLOCKS = 'p, div, h1, h2, h3, h4, h5, h6, li, blockquote, dd, dt, td, section, article, figcaption';
+
+  /**
+   * What the book calls its own chapters, as a path for each name.
+   *
+   * Worth the trouble because most books do not repeat the chapter name
+   * inside the chapter: without this, a book opens as Section 1, Section 2,
+   * Section 3, which is no way to find your place in it. EPUB 3 keeps the
+   * list in a nav document and EPUB 2 in a toc.ncx, and books in the wild
+   * are still mostly the second kind.
+   */
+  async function tableOfContents(files, opf, base) {
+    const named = new Map();
+
+    const items = [...opf.querySelectorAll('manifest item')];
+    const nav = items.find((item) =>
+      (item.getAttribute('properties') || '').split(/\s+/).indexOf('nav') !== -1);
+    if (nav) {
+      const path = resolve(base, nav.getAttribute('href'));
+      const doc = await xml(files, path, 'text/html');
+      const from = path.replace(/[^/]+$/, '');
+      if (doc) {
+        for (const link of doc.querySelectorAll('nav a[href]')) {
+          keep(named, resolve(from, link.getAttribute('href')), link.textContent);
+        }
+      }
+    }
+
+    const spine = opf.querySelector('spine');
+    const ncxId = spine && spine.getAttribute('toc');
+    const ncxItem = ncxId && items.find((item) => item.getAttribute('id') === ncxId);
+    if (ncxItem) {
+      const path = resolve(base, ncxItem.getAttribute('href'));
+      const doc = await xml(files, path);
+      const from = path.replace(/[^/]+$/, '');
+      if (doc) {
+        for (const point of doc.querySelectorAll('navPoint')) {
+          const label = point.querySelector('navLabel text');
+          const src = point.querySelector('content');
+          if (label && src) keep(named, resolve(from, src.getAttribute('src')), label.textContent);
+        }
+      }
+    }
+    return named;
+  }
+
+  /** The first name a file is given wins: later ones are its own sections. */
+  function keep(named, path, text) {
+    const name = tidy(text);
+    if (name && !named.has(path)) named.set(path, name);
   }
 
   /** Pull the readable text out of one page of a book. */
@@ -208,22 +272,35 @@
     // word would arrive with its own reading glued to it, so 食べる would
     // come out as 食た べる and match nothing at all.
     for (const el of doc.querySelectorAll('rt, rp, script, style')) el.remove();
+    // A line break ends a paragraph as far as reading is concerned, and some
+    // books use nothing else.
+    for (const br of doc.querySelectorAll('br')) br.replaceWith('\n');
 
     const heading = doc.querySelector('h1, h2, h3');
-    const blocks = doc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, dd');
-    let paragraphs = [...blocks]
-      .map((el) => el.textContent.replace(/\s+/g, ' ').trim())
-      .filter(Boolean);
 
-    // A page built entirely out of bare <div>s or <br>s has no blocks to find.
-    if (!paragraphs.length && doc.body) {
-      paragraphs = doc.body.textContent.split('\n').map((line) => line.trim()).filter(Boolean);
-    }
+    // Only the innermost blocks. A block holding another block is a wrapper,
+    // and taking its text as well would repeat every word inside it: a
+    // paragraph in a blockquote came out twice, once for each, which put it
+    // on the page twice and counted it twice in the score.
+    const blocks = [...doc.querySelectorAll(BLOCKS)].filter((el) => !el.querySelector(BLOCKS));
+    const holders = blocks.length ? blocks : (doc.body ? [doc.body] : []);
 
-    const title = heading ? heading.textContent.replace(/\s+/g, ' ').trim() : '';
+    let paragraphs = [];
+    for (const holder of holders) paragraphs = paragraphs.concat(linesOf(holder));
+
+    const title = heading ? tidy(heading.textContent) : '';
     // The heading is shown separately, so it should not also be the first line.
     if (title && paragraphs[0] === title) paragraphs.shift();
     return { title, paragraphs };
+  }
+
+  /** The text of one element, as the lines it is written in. */
+  function linesOf(el) {
+    return el.textContent.split('\n').map(tidy).filter(Boolean);
+  }
+
+  function tidy(text) {
+    return text.replace(/\s+/g, ' ').trim();
   }
 
   /** One chapter, cut into parts short enough to read and to measure. */
