@@ -1,11 +1,33 @@
-/* LLL, settings page. Same restraint as the popup, a little roomier. */
+/*
+ * LLL, settings.
+ *
+ * Same restraint as the popup, a little roomier. The page is a sidebar of
+ * places and a column of cards, and the cards are what does the work: a
+ * settings page where every line has the same weight is one you have to read
+ * from the top every time to find anything.
+ */
 
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+
+  --page: #0f1012;
+  --panel: #16171b;
+  --sunk: #101115;
+  --line: #23252a;
+  --line-soft: #1c1e22;
+  --ink: #e7e8ea;
+  --ink-bright: #f4f5f7;
+  --ink-quiet: #9aa0aa;
+  --ink-faint: #6e737c;
+  --accent: #4d7d8f;
+  --warn: #d08a7a;
+  --japanese: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+}
 
 body {
   margin: 0;
-  background: #0f1012;
-  color: #e7e8ea;
+  background: var(--page);
+  color: var(--ink);
   font: 14px/1.6 -apple-system, "Segoe UI", sans-serif;
 }
 
@@ -17,68 +39,90 @@ body {
 
 main {
   flex: 1;
-  max-width: 620px;
-  padding: 48px 32px;
-}
-
-h1 {
-  margin: 0 0 24px;
-  font-size: 14px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #6b7078;
-}
-
-h2 {
-  margin: 0 0 6px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-section { margin-bottom: 36px; }
-
-.note {
-  margin: 0 0 16px;
-  font-size: 13px;
-  color: #7d828b;
+  max-width: 660px;
+  padding: 44px 36px 80px;
 }
 
 /* --- the sidebar ----------------------------------------------------------
  * Headings you click, not tabs across the top: which section you are in and
- * how to get to the other one are the same piece of information, so they
- * belong in the same place rather than a page title above a separate row of
+ * how to get to the others are the same piece of information, so they belong
+ * in the same place rather than a page title above a separate row of
  * controls. */
 
 .sidebar {
-  flex: 0 0 200px;
+  position: sticky;
+  top: 0;
+  flex: 0 0 216px;
   box-sizing: border-box;
-  min-height: 100vh;
-  padding: 48px 16px;
-  background: #131417;
-  border-right: 1px solid #232529;
+  height: 100vh;
+  padding: 40px 14px;
+  background: #121316;
+  border-right: 1px solid var(--line);
+}
+
+h1 {
+  margin: 0 0 26px;
+  padding: 0 14px;
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  color: var(--ink-quiet);
 }
 
 .tab {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  margin-bottom: 2px;
-  padding: 9px 14px;
+  margin-bottom: 3px;
+  padding: 10px 14px;
   background: none;
+  /* A line down the left, transparent until it is wanted, so that nothing
+     moves sideways when a tab becomes the current one. */
   border: 0;
-  border-radius: 6px;
+  border-left: 2px solid transparent;
+  border-radius: 0 7px 7px 0;
   font: inherit;
   font-size: 14px;
   text-align: left;
-  color: #a9aeb8;
+  color: var(--ink-quiet);
   cursor: pointer;
 }
 
-.tab:hover { background: #1c1e22; color: #dfe1e5; }
+.tab:hover { background: #1b1d21; color: #dfe1e5; }
 
 .tab.current {
-  background: #202b33;
-  color: #f4f5f7;
+  background: #1c2226;
+  border-left-color: var(--accent);
+  color: var(--ink-bright);
+}
+
+/* --- cards ----------------------------------------------------------------
+ * One card per thing you might be here to do. */
+
+section {
+  margin-bottom: 18px;
+  padding: 22px 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-bright);
+}
+
+.note {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+/* A note that belongs to the field above it rather than to the card. */
+.hint {
+  margin: -2px 0 16px 162px;
+  font-size: 12.5px;
 }
 
 /* --- forms --------------------------------------------------------------- */
@@ -87,15 +131,15 @@ label {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 label > span {
-  flex: 0 0 170px;
-  color: #a9aeb8;
+  flex: 0 0 150px;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-quiet);
 }
 
 select,
@@ -103,20 +147,26 @@ input,
 textarea {
   flex: 1;
   min-width: 0;
-  padding: 7px 9px;
-  background: #17181b;
-  color: #e7e8ea;
+  padding: 9px 11px;
+  background: var(--sunk);
+  color: var(--ink);
   border: 1px solid #2c2e33;
-  border-radius: 4px;
+  border-radius: 7px;
   font: inherit;
 }
+
+select:hover,
+input:hover,
+textarea:hover { border-color: #383b41; }
 
 select:focus,
 input:focus,
 textarea:focus {
   outline: none;
-  border-color: #4a4f58;
+  border-color: var(--accent);
 }
+
+input[type="number"] { flex: 0 0 110px; }
 
 .actions,
 .row {
@@ -125,52 +175,79 @@ textarea:focus {
   gap: 12px;
 }
 
-.row { margin-top: 10px; }
+.row { margin-top: 12px; }
 .spacer { flex: 1; }
 
+/* Saving is the whole point of the Anki page, so it does not scroll away. */
+.actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  padding: 14px 0 18px;
+  background: var(--page);
+  border-top: 1px solid var(--line);
+}
+
 button {
-  padding: 8px 18px;
-  background: #24262b;
-  color: #e7e8ea;
+  padding: 9px 18px;
+  background: #23252a;
+  color: var(--ink);
   border: 1px solid #34373d;
-  border-radius: 4px;
+  border-radius: 7px;
   font: inherit;
   cursor: pointer;
 }
 
 button:hover { background: #2c2f35; }
-button:disabled { opacity: 0.5; cursor: default; }
+button:active { background: #212328; }
+button:disabled { opacity: 0.45; cursor: default; }
 
-/* The one button on a panel that does the thing the panel is for. */
+/* The one button on a card that does the thing the card is for. */
 .primary {
-  background: #2b3b45;
-  border-color: #3d5866;
-  color: #f4f5f7;
+  background: #263a44;
+  border-color: #3c5c6b;
+  color: var(--ink-bright);
 }
 
-.primary:hover { background: #34474f; }
+.primary:hover { background: #2e4753; }
 
-#status { font-size: 12px; color: #7d828b; }
-#status.error { color: #d08a7a; }
-#result.error { color: #d08a7a; }
+#status { font-size: 13px; color: var(--ink-faint); }
+#status.error { color: var(--warn); }
+#result.error { color: var(--warn); }
 
-/* --- known words --------------------------------------------------------- */
+/* --- word lists ---------------------------------------------------------- */
+
+/* The heading, the count and the search box are one line of furniture rather
+   than three stacked ones, which is what leaves room for the list itself. */
+.parting {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 34px 0 6px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line);
+}
+.parting.first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 
 .count {
   margin: 0;
-  font-size: 32px;
+  font-size: 15px;
   font-weight: 600;
-  color: #f4f5f7;
+  color: var(--accent);
 }
 
-.count-note { margin-bottom: 32px; }
+.count-note { margin-bottom: 18px; }
 
 textarea {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 12px;
-  font: 14px/1.6 "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+  padding: 11px 13px;
+  font: 15px/1.7 var(--japanese);
   resize: vertical;
 }
 
@@ -180,24 +257,25 @@ input[type="file"] {
   background: none;
   border: 0;
   font-size: 12px;
-  color: #a9aeb8;
+  color: var(--ink-quiet);
 }
 
-.search { margin-bottom: 12px; }
+.search { margin-bottom: 14px; }
 .search > span { flex: 0 0 auto; }
 
 .words {
   max-height: 420px;
   overflow-y: auto;
-  border: 1px solid #232529;
-  border-radius: 4px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 
-.words .note { margin: 0; padding: 14px; }
+.words .note { margin: 0; padding: 16px; }
 
 .more {
-  margin: 6px 0 0;
-  font-size: 11px;
+  margin: 8px 0 0;
+  font-size: 12px;
   color: #5f646c;
 }
 
@@ -205,26 +283,27 @@ input[type="file"] {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 5px 10px;
+  padding: 7px 12px;
 }
 
-.word-row + .word-row { border-top: 1px solid #1c1e22; }
-.word-row:hover { background: #17181b; }
+.word-row + .word-row { border-top: 1px solid var(--line-soft); }
+.word-row:hover { background: #16171b; }
 
 .word-row .word {
   flex: 1;
   font-size: 17px;
-  font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
-  color: #f4f5f7;
+  font-family: var(--japanese);
+  color: var(--ink-bright);
 }
 
 .word-row .when {
   font-size: 12px;
   color: #5f646c;
+  font-variant-numeric: tabular-nums;
 }
 
 .word-row .remove {
-  padding: 0 5px;
+  padding: 0 6px;
   background: none;
   border: 0;
   font-size: 17px;
@@ -232,18 +311,4 @@ input[type="file"] {
   color: #4a4f57;
 }
 
-.word-row .remove:hover { background: none; color: #d08a7a; }
-
-/* The two word lists share a page, since they are the same decision with
-   different answers and a word moves between them. A rule and a heading are
-   enough to say where one stops and the other starts. */
-.parting {
-  margin: 44px 0 4px;
-  padding-top: 28px;
-  border-top: 1px solid #26282d;
-}
-.parting.first {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: 0;
-}
+.word-row .remove:hover { background: none; color: var(--warn); }

@@ -43,10 +43,9 @@
         <span>Audio lead-in</span>
         <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.25">
       </label>
-      <p class="note">
-        Roughly how many seconds of sound to keep from before the line, so the
-        first word is not clipped. Rough because a recorder swallows an
-        unpredictable moment at the start, which LLL allows for.
+      <p class="note hint">
+        Roughly, because a recorder swallows an unpredictable moment at the
+        start, which LLL allows for.
       </p>
     </section>
 
@@ -67,8 +66,7 @@
   <!-- ------------------------------------------------------------------ -->
 
   <div class="panel" id="panel-words" hidden>
-    <h2 class="parting first">Known words</h2>
-    <div class="count" id="count">…</div>
+    <div class="parting first"><h2>Known words</h2><span class="count" id="count">…</span></div>
     <p class="note count-note">
       What a page is measured against. Press ✓ in the popup, or 2.
     </p>
@@ -102,8 +100,7 @@
       <p id="more" class="note more" hidden></p>
     </section>
 
-    <h2 class="parting">Ignored words</h2>
-    <div class="count" id="count-ignored">…</div>
+    <div class="parting"><h2>Ignored words</h2><span class="count" id="count-ignored">…</span></div>
     <p class="note count-note">
       Names, English, misreadings. Left out of the score entirely rather
       than counting either way. Press ⊘ in the popup, or 3.
@@ -124,10 +121,11 @@
 
   <div class="panel" id="panel-reader" hidden>
     <section>
-      <h2>Read a book in LLL</h2>
+      <h2>Your books</h2>
       <p class="note">
-        An epub or a txt file, read in a tab of its own, with hovering,
-        marking and the comprehension bar working as they do on any page.
+        Epub and txt files, read in a tab of their own, with hovering, marking
+        and the comprehension bar working as they do on any page. The shelf
+        says how much of each book you would understand.
       </p>
       <p class="row">
         <button id="open-reader" class="primary">Open the reader</button>

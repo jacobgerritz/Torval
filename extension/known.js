@@ -39,7 +39,6 @@
   browsePanel({
     list: 'knownList',
     forget: 'forgetWords',
-    noun: 'known word',
     ids: { count: 'count', search: 'search', list: 'list', more: 'more' },
     empty: 'Nothing here yet. Press ✓ on a word in the popup, or paste a text above.'
   });
@@ -47,7 +46,6 @@
   browsePanel({
     list: 'ignoredList',
     forget: 'forgetIgnored',
-    noun: 'ignored word',
     ids: {
       count: 'count-ignored', search: 'search-ignored',
       list: 'list-ignored', more: 'more-ignored'
@@ -156,7 +154,8 @@
     }
 
     function setCount(n) {
-      countEl.textContent = n.toLocaleString('en-US') + ' ' + config.noun + (n === 1 ? '' : 's');
+      // Just the number: it sits next to the heading that says which list it is.
+      countEl.textContent = n.toLocaleString('en-US');
     }
   }
 
