@@ -10,6 +10,7 @@
 
 body {
   margin: 0;
+  padding-top: 40px;
   background: #0f1012;
   color: #d7d9dd;
   font: 15px/1.6 -apple-system, "Segoe UI", sans-serif;
@@ -17,14 +18,15 @@ body {
 
 .chrome {
   position: sticky;
-  top: 0;
+  /* The comprehension bar sits across the very top of every page and stays
+     down on this one, so everything else starts below it. */
+  top: 40px;
   z-index: 5;
   display: flex;
   align-items: center;
   gap: 12px;
   box-sizing: border-box;
-  /* Room on the right for the comprehension bar's own handle. */
-  padding: 10px 130px 10px 20px;
+  padding: 10px 20px;
   background: #131417;
   border-bottom: 1px solid #212328;
 }
@@ -84,3 +86,68 @@ article h1, article h2, article h3 {
 
 /* Dragging a file anywhere over the page is the same as opening it. */
 body.dropping { outline: 2px dashed #dba35f; outline-offset: -10px; }
+
+/* ---------------------------------------------------------------------------
+   The shelf: what you have, and how much of each you would follow, before
+   deciding what to read.
+   --------------------------------------------------------------------------- */
+
+.shelf {
+  max-width: 40em;
+  margin: 40px auto 120px;
+  padding: 0 24px;
+}
+
+.books { display: flex; flex-direction: column; }
+
+.book {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid #1d1f23;
+}
+.book:last-child { border-bottom: 0; }
+
+/* The whole title block is the way in, so there is no small target to find. */
+.open-book {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 14px 4px;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  text-align: left;
+  cursor: pointer;
+}
+.open-book:hover { background: #17181b; }
+
+.book-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #eceef1;
+  font-size: 16px;
+}
+.book-note { color: #767b84; font-size: 13px; }
+
+.book-score {
+  min-width: 3.4em;
+  text-align: right;
+  font-size: 17px;
+  font-weight: 600;
+  color: #5a5f67;
+  font-variant-numeric: tabular-nums;
+}
+
+.book .remove {
+  padding: 4px 9px;
+  background: none;
+  border: 0;
+  color: #5a5f67;
+  font-size: 17px;
+  line-height: 1;
+}
+.book .remove:hover { background: #24262b; color: #d7d9dd; }

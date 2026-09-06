@@ -32,6 +32,10 @@
   .preview-warning b { color: #fff; }
 </style>
 
+<script src="../extension/japanese.js"></script>
+<script src="../extension/deinflect.js"></script>
+<script src="../extension/lookup.js"></script>
+<script src="preview-words.js"></script>
 <script>
 // The book is kept in this tab's own session storage rather than in the
 // extension's. It survives a reload, so coming back to a book can be tried
@@ -40,8 +44,6 @@ const stored = JSON.parse(sessionStorage.getItem("lll-preview-store") || "{}");
 const remember = () => {
   try { sessionStorage.setItem("lll-preview-store", JSON.stringify(stored)); } catch (e) {}
 };
-const known = new Set();
-const ignored = new Set();
 
 window.browser = {
   storage: {
@@ -56,7 +58,11 @@ window.browser = {
         for (const name of names) if (name in stored) out[name] = stored[name];
         return out;
       },
-      async set(values) { Object.assign(stored, values); remember(); }
+      async set(values) { Object.assign(stored, values); remember(); },
+      async remove(keys) {
+        for (const key of (typeof keys === 'string' ? [keys] : keys)) delete stored[key];
+        remember();
+      }
     },
     onChanged: { addListener() {} }
   },
@@ -67,11 +73,40 @@ window.browser = {
     async sendMessage(msg) {
       switch (msg.type) {
         case 'status': return { status: { state: 'ready', progress: 1 } };
-        case 'tags': return {};
-        case 'lookup': return { status: { state: 'ready' }, groups: [], start: 0 };
-        case 'comprehension': return { ok: true, result: { total: 0, known: 0, counts: {} } };
-        case 'wordPlaces':
-          return { ok: true, result: { total: 0, known: 0, counts: {}, places: {}, unmarked: [] } };
+        case 'tags': return TAGS;
+        case 'lookup': {
+          const found = typeof msg.point === 'number'
+            ? await LLLLookup.hover(msg.text, msg.point, db)
+            : { start: 0, groups: await LLLLookup.search(msg.text, db) };
+          for (const group of found.groups) {
+            for (const hit of group.hits) {
+              hit.band = LLLLookup.frequencyBand(hit.q);
+              hit.shared = LLLLookup.sharedTags(hit.entry);
+              hit.sharedPos = LLLLookup.sharedPos(hit.entry);
+              hit.known = known.has(hit.word);
+              hit.ignored = ignored.has(hit.word);
+            }
+          }
+          return { status: { state: 'ready' }, groups: found.groups, start: found.start };
+        }
+        case 'comprehension': {
+          const tokens = await LLLLookup.locateTokens(msg.text, db);
+          return { ok: true, result: LLLLookup.coverage(tokens, known, ignored) };
+        }
+        case 'wordPlaces': {
+          const tokens = await LLLLookup.locateTokens(msg.text, db);
+          const places = {};
+          const unmarked = [];
+          tokens.forEach((t, i) => {
+            if (!places[t.word]) {
+              places[t.word] = [];
+              if (ignored.has(t.word) || LLLLookup.isKnown(t, known)) unmarked.push(t.word);
+            }
+            places[t.word].push(t.start, t.length, i % 2);
+          });
+          const score = LLLLookup.coverage(tokens, known, ignored);
+          return { ok: true, result: { ...score, places, unmarked } };
+        }
         case 'setKnown': return { ok: true, result: { word: msg.word, on: msg.known } };
         case 'setIgnored': return { ok: true, result: { word: msg.word, on: msg.ignored } };
         default: return { ok: true, result: null };

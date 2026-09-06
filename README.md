@@ -370,10 +370,19 @@ about twelve thousand characters is cut into parts, both because that is a long
 way to scroll and because reading a page end to end for a score should take a
 moment rather than a minute.
 
-The book and your place in it are kept in the browser's storage, so closing the
+The reader opens on a shelf: every book you have added, with how much of each
+one you would understand beside it, coloured the same way the bar is. That
+estimate comes from a sample taken evenly through the book rather than from the
+whole of it, because the whole of a novel is a minute of reading and the answer
+would not move. Books fill in one at a time as they are worked out.
+
+The bar stays down inside the reader instead of tucking itself away, since a
+page that exists only to be read in has room for it, and hiding the one number
+you are there for would be strange.
+
+Books and your place in each are kept in the browser's storage, so closing the
 tab loses neither. Your place is the chapter and how far down it you had read,
-since a chapter is several screens. One book at a time: a library is a
-different feature.
+since a chapter is several screens.
 
 ---
 

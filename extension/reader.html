@@ -4,21 +4,26 @@
 <link rel="stylesheet" href="reader.css">
 
 <header class="chrome">
-  <span class="title" id="title">LLL reader</span>
+  <button id="back" hidden title="All your books">‹ Books</button>
+  <span class="title" id="title">Your books</span>
   <select id="chapters" hidden></select>
   <span class="spacer"></span>
   <button id="prev" hidden title="Previous chapter">‹</button>
   <button id="next" hidden title="Next chapter">›</button>
   <label class="open">
-    <span>Open a book</span>
+    <span>Add a book</span>
     <input type="file" id="book" accept=".epub,.txt,text/plain,application/epub+zip">
   </label>
 </header>
 
-<article id="page" lang="ja"></article>
+<section class="shelf" id="shelf" hidden>
+  <div class="books" id="list"></div>
+</section>
+
+<article id="page" lang="ja" hidden></article>
 
 <div class="empty" id="empty">
-  <p>Drop an <b>epub</b> or <b>txt</b> file here, or open one above.</p>
+  <p>Drop an <b>epub</b> or <b>txt</b> file here, or add one above.</p>
   <p class="note" id="trouble"></p>
 </div>
 

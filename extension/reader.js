@@ -1,47 +1,61 @@
 /*
  * LLL, the reader
  *
- * Opens an epub or a plain text file and shows it as an ordinary page, which
- * is the whole trick: this page loads LLL's own scripts, so hovering, the
- * popup, the marking and the comprehension bar all work on a book exactly as
- * they do on a website. Nothing here knows anything about dictionaries.
+ * Opens epub and plain text files and shows them as ordinary pages, which is
+ * the whole trick: this page loads LLL's own scripts, so hovering, the popup,
+ * the marking and the comprehension bar all work on a book exactly as they do
+ * on a website. Nothing here knows anything about dictionaries.
  *
- * A book is kept in the browser's storage so that closing the tab does not
- * lose your place. One book at a time, since a library is a different feature
- * from a reader and only one of them was asked for.
+ * Books are kept in the browser's storage, with the shelf as the front page:
+ * what you have, and how much of each you would understand, before you decide
+ * what to read. The estimate is taken from a sample spread through the book
+ * rather than from the whole of it, since the whole of a novel is a minute of
+ * reading and the answer would not change.
  *
  * Chapters are shown one at a time rather than as one long scroll. That is
  * what the spine of an epub says to do anyway, and it keeps the page short
- * enough that reading it end to end for a comprehension score takes a moment
- * rather than a minute.
+ * enough that reading it end to end for a comprehension score takes a moment.
  */
 
 'use strict';
 
 (function () {
   const api = globalThis.browser || globalThis.chrome;
-  const KEY = 'book';
-  const PLACE = 'bookAt';
-  const DOWN = 'bookScroll';
+  const BOOKS = 'books';        // everything on the shelf
+  const PLACE = 'bookPlace';    // where you were in each of them
 
   // Longest chapter shown in one go. Some epubs are a whole novel in a single
   // file, which is a page nobody wants to scroll and a lot to read through.
   const PART = 12000;
 
+  // How much of a book is read to estimate how much of it you would follow.
+  // Enough to be steady, little enough to be quick: the shelf should fill in
+  // while you look at it, not after.
+  const SAMPLE = 4000;
+
   const els = {
+    back: document.getElementById('back'),
     title: document.getElementById('title'),
     chapters: document.getElementById('chapters'),
     prev: document.getElementById('prev'),
     next: document.getElementById('next'),
     file: document.getElementById('book'),
+    shelf: document.getElementById('shelf'),
+    list: document.getElementById('list'),
     page: document.getElementById('page'),
     empty: document.getElementById('empty'),
     trouble: document.getElementById('trouble')
   };
 
-  let book = null;
-  let showing = 0;   // which chapter, kept here rather than in the book
-  let saving = null; // the timer that writes where you are down
+  // The bar belongs down on a page that exists only to be read in.
+  if (typeof LLLBar !== 'undefined') LLLBar.alwaysDown();
+
+  let books = [];
+  let book = null;   // the one being read, or null on the shelf
+  let places = {};   // book id -> { at, down }
+  let showing = 0;
+  let saving = null;
+  const estimates = new Map();   // book id -> percent, for this visit
 
   start();
 
@@ -53,23 +67,13 @@
     els.chapters.addEventListener('change', () => show(Number(els.chapters.value)));
     els.prev.addEventListener('click', () => show(showing - 1));
     els.next.addEventListener('click', () => show(showing + 1));
+    els.back.addEventListener('click', () => shelf());
 
     document.addEventListener('dragover', (e) => {
       e.preventDefault();
       document.body.classList.add('dropping');
     });
     document.addEventListener('dragleave', () => document.body.classList.remove('dropping'));
-
-    // A chapter is a good few screens, so the chapter alone is not where you
-    // were. Written down a moment after you stop moving rather than on every
-    // scroll event, which fires all the way down the page.
-    window.addEventListener('scroll', () => {
-      if (!book) return;
-      clearTimeout(saving);
-      saving = setTimeout(() => {
-        api.storage.local.set({ [DOWN]: window.scrollY }).catch(() => {});
-      }, 400);
-    });
     document.addEventListener('drop', (e) => {
       e.preventDefault();
       document.body.classList.remove('dropping');
@@ -77,30 +81,198 @@
       if (file) load(file);
     });
 
-    const stored = await api.storage.local.get([KEY, PLACE, DOWN]);
-    if (stored && stored[KEY]) {
-      book = stored[KEY];
-      show(stored[PLACE] || 0, stored[DOWN] || 0);
+    // A chapter is a good few screens, so the chapter alone is not where you
+    // were. Written down a moment after you stop moving rather than on every
+    // scroll event, which fires all the way down the page.
+    window.addEventListener('scroll', () => {
+      if (!book) return;
+      clearTimeout(saving);
+      saving = setTimeout(() => savePlace(book.id, showing, window.scrollY), 400);
+    });
+
+    await gather();
+    shelf();
+  }
+
+  /** Everything on the shelf, and where you were in each of them. */
+  async function gather() {
+    const stored = await api.storage.local.get([BOOKS, PLACE, 'book', 'bookAt', 'bookScroll']);
+    books = (stored && stored[BOOKS]) || [];
+    places = (stored && stored[PLACE]) || {};
+
+    // The reader used to hold one book, under its own name. Carry it across
+    // rather than lose somebody's place in it.
+    if (stored && stored.book && !books.length) {
+      const carried = { id: name(), title: stored.book.title, chapters: stored.book.chapters };
+      books = [carried];
+      places = { [carried.id]: { at: stored.bookAt || 0, down: stored.bookScroll || 0 } };
+      await api.storage.local.set({ [BOOKS]: books, [PLACE]: places }).catch(() => {});
+      if (api.storage.local.remove) {
+        await api.storage.local.remove(['book', 'bookAt', 'bookScroll']).catch(() => {});
+      }
     }
+  }
+
+  function name() {
+    return 'b' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+  }
+
+  // -------------------------------------------------------------------------
+  // The shelf
+  // -------------------------------------------------------------------------
+
+  function shelf() {
+    book = null;
+    clearTimeout(saving);
+    els.page.textContent = '';
+    els.page.hidden = true;
+    els.shelf.hidden = false;
+    els.back.hidden = true;
+    els.chapters.hidden = true;
+    els.prev.hidden = els.next.hidden = true;
+    els.title.textContent = 'Your books';
+    els.empty.hidden = books.length > 0;
+    if (!books.length) say('');
+    document.title = 'LLL reader';
+
+    els.list.textContent = '';
+    for (const shelved of books) els.list.appendChild(row(shelved));
+
+    // The bar measures the page it is on, and the shelf is not Japanese.
+    document.dispatchEvent(new CustomEvent('lll-reread'));
+    fill();
+  }
+
+  function row(shelved) {
+    const line = document.createElement('div');
+    line.className = 'book';
+
+    const open = document.createElement('button');
+    open.className = 'open-book';
+    open.addEventListener('click', () => read(shelved.id));
+
+    const title = document.createElement('span');
+    title.className = 'book-title';
+    title.textContent = shelved.title;
+
+    const where = places[shelved.id];
+    const many = shelved.chapters.length;
+    const note = document.createElement('span');
+    note.className = 'book-note';
+    note.textContent = many > 1
+      ? many + ' chapters' + (where && where.at ? ', you are in ' + (where.at + 1) : '')
+      : 'one chapter';
+
+    open.append(title, note);
+
+    const score = document.createElement('span');
+    score.className = 'book-score';
+    score.dataset.id = shelved.id;
+    score.textContent = '…';
+
+    const drop = document.createElement('button');
+    drop.className = 'remove';
+    drop.textContent = '×';
+    drop.title = 'Take this book off the shelf';
+    drop.addEventListener('click', () => forget(shelved.id));
+
+    line.append(open, score, drop);
+    return line;
+  }
+
+  /**
+   * Put a number against each book, one at a time.
+   *
+   * In order and not all at once: the background reads one text at a time
+   * anyway, and asking for six at once only means waiting for all six before
+   * seeing any of them.
+   */
+  async function fill() {
+    for (const shelved of books) {
+      const percent = await estimate(shelved);
+      const cell = els.list.querySelector('.book-score[data-id="' + shelved.id + '"]');
+      if (!cell) return;   // the shelf went away while this was being worked out
+      if (percent === null) { cell.textContent = ''; continue; }
+      cell.textContent = percent + '%';
+      if (typeof LLLBar !== 'undefined') cell.style.color = LLLBar.colourFor(percent);
+    }
+  }
+
+  async function estimate(shelved) {
+    if (estimates.has(shelved.id)) return estimates.get(shelved.id);
+    let percent = null;
+    try {
+      const reply = await api.runtime.sendMessage({ type: 'comprehension', text: sample(shelved) });
+      if (reply && reply.ok && reply.result && reply.result.total) {
+        percent = Math.round((reply.result.known / reply.result.total) * 100);
+      }
+    } catch (err) { /* the dictionary is not ready; the shelf still works */ }
+    if (percent !== null) estimates.set(shelved.id, percent);
+    return percent;
+  }
+
+  /**
+   * A sample of a book, taken evenly from end to end.
+   *
+   * From the front would be the easy way and the wrong one: a novel opens with
+   * names and scene setting and reads nothing like its middle.
+   */
+  function sample(shelved) {
+    const all = [];
+    for (const chapter of shelved.chapters) {
+      for (const paragraph of chapter.paragraphs) all.push(paragraph);
+    }
+    if (!all.length) return '';
+    const total = all.reduce((sum, p) => sum + p.length, 0);
+    if (total <= SAMPLE) return all.join('\n');
+
+    const average = total / all.length;
+    const want = Math.max(1, Math.min(all.length, Math.ceil(SAMPLE / average)));
+    const step = all.length / want;
+    const out = [];
+    for (let i = 0; i < want; i++) out.push(all[Math.floor(i * step)]);
+    return out.join('\n');
+  }
+
+  async function forget(id) {
+    books = books.filter((b) => b.id !== id);
+    delete places[id];
+    estimates.delete(id);
+    await api.storage.local.set({ [BOOKS]: books, [PLACE]: places }).catch(() => {});
+    shelf();
+  }
+
+  // -------------------------------------------------------------------------
+  // Reading one of them
+  // -------------------------------------------------------------------------
+
+  function read(id) {
+    book = books.find((b) => b.id === id) || null;
+    if (!book) return;
+    els.shelf.hidden = true;
+    els.page.hidden = false;
+    els.back.hidden = false;
+    els.empty.hidden = true;
+    document.title = book.title;
+    const where = places[id] || {};
+    show(where.at || 0, where.down || 0);
   }
 
   async function load(file) {
     say('Reading ' + file.name + '…');
     try {
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
-      const read = isEpub ? await readEpub(file) : await readText(file);
-      if (!read.chapters.length) throw new Error('There is no text in that file.');
-      book = { title: read.title || file.name, chapters: read.chapters };
-      await api.storage.local.set({ [KEY]: book, [PLACE]: 0 }).catch(tooBig);
-      show(0);
+      const read0 = isEpub ? await readEpub(file) : await readText(file);
+      if (!read0.chapters.length) throw new Error('There is no text in that file.');
+      const added = { id: name(), title: read0.title || file.name, chapters: read0.chapters };
+      books = books.concat([added]);
+      await api.storage.local.set({ [BOOKS]: books }).catch(tooBig);
+      say('');
+      read(added.id);
     } catch (err) {
       say(err.message, true);
     }
   }
-
-  // -------------------------------------------------------------------------
-  // Showing it
-  // -------------------------------------------------------------------------
 
   function show(index, down) {
     if (!book) return;
@@ -121,7 +293,6 @@
     }
 
     els.title.textContent = book.title;
-    els.empty.hidden = true;
     els.chapters.hidden = book.chapters.length < 2;
     els.prev.hidden = els.next.hidden = book.chapters.length < 2;
     els.prev.disabled = at === 0;
@@ -141,18 +312,25 @@
     // Turning to a chapter starts at the top of it. Coming back to the book
     // starts where you stopped reading.
     window.scrollTo(0, down || 0);
-    // Only the place, not the book. A novel is a few megabytes, and writing
-    // all of it out again to record that you turned a page is a lot of work
-    // to record one number.
     clearTimeout(saving);
-    api.storage.local.set({ [PLACE]: at, [DOWN]: down || 0 }).catch(() => {});
+    savePlace(book.id, at, down || 0);
     // The page has been replaced, so whatever was measured and marked on it
     // belongs to the last chapter. content.js listens for this.
     document.dispatchEvent(new CustomEvent('lll-reread'));
   }
 
+  /**
+   * Where you are in one book. Only the place, never the book: a novel is a
+   * few megabytes, and writing all of it out again to record that you turned a
+   * page is a lot of work to record one number.
+   */
+  function savePlace(id, at, down) {
+    places[id] = { at: at, down: down };
+    api.storage.local.set({ [PLACE]: places }).catch(() => {});
+  }
+
   function say(text, bad) {
-    els.empty.hidden = false;
+    els.empty.hidden = !text && books.length > 0;
     els.trouble.className = bad ? 'note error' : 'note';
     els.trouble.textContent = text;
   }

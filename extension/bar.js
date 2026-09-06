@@ -31,6 +31,7 @@ var LLLBar = (function () {
 
   var expanded = false;
   var pinned = false;
+  var always = false;   // this page keeps the bar down, whatever the setting
   var retractTimer = null;
 
   var HANDLE_TITLE = 'How much of this page you understand';
@@ -44,9 +45,25 @@ var LLLBar = (function () {
   // 1.5 seconds after the page itself loads), this has almost always already
   // resolved.
   api.storage.local.get('barPinned').then(function (stored) {
+    if (always) return;
     pinned = !!stored.barPinned;
     if (host && pinned && !expanded) setExpanded(true);
   }).catch(function () {});
+
+  /**
+   * Keep the bar down on this page whatever the setting says, and take away
+   * the pin, since there is nothing to unpin it from. The reader asks for
+   * this: a page that exists only to be read in has room for a bar, and
+   * hiding the one number the reader is there for would be strange.
+   */
+  function alwaysDown() {
+    always = true;
+    pinned = true;
+    if (host) {
+      setExpanded(true);
+      els.pin.hidden = true;
+    }
+  }
 
   /**
    * Show a fresh reading. `counts` is how many times each word was said, kept
@@ -127,6 +144,15 @@ var LLLBar = (function () {
     stopWaiting();
     if (!host) return;
     if (data && data.total) { idle(); return; }
+    // On a page that keeps the bar down, taking it away is worse than having
+    // nothing to say: the shelf in the reader has no Japanese on it, and a bar
+    // that vanished there and came back in a book would look broken.
+    if (always) {
+      idle();
+      els.score.textContent = '';
+      els.detail.textContent = 'nothing to read here yet';
+      return;
+    }
     host.style.display = 'none';
   }
 
@@ -161,12 +187,25 @@ var LLLBar = (function () {
     els.score.textContent = percent + '%';
     els.detail.textContent = data.known.toLocaleString('en-US') + ' of ' +
       data.total.toLocaleString('en-US') + ' words known';
-    // Green when a text is comfortable, amber when it is a stretch, plain when
-    // it is out of reach, a colour read at a glance where a number needs
-    // thinking about. The line at 90% is the usual one for reading without
-    // stopping every sentence.
-    els.score.className = 'score ' + (percent >= 90 ? 'easy' : percent >= 70 ? 'ok' : 'hard');
+    // A colour is read at a glance where a number has to be thought about.
+    els.score.style.color = colourFor(percent);
     host.style.display = document.fullscreenElement ? 'none' : 'block';
+  }
+
+  /**
+   * What a comprehension percentage looks like: red where a text is out of
+   * reach, amber where it is a stretch, green where it can be read without
+   * stopping every sentence.
+   *
+   * Sliding rather than stepping, because the difference between 71% and 89%
+   * is the difference between hard work and nearly comfortable, and three
+   * fixed bands paint both of those the same. Nothing below about 30% is any
+   * more readable than anything else below it, so the scale gives that end
+   * one colour and spends its range where reading actually happens.
+   */
+  function colourFor(percent) {
+    var hue = Math.max(0, Math.min(120, (percent - 30) * 1.7));
+    return 'hsl(' + Math.round(hue) + ' 48% 62%)';
   }
 
   function build() {
@@ -230,6 +269,7 @@ var LLLBar = (function () {
 
     paintPin();
     setExpanded(pinned);
+    if (always) els.pin.hidden = true;
 
     // A video played full screen should be a video, not a video with a bar
     // across it. The page's own reading is unaffected, it comes straight back
@@ -258,6 +298,7 @@ var LLLBar = (function () {
   }
 
   function setPinned(value) {
+    if (always) return;
     pinned = value;
     try { api.storage.local.set({ barPinned: pinned }); } catch (err) { /* not fatal */ }
     paintPin();
@@ -312,9 +353,6 @@ var LLLBar = (function () {
     '.bar.expanded { transform: translateY(0); }',
     '.mark { font-size: 12px; letter-spacing: 0.08em; color: #5a5f67; }',
     '.score { font-size: 17px; font-weight: 600; color: #f4f5f7; }',
-    '.score.easy { color: #7fb488; }',
-    '.score.ok { color: #c7ab72; }',
-    '.score.hard { color: #b8868a; }',
     '.detail { color: #767b84; }',
     '.spacer { flex: 1; }',
     'button {',
@@ -334,7 +372,9 @@ var LLLBar = (function () {
     busy: busy,
     quiet: quiet,
     restate: restate,
-    onRefresh: function (fn) { onRefresh = fn; }
+    onRefresh: function (fn) { onRefresh = fn; },
+    alwaysDown: alwaysDown,
+    colourFor: colourFor
   };
 })();
 

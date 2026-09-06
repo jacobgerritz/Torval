@@ -49,79 +49,8 @@
 <script src="../extension/japanese.js"></script>
 <script src="../extension/deinflect.js"></script>
 <script src="../extension/lookup.js"></script>
+<script src="preview-words.js"></script>
 <script>
-// --- a dozen real JMdict entries, copied out of the built data ---------------
-const SAMPLE = [
-  { k: ['日本語'], kv: 1, q: 4705, r: ['にほんご'], f: 70, s: [{ p: ['n'], g: ['Japanese (language)'] }] },
-  { k: ['日本'], kv: 1, q: 1146, r: ['にほん'], f: 80, s: [{ p: ['n'], g: ['Japan'] }] },
-  { k: ['勉強'], kv: 1, q: 1329, r: ['べんきょう'], f: 60, s: [
-      { p: ['n', 'vs', 'vt'], g: ['study', 'diligence'] },
-      { p: ['n', 'vs', 'vt'], g: ['discount', 'reduction'] },
-      { p: ['n', 'vs', 'vt'], g: ['experience', 'lesson (for the future)'] }] },
-  { k: ['新しい'], kv: 1, q: 699, r: ['あたらしい'], f: 65, s: [{ p: ['adj-i'], g: ['new', 'novel', 'fresh', 'recent', 'latest'] }] },
-  { k: ['車'], kv: 1, q: 745, r: ['くるま'], f: 55, s: [{ p: ['n'], g: ['car', 'automobile', 'vehicle'] }, { p: ['n'], g: ['wheel'] }] },
-  { k: ['買う'], kv: 1, q: 334, r: ['かう'], f: 58, s: [{ p: ['v5u', 'vt'], g: ['to buy', 'to purchase'] },
-      { p: ['v5u', 'vt'], g: ['to value', 'to have a high opinion of'] },
-      { p: ['v5u', 'vt'], g: ['to incur (someone’s anger)'] }] },
-  { k: ['図書館'], kv: 1, q: 7261, r: ['としょかん'], f: 45, s: [{ p: ['n'], g: ['library'] }] },
-  { k: ['図書'], kv: 1, q: 24380, r: ['としょ'], f: 20, s: [{ p: ['n'], g: ['books'] }] },
-  { k: ['読む'], kv: 1, q: 414, r: ['よむ'], f: 62, s: [{ p: ['v5m', 'vt'], g: ['to read'] },
-      { p: ['v5m', 'vt'], g: ['to recite (e.g. a sutra)', 'to chant'] },
-      { p: ['v5m', 'vt'], g: ['to predict', 'to guess', 'to forecast'] },
-      { p: ['v5m', 'vt'], g: ['to count'] }] },
-  { k: ['食べる'], kv: 1, q: 184, r: ['たべる'], f: 66, s: [{ p: ['v1', 'vt'], g: ['to eat'] },
-      { p: ['v1', 'vt'], g: ['to live on (e.g. a salary)', 'to live off', 'to subsist on'] }] },
-  { k: ['親切'], kv: 1, q: 4986, r: ['しんせつ'], f: 40, s: [{ p: ['adj-na', 'n'], m: ['uk'], g: ['kind', 'gentle', 'friendly'] }] },
-  { k: ['料理'], kv: 1, q: 1585, r: ['りょうり'], f: 52, s: [{ p: ['n', 'vs', 'vt'], g: ['cooking', 'cookery', 'cuisine'] },
-      { p: ['n', 'vs', 'vt'], g: ['dealing with', 'handling', 'administration'] }] },
-  { k: ['上手'], kv: 1, q: 1731, r: ['じょうず'], f: 48, s: [{ p: ['adj-na', 'n'], g: ['skill', 'skillful', 'good at'] }] },
-  { k: ['本'], kv: 1, q: 233, r: ['ほん'], f: 75, s: [{ p: ['n'], g: ['book', 'volume', 'script'] }, { p: ['pref'], g: ['this', 'present'] }] },
-  { k: ['人'], kv: 1, q: 35, r: ['ひと'], f: 90, s: [{ p: ['n'], g: ['person', 'someone'] }, { p: ['n'], g: ['human beings', 'mankind'] }] },
-  // No kanji spelling at all, for testing that hovering any character of a
-  // multi-character word finds the whole word, not just wherever the cursor
-  // happened to land inside it.
-  { k: [], kv: 0, q: 93550, r: ['ネカフェ'], f: 0, s: [{ p: ['n'], m: ['abbr'], g: ['Internet cafe'] }] },
-  // A run of katakana with a small kana inside it, plus the two words a
-  // careless boundary used to manufacture out of it by cutting ジャ in half.
-  { k: [], kv: 0, q: 40000, r: ['ジャパニーズ'], f: 0, s: [{ p: ['n'], g: ['Japanese (people, language, style)'] }] },
-  { k: ['鰺'], kv: 1, q: 22000, r: ['アジ'], f: 0, s: [{ p: ['n'], m: ['uk'], g: ['horse mackerel'] }] },
-  { k: [], kv: 0, q: 30000, r: ['ニーズ'], f: 0, s: [{ p: ['n'], g: ['needs'] }] },
-  { k: ['仲間'], kv: 1, q: 900, r: ['なかま'], f: 50, s: [{ p: ['n'], g: ['companion', 'fellow', 'comrade'] }] },
-  // A second, separate entry spelled exactly like the 本 above it. Two entries
-  // sharing a spelling is ordinary, こと is both a particle and a noun, and
-  // it means one popup can show the same word twice, each with its own tick.
-  { k: ['本'], kv: 1, q: 8000, r: ['ほん'], f: 10, s: [{ p: ['ctr'], g: ['counter for long cylindrical things'] }] }
-];
-
-const entries = SAMPLE.map((e, id) => Object.assign(e, { id }));
-const index = new Map();
-for (const e of entries) {
-  for (const term of [...e.k, ...e.r]) {
-    if (!index.has(term)) index.set(term, []);
-    index.get(term).push(e.id);
-  }
-}
-const db = {
-  async getEntries(terms) {
-    const out = new Map();
-    for (const t of terms) if (index.has(t)) out.set(t, index.get(t).map((id) => entries[id]));
-    return out;
-  }
-};
-
-const TAGS = {
-  n: 'noun (common) (futsuumeishi)', vs: 'noun or participle which takes the aux. verb suru',
-  vt: 'transitive verb', vi: 'intransitive verb', v1: 'Ichidan verb', v5u: 'Godan verb with u ending',
-  v5m: 'Godan verb with mu ending', 'adj-i': 'adjective (keiyoushi)', 'adj-na': 'adjectival nouns',
-  pref: 'prefix', uk: 'word usually written using kana alone'
-};
-
-// The known words the extension keeps in browser storage. A couple are marked
-// known up front so the comprehension bar starts on a real number rather than
-// zero, and so the popup has both states of the ✓ to show.
-const known = new Set(['本', '人']);
-const ignored = new Set();
-
 // --- stand in for the extension's messaging ---------------------------------
 let settings = {};
 window.browser = {
