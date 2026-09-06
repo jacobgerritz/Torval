@@ -162,7 +162,7 @@ Four things can be put on a card:
 | **Word audio** | a recording of the word, if one can be found |
 | **Pitch accent** | the accent diagram, drawn as an SVG |
 | **Video frame** | the frame on screen when you pressed + |
-| **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says how much sound to keep from before the line, a quarter of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said |
+| **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says roughly how much sound to keep from before the line, a third of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said. Roughly, because a recorder swallows an unpredictable moment when it starts, measured at anything from 0.05 to 0.4 seconds, so LLL starts it early and lets it |
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
 mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"

@@ -39,11 +39,24 @@ var LLLVideo = (function () {
   // How much to record from before the line starts. Subtitle timings are
   // written to be read rather than to be cut on, and a line that appears the
   // instant the first word is said leaves nothing in front of it, so the clip
-  // opens part way into that word. A quarter of a second is enough to hear it
-  // whole, and the settings page can change it for subtitles that run early
-  // or late by more.
-  var LEAD_SECONDS = 0.25;
+  // opens part way into that word. The settings page can change this for
+  // subtitles that run early or late by more.
+  var LEAD_SECONDS = 0.3;
   var MAX_LEAD_SECONDS = 3;
+
+  // A recorder does not start recording when it is told to. Measured against
+  // the test video, whose pitch changes on every whole second: asked for the
+  // two seconds from 4s to 6s, the clip that came back had only 0.6s of the
+  // first tone in it, so the first 0.4s had gone. A lead-in of a quarter of a
+  // second was swallowed whole and the line still opened clipped, which is
+  // why padding alone never fixed this.
+  //
+  // So the recorder is started early and left to lose what it loses. What
+  // survives begins about where it was asked to, give or take: how much a
+  // recorder swallows varies from one clip to the next, so the lead-in is a
+  // rough amount rather than an exact one. Erring towards a little extra sound
+  // at the front is the right way to be wrong.
+  var WARMUP_SECONDS = 0.5;
 
   var stream = null;
   var streamFor = null;
@@ -141,6 +154,8 @@ var LLLVideo = (function () {
     // Where the recording opens, as against where the line is written to
     // begin. Never before the video does.
     var from = Math.max(0, start - (lead || 0));
+    // And where the recorder is told to start, which is earlier again.
+    var open = Math.max(0, from - WARMUP_SECONDS);
 
     var wasPaused = video.paused;
     var wasTime = video.currentTime;
@@ -162,13 +177,13 @@ var LLLVideo = (function () {
       // The line plays out loud while this records, that is deliberate, so
       // you can hear what is being captured rather than mining blind.
       video.playbackRate = 1;
-      video.currentTime = Math.max(0, from - PREROLL_SECONDS);
+      video.currentTime = Math.max(0, open - PREROLL_SECONDS);
       await seeked(video);
       await video.play();
 
       // Watch the clock rather than trusting a timer: buffering, or a frame
       // dropped, would otherwise cut the line short at either end.
-      await until(function () { return video.currentTime >= from; }, 5000);
+      await until(function () { return video.currentTime >= open; }, 5000);
       recorder.start();
       await until(function () { return video.currentTime >= from + length; },
         length * 1000 + 5000);
