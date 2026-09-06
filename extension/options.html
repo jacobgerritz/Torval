@@ -38,6 +38,15 @@
         <span>Tags</span>
         <input id="tags" type="text" placeholder="lll" spellcheck="false">
       </label>
+
+      <label>
+        <span>Audio lead-in</span>
+        <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.25">
+      </label>
+      <p class="note">
+        Seconds of sound kept from before the subtitle line, so the first word
+        is not clipped. Raise it if your subtitles appear late.
+      </p>
     </section>
 
     <section id="mapping-section" hidden>

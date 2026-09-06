@@ -36,6 +36,15 @@ var LLLVideo = (function () {
   // line, the run-up is played, not recorded.
   var PREROLL_SECONDS = 0.6;
 
+  // How much to record from before the line starts. Subtitle timings are
+  // written to be read rather than to be cut on, and a line that appears the
+  // instant the first word is said leaves nothing in front of it, so the clip
+  // opens part way into that word. A quarter of a second is enough to hear it
+  // whole, and the settings page can change it for subtitles that run early
+  // or late by more.
+  var LEAD_SECONDS = 0.25;
+  var MAX_LEAD_SECONDS = 3;
+
   var stream = null;
   var streamFor = null;
 
@@ -84,17 +93,20 @@ var LLLVideo = (function () {
    * seconds; without one there is no audio, only the frame.
    * Returns {} where there is no video, or where the video refuses to be read.
    */
-  async function capture(sentence, cue) {
+  async function capture(sentence, cue, options) {
     var video = currentVideo();
     if (!video) return {};
     var out = {};
+    var lead = options && typeof options.lead === 'number' && isFinite(options.lead)
+      ? Math.max(0, Math.min(MAX_LEAD_SECONDS, options.lead))
+      : LEAD_SECONDS;
 
     // Before anything moves: the picture you were actually looking at.
     var frame = grabFrame(video);
     if (frame) out.image = { filename: name(sentence, 'jpg'), data: frame };
 
     if (cue && cue.end > cue.start) {
-      var clip = await record(video, cue.start, cue.end);
+      var clip = await record(video, cue.start, cue.end, lead);
       if (clip) out.sentenceAudio = { filename: name(sentence, 'webm'), data: await toBase64(clip) };
     }
     return out;
@@ -121,15 +133,19 @@ var LLLVideo = (function () {
    * Speed is forced to normal for the duration: a line captured at 1.5x is a
    * line spoken at 1.5x, which is not what you want on a card.
    */
-  async function record(video, start, end) {
+  async function record(video, start, end, lead) {
     var type = mimeType();
     var source = audioStream(video);
     if (!type || !source) return null;
 
+    // Where the recording opens, as against where the line is written to
+    // begin. Never before the video does.
+    var from = Math.max(0, start - (lead || 0));
+
     var wasPaused = video.paused;
     var wasTime = video.currentTime;
     var wasRate = video.playbackRate;
-    var length = Math.min(end - start, MAX_CLIP_SECONDS);
+    var length = Math.min(end - from, MAX_CLIP_SECONDS);
 
     var recorder;
     try {
@@ -146,15 +162,15 @@ var LLLVideo = (function () {
       // The line plays out loud while this records, that is deliberate, so
       // you can hear what is being captured rather than mining blind.
       video.playbackRate = 1;
-      video.currentTime = Math.max(0, start - PREROLL_SECONDS);
+      video.currentTime = Math.max(0, from - PREROLL_SECONDS);
       await seeked(video);
       await video.play();
 
       // Watch the clock rather than trusting a timer: buffering, or a frame
       // dropped, would otherwise cut the line short at either end.
-      await until(function () { return video.currentTime >= start; }, 5000);
+      await until(function () { return video.currentTime >= from; }, 5000);
       recorder.start();
-      await until(function () { return video.currentTime >= start + length; },
+      await until(function () { return video.currentTime >= from + length; },
         length * 1000 + 5000);
       recorder.stop();
       await finished;

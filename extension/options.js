@@ -57,6 +57,7 @@ const SOURCE_LABELS = [
 const deckSelect = document.getElementById('deck');
 const modelSelect = document.getElementById('model');
 const tagsInput = document.getElementById('tags');
+const leadInput = document.getElementById('lead');
 const mappingBox = document.getElementById('mapping');
 const mappingSection = document.getElementById('mapping-section');
 const statusText = document.getElementById('status');
@@ -69,6 +70,7 @@ async function load() {
   const stored = await api.storage.local.get('ankiConfig');
   config = stored.ankiConfig || { fields: {} };
   tagsInput.value = (config.tags || []).join(', ');
+  leadInput.value = typeof config.lead === 'number' ? config.lead : '';
 
   const reply = await api.runtime.sendMessage({ type: 'ankiDescribe', url: config.url });
   if (!reply.ok) return fail(reply.error);
@@ -137,6 +139,9 @@ async function save() {
     deck: deckSelect.value,
     model: modelSelect.value,
     tags: tagsInput.value.split(',').map((t) => t.trim()).filter(Boolean),
+    // Left out entirely when the box is empty, so that "no answer" stays
+    // the recorder's own default rather than becoming zero.
+    lead: leadInput.value === '' ? undefined : Math.max(0, Math.min(3, Number(leadInput.value) || 0)),
     fields
   };
   await api.storage.local.set({ ankiConfig: config });

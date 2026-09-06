@@ -170,7 +170,7 @@ textarea {
   width: 100%;
   box-sizing: border-box;
   padding: 10px 12px;
-  font: 14px/1.6 "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  font: 14px/1.6 "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
   resize: vertical;
 }
 
@@ -214,7 +214,7 @@ input[type="file"] {
 .word-row .word {
   flex: 1;
   font-size: 17px;
-  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, sans-serif;
+  font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
   color: #f4f5f7;
 }
 

@@ -771,7 +771,7 @@ var LLLSubtitles = (function () {
       'box-shadow:0 8px 28px rgba(0,0,0,.5)', 'color:#f4f5f7',
       'padding:9px 22px',
       'font:500 34px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
-        '"Yu Gothic UI",Meiryo,sans-serif',
+        '"Noto Sans JP","Yu Gothic",Meiryo,sans-serif',
       'text-align:center', 'white-space:pre-wrap'
     ].join(';');
     overlay.appendChild(overlayLine);

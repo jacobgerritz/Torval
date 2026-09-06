@@ -1282,8 +1282,9 @@
     // back over it to record it, so this takes as long as the line does.
     const sentence = context ? context.text : '';
     const cue = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.cueFor(sentence) : null;
+    const settings = await api.storage.local.get('ankiConfig').catch(() => ({}));
     const media = typeof LLLVideo !== 'undefined'
-      ? await LLLVideo.capture(sentence, cue)
+      ? await LLLVideo.capture(sentence, cue, { lead: (settings.ankiConfig || {}).lead })
       : {};
 
     const note = {

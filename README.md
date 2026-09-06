@@ -162,7 +162,7 @@ Four things can be put on a card:
 | **Word audio** | a recording of the word, if one can be found |
 | **Pitch accent** | the accent diagram, drawn as an SVG |
 | **Video frame** | the frame on screen when you pressed + |
-| **Sentence audio** | the subtitle line, spoken |
+| **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says how much sound to keep from before the line, a quarter of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said |
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
 mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
