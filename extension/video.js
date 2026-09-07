@@ -36,12 +36,12 @@ var LLLVideo = (function () {
   // line, the run-up is played, not recorded.
   var PREROLL_SECONDS = 0.6;
 
-  // How much to record from before the line starts. Subtitle timings are
-  // written to be read rather than to be cut on, and a line that appears the
-  // instant the first word is said leaves nothing in front of it, so the clip
-  // opens part way into that word. The settings page can change this for
-  // subtitles that run early or late by more.
-  var LEAD_SECONDS = 0.3;
+  // How much to record from before the line starts, on top of whatever the
+  // recorder swallows anyway. Subtitle timings are written to be read rather
+  // than to be cut on, so a little is wanted, but the warm-up below already
+  // supplies most of it and asking for much more only puts the end of the
+  // previous line on the card. The settings page can change it.
+  var LEAD_SECONDS = 0.1;
   var MAX_LEAD_SECONDS = 3;
 
   // A recorder does not start recording when it is told to. Measured against

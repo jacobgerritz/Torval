@@ -284,7 +284,12 @@ var LLLBar = (function () {
     // across it. The page's own reading is unaffected, it comes straight back
     // on the way out.
     document.addEventListener('fullscreenchange', function () {
-      if (data) host.style.display = document.fullscreenElement ? 'none' : 'block';
+      var full = !!document.fullscreenElement;
+      host.style.display = full ? 'none' : (data && data.total ? 'block' : host.style.display);
+      // And the room the page was leaving for it goes back: full screen means
+      // the video fills the screen, and a page still pushed down by forty
+      // pixels is a video pushed down by forty pixels.
+      makeRoom(!full && expanded && pinned);
     });
   }
 

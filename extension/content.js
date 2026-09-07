@@ -1003,6 +1003,7 @@
     root.append(style, card);
     (document.body || document.documentElement).appendChild(host);
     ui = { host, card };
+    watchSize(card);
     return ui;
   }
 
@@ -1048,6 +1049,7 @@
       toggle.addEventListener('click', () => {
         rest.hidden = !rest.hidden;
         toggle.classList.toggle('open', !rest.hidden);
+        reflow();
       });
       card.append(toggle, rest);
     }
@@ -1336,6 +1338,7 @@
       note.className = 'note dup-note';
       note.textContent = 'Already in your collection, adding it again too.';
       entryEl.appendChild(note);
+      reflow();
     }
   }
 
@@ -1358,6 +1361,10 @@
     said.className = 'note doing';
     said.textContent = text;
     entryEl.appendChild(said);
+    reflow();
+    // Taking it away changes the size back, so that has to be said too.
+    const drop = said.remove.bind(said);
+    said.remove = function () { drop(); reflow(); };
     return said;
   }
 
@@ -1416,6 +1423,7 @@
     message.className = 'error';
     message.textContent = (reply && reply.error) || 'Could not add the card.';
     entryEl.appendChild(message);
+    reflow();
   }
 
   /**
@@ -1429,19 +1437,80 @@
     return described ? described.split('(')[0].trim().toLowerCase() : code;
   }
 
-  /** Put the popup near the cursor, nudged back on screen if it would overflow. */
+  // Where the popup was last put, and how tall it was when it was put there.
+  let placed = null;
+
+  /**
+   * Put the popup by the cursor, in whichever direction it fits.
+   *
+   * Under the cursor if there is room, above it if there is more room there,
+   * and never taller than the room it takes: a word in a subtitle sits at the
+   * very bottom of the screen, and a popup that hangs off the edge from there
+   * cannot be scrolled to, because scrolling the page is what closes it.
+   */
   function place(at) {
     const { host, card } = ui;
     host.style.display = 'block';
     host.style.left = '0px';
     host.style.top = '0px';
+    card.style.maxHeight = '';           // measured with room to breathe
     const box = card.getBoundingClientRect();
     const margin = 8;
-    let left = at.x + 18;
-    let top = at.y + 18;
-    if (left + box.width > window.innerWidth - margin) left = Math.max(margin, at.x - box.width - 18);
-    if (top + box.height > window.innerHeight - margin) top = Math.max(margin, window.innerHeight - box.height - margin);
+    const gap = 18;
+
+    let left = at.x + gap;
+    if (left + box.width > window.innerWidth - margin) {
+      left = Math.max(margin, at.x - box.width - gap);
+    }
+
+    const below = window.innerHeight - (at.y + gap) - margin;
+    const above = at.y - gap - margin;
+    let top;
+    if (box.height <= below) {
+      top = at.y + gap;
+    } else if (box.height <= above) {
+      top = at.y - gap - box.height;
+    } else if (above > below) {
+      // Neither side fits, so take the roomier one and let the popup scroll.
+      top = margin;
+      card.style.maxHeight = above + 'px';
+    } else {
+      top = at.y + gap;
+      card.style.maxHeight = Math.max(80, below) + 'px';
+    }
+
     host.style.left = `${left}px`;
     host.style.top = `${top}px`;
+    placed = { at: at, height: card.getBoundingClientRect().height };
+  }
+
+  /** Put the popup where it fits again, after it has changed size. */
+  function reflow() {
+    if (!ui || !placed || ui.host.style.display !== 'block') return;
+    place(placed.at);
+  }
+
+  /**
+   * A popup that grows after it has been placed has to be placed again.
+   *
+   * It grows for several reasons: the note saying a word is already in the
+   * collection arrives a moment later, so does the one about recording a
+   * line, and opening "other matches" can double its height. Any of those
+   * could push the bottom of it off the screen, where it could not be read
+   * and could not be scrolled to.
+   */
+  // Held onto, because an observer nobody keeps a reference to can be
+  // collected while it is still watching, and then it simply stops firing.
+  let sizeWatch = null;
+
+  function watchSize(card) {
+    if (typeof ResizeObserver !== 'function') return;
+    sizeWatch = new ResizeObserver(function () {
+      if (!ui || ui.host.style.display !== 'block' || !placed) return;
+      var now = ui.card.getBoundingClientRect().height;
+      if (Math.abs(now - placed.height) < 1) return;
+      place(placed.at);
+    });
+    sizeWatch.observe(card);
   }
 })();
