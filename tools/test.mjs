@@ -345,6 +345,25 @@ const run = async () => {
     /did not answer/.test(said || ''), String(said));
   Anki._deadlines(10, 8);
 
+  // B opens Anki's browser on a word, with the same search the duplicate
+  // check uses, so what Anki shows is what LLL meant by "already in your
+  // collection".
+  let sentToAnki = null;
+  globalThis.fetch = async (url, init) => {
+    sentToAnki = JSON.parse(init.body);
+    return { ok: true, json: async () => ({ result: null, error: null }) };
+  };
+  await Anki.browse(mining, '食べる');
+  check('B asks Anki to open its browser', sentToAnki.action === 'guiBrowse', JSON.stringify(sentToAnki));
+  check('and searches the mapped field in the chosen deck',
+    sentToAnki.params.query === '"deck:' + mining.deck + '" "Target Word:食べる"',
+    sentToAnki.params.query);
+
+  // A word with a colon in it must not turn into search syntax.
+  await Anki.browse(mining, 'a:b');
+  check('a colon in the word is escaped, not read as a search field',
+    sentToAnki.params.query.indexOf('a\\:b') !== -1, sentToAnki.params.query);
+
   // Deck names nest with colons, which must survive; a word's own colon must not.
   check('deck names keep their colons, field values do not',
     Anki.escapeSearch('A::B') === 'A::B' && Anki.escapeSearch('a:b', true) === 'a\\:b',

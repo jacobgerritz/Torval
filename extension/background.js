@@ -108,6 +108,7 @@ api.runtime.onMessage.addListener((message) => {
     case 'tags':   return loadTags();
     case 'ankiAdd':      return ankiAdd(message.note);
     case 'ankiDuplicate': return ankiDuplicate(message.word);
+    case 'ankiBrowse':   return guard(() => ankiBrowse(message.word));
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     case 'extractWords': return guard(() => extractWords(message.text));
@@ -152,6 +153,12 @@ async function guard(fn) {
  * audio even starts, so the answer is not stuck waiting behind it. This never
  * blocks the card being made; it is only a heads-up.
  */
+/** Open Anki's card browser on a word. */
+async function ankiBrowse(word) {
+  const stored = await api.storage.local.get('ankiConfig');
+  return LLLAnki.browse(stored.ankiConfig || {}, word);
+}
+
 async function ankiDuplicate(word) {
   return guard(async () => {
     const { ankiConfig } = await api.storage.local.get('ankiConfig');

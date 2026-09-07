@@ -259,6 +259,26 @@ var LLLAnki = (function () {
   }
 
   /**
+   * Open Anki's card browser on a word, and bring Anki to the front.
+   *
+   * The same search the duplicate check uses, so what you are shown is
+   * exactly what LLL means when it says a word is already in the
+   * collection: that field, in that deck. Without a field mapped for the
+   * word there is nothing to search by name, so it falls back to looking
+   * for the text anywhere in the deck.
+   */
+  async function browse(config, word) {
+    if (!word) throw new Error('No word to look up.');
+    var deck = config && config.deck ? '"deck:' + escapeSearch(config.deck) + '" ' : '';
+    var field = fieldFor(config, 'word');
+    var query = field
+      ? deck + '"' + escapeSearch(field) + ':' + escapeSearch(word, true) + '"'
+      : deck + '"' + escapeSearch(word, true) + '"';
+    await invoke(config && config.url, 'guiBrowse', { query: query });
+    return query;
+  }
+
+  /**
    * Anki's search syntax. Quotes and backslashes always need escaping; in a
    * field's value so do the wildcards and the colon, which would otherwise be
    * read as syntax. Deck names keep their colons, that is how nesting is
@@ -280,6 +300,7 @@ var LLLAnki = (function () {
     fieldFor: fieldFor,
     alreadyHave: alreadyHave,
     fetchAudio: fetchAudio,
+    browse: browse,
     // Exposed so the tests can watch a deadline pass without waiting for one.
     _deadlines: function (anki, audio) { ANKI_SECONDS = anki; AUDIO_SECONDS = audio; },
     audioFilename: audioFilename,

@@ -173,6 +173,7 @@
     if (e.key === '1' && markHover(e, 'unknown')) return;
     if (e.key === '2' && markHover(e, 'known')) return;
     if (e.key === '3' && markHover(e, 'ignored')) return;
+    if ((e.key === 'b' || e.key === 'B') && browseInAnki(e)) return;
     if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
@@ -236,6 +237,42 @@
     // than counting the same word twice.
     if (wanted === 'unknown') applyState(hoverWord, before === 'known' ? 'know' : 'ignore', false, before);
     else applyState(hoverWord, wanted === 'known' ? 'know' : 'ignore', true, before);
+    return true;
+  }
+
+  /**
+   * B opens Anki's card browser on whatever is under the cursor, or on what
+   * you have selected if you have selected something.
+   *
+   * The same search the popup uses to say a word is already in your
+   * collection, so what Anki shows is what LLL meant by that. Unlike 1, 2
+   * and 3 it only takes the key when there is something to look up, since a
+   * letter is a letter and plenty of sites have their own use for it.
+   */
+  function browseInAnki(e) {
+    if (e.ctrlKey || e.altKey || e.metaKey) return false;
+
+    const focused = document.activeElement;
+    if (focused && (focused.isContentEditable ||
+      /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return false;
+
+    // What you picked out yourself beats what the cursor happens to be over.
+    const chosen = String(window.getSelection() || '').trim();
+    const word = chosen || hoverWord;
+    if (!word) return false;
+
+    e.preventDefault();
+    e.stopPropagation();
+    api.runtime.sendMessage({ type: 'ankiBrowse', word }).then((reply) => {
+      if (reply && reply.ok) return;
+      // Anki not being open is worth saying, and the popup is the only place
+      // there is to say it. With no popup open there is nowhere, and a word
+      // that simply is not there is not an error worth interrupting for.
+      const entry = ui && ui.host.style.display === 'block' && ui.card.querySelector('.entry');
+      if (!entry) return;
+      const failed = saying(entry, (reply && reply.error) || 'Anki did not answer.');
+      failed.className = 'error';
+    }).catch(() => {});
     return true;
   }
 

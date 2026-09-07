@@ -93,6 +93,7 @@ window.browser = {
     async sendMessage(msg) {
       if (msg.type === 'tags') return TAGS;
       if (msg.type === 'ankiAdd') { window.__lastNote = msg.note; return { ok: true, result: 1 }; }
+      if (msg.type === 'ankiBrowse') { window.__browsed = msg.word; return { ok: true, result: 'query' }; }
       if (msg.type === 'openOptions') { console.log('preview: would open the settings page'); return { ok: true }; }
       if (msg.type === 'status') return { status: { state: 'ready', progress: 1 } };
       if (msg.type === 'setKnown') {
