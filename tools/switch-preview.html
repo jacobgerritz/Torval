@@ -1,0 +1,77 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PREVIEW, the LLL toolbar panel</title>
+<!--
+  The panel behind the toolbar button, without reloading the extension.
+
+      node tools/serve.mjs   ->  http://localhost:8137/tools/switch-preview.html
+
+  It runs the real switch.html, switch.css and switch.js. Only the storage is
+  fake, and what it holds is printed underneath so the switch can be seen to
+  do what it says.
+-->
+
+<style>
+  body { margin: 0; background: #23252a; }
+  .frame { width: 268px; margin: 30px; box-shadow: 0 10px 30px rgba(0,0,0,.5); border-radius: 8px; overflow: hidden; }
+  .said { margin: 0 30px; color: #b9bec7; font: 13px/1.6 -apple-system, "Segoe UI", sans-serif; }
+</style>
+
+<div class="frame" id="frame"></div>
+<p class="said" id="said">storage: {}</p>
+
+<script>
+const stored = {};
+const said = () => { document.getElementById('said').textContent = 'storage: ' + JSON.stringify(stored); };
+
+window.browser = {
+  storage: {
+    local: {
+      async get(key) { return key in stored ? { [key]: stored[key] } : {}; },
+      async set(values) { Object.assign(stored, values); said(); }
+    }
+  },
+  runtime: {
+    id: 'preview',
+    getURL: (path) => '../extension/' + path,
+    openOptionsPage() { alert('would open the settings page'); }
+  },
+  tabs: { create({ url }) { alert('would open ' + url); } }
+};
+
+// Nothing here should really close the window it is previewed in.
+window.close = () => {};
+
+(async () => {
+  const html = await (await fetch('../extension/switch.html')).text();
+  const page = new DOMParser().parseFromString(html, 'text/html');
+
+  for (const link of page.querySelectorAll('link[rel="stylesheet"]')) {
+    const clone = document.createElement('link');
+    clone.rel = 'stylesheet';
+    clone.href = '../extension/' + link.getAttribute('href');
+    document.head.appendChild(clone);
+  }
+  // The panel styles its own body, which here is the whole page, so it is put
+  // in a box of its own the size a popup really is.
+  const frame = document.getElementById('frame');
+  for (const node of [...page.body.children]) {
+    if (node.tagName !== 'SCRIPT') frame.appendChild(node);
+  }
+  const scale = document.createElement('style');
+  scale.textContent = '.frame { background: #0f1012; padding: 16px; box-sizing: border-box; }' +
+    'body > .frame { color: #e7e8ea; font: 14px/1.5 -apple-system, "Segoe UI", sans-serif; }';
+  document.head.appendChild(scale);
+
+  for (const script of page.querySelectorAll('script')) {
+    await new Promise((resolve, reject) => {
+      const clone = document.createElement('script');
+      clone.src = '../extension/' + script.getAttribute('src');
+      clone.onload = resolve;
+      clone.onerror = reject;
+      document.body.appendChild(clone);
+    });
+  }
+  said();
+})();
+</script>

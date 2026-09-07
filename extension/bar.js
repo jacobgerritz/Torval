@@ -29,6 +29,7 @@ var LLLBar = (function () {
   var data = null;        // the last reading: { total, known, counts }
   var onRefresh = null;
 
+  var BAR_HEIGHT = 40;   // the bar itself, and the room the page gives it
   var expanded = false;
   var pinned = false;
   var always = false;   // this page keeps the bar down, whatever the setting
@@ -197,14 +198,19 @@ var LLLBar = (function () {
    * reach, amber where it is a stretch, green where it can be read without
    * stopping every sentence.
    *
-   * Sliding rather than stepping, because the difference between 71% and 89%
-   * is the difference between hard work and nearly comfortable, and three
-   * fixed bands paint both of those the same. Nothing below about 30% is any
-   * more readable than anything else below it, so the scale gives that end
-   * one colour and spends its range where reading actually happens.
+   * Sliding rather than stepping, because the difference between 91% and 98%
+   * is the difference between hard work and comfortable, and fixed bands
+   * paint both of those the same.
+   *
+   * The scale is deliberately hard to please. Reading without stopping every
+   * sentence takes somewhere around 98% of the running words, and even 90%
+   * is one word in ten looked up, which is study rather than reading. So
+   * green begins where it is genuinely comfortable and everything below 70%
+   * is red, rather than a cheerful yellow-green at 75% telling you a text is
+   * within reach when it is not.
    */
   function colourFor(percent) {
-    var hue = Math.max(0, Math.min(120, (percent - 30) * 1.7));
+    var hue = Math.max(0, Math.min(120, (percent - 70) * 4));
     return 'hsl(' + Math.round(hue) + ' 48% 62%)';
   }
 
@@ -279,9 +285,26 @@ var LLLBar = (function () {
     });
   }
 
+  /**
+   * Push the page down by the height of the bar, so the bar covers nothing.
+   *
+   * Only for a bar that is staying: one that slides away when the pointer
+   * leaves would drag the whole page up and down with it, which is worse
+   * than covering a strip of it. A margin on the root element rather than on
+   * the body, since plenty of pages give the body a margin of their own and
+   * this way nothing of theirs is overwritten.
+   */
+  function makeRoom(yes) {
+    var root = document.documentElement;
+    if (!root || !root.style) return;
+    if (yes) root.style.setProperty('margin-top', BAR_HEIGHT + 'px', 'important');
+    else root.style.removeProperty('margin-top');
+  }
+
   function setExpanded(value) {
     expanded = value;
     if (els.bar) els.bar.classList.toggle('expanded', expanded);
+    makeRoom(expanded && pinned);
     cancelRetract();
   }
 
@@ -341,7 +364,7 @@ var LLLBar = (function () {
     '.note { color: #c7ab72; }',
     '.bar {',
     '  position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;',
-    '  box-sizing: border-box; height: 40px; display: flex; align-items: center; gap: 14px;',
+    '  box-sizing: border-box; height: ' + BAR_HEIGHT + 'px; display: flex; align-items: center; gap: 14px;',
     '  padding: 0 14px;',
     '  background: #16171a; border-bottom: 1px solid #292b30;',
     '  font: 14px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
@@ -373,6 +396,11 @@ var LLLBar = (function () {
     quiet: quiet,
     restate: restate,
     onRefresh: function (fn) { onRefresh = fn; },
+    // Off and on again, for the switch on the toolbar button.
+    visible: function (show) {
+      if (!host) return;
+      host.style.display = show ? 'block' : 'none';
+    },
     alwaysDown: alwaysDown,
     colourFor: colourFor
   };

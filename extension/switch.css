@@ -1,0 +1,83 @@
+/*
+ * LLL, the panel behind the toolbar button.
+ *
+ * One switch and two doors. It exists because a button that only opened the
+ * settings gave no quick way to put LLL down for a while, and a button that
+ * only toggled would have left the settings with no way in at all.
+ */
+
+:root { color-scheme: dark; }
+
+body {
+  width: 236px;
+  margin: 0;
+  padding: 16px;
+  background: #0f1012;
+  color: #e7e8ea;
+  font: 14px/1.5 -apple-system, "Segoe UI", sans-serif;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  cursor: pointer;
+}
+
+.switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 23px;
+  background: #2a2d33;
+  border-radius: 999px;
+  transition: background .15s ease;
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  background: #8b9099;
+  border-radius: 50%;
+  transition: transform .15s ease, background .15s ease;
+}
+
+.switch input:checked + .track { background: #2f5d4a; }
+.switch input:checked + .track .knob { background: #7fb488; transform: translateX(17px); }
+.switch input:focus-visible + .track { outline: 2px solid #4d7d8f; outline-offset: 2px; }
+
+.state {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f4f5f7;
+}
+
+.note {
+  margin: 10px 0 16px;
+  font-size: 12.5px;
+  color: #767b84;
+}
+
+nav { display: flex; gap: 8px; }
+
+nav button {
+  flex: 1;
+  padding: 8px 10px;
+  background: #1c1e22;
+  color: #d7d9dd;
+  border: 1px solid #2a2d33;
+  border-radius: 7px;
+  font: inherit;
+  cursor: pointer;
+}
+
+nav button:hover { background: #24272c; }

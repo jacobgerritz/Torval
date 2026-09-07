@@ -47,12 +47,86 @@ var LLLSubtitles = (function () {
   var MIN_OBSERVED_SECONDS = 0.15; // shorter than this is a DOM flicker, not a line
 
   var enabled = false;
+  var suspended = false;   // the toolbar switch is off
+
+  // How far up the video the line sits, as a percentage of its height, and
+  // where it started. Kept in storage so a video watched tomorrow puts them
+  // back where you left them.
+  var BOTTOM_DEFAULT = 4;
+  var bottom = BOTTOM_DEFAULT;
+  if (api && api.storage) {
+    api.storage.local.get('subtitleBottom').then(function (stored) {
+      if (typeof stored.subtitleBottom !== 'number') return;
+      bottom = stored.subtitleBottom;
+      if (overlay) overlay.style.bottom = bottom + '%';
+    }).catch(function () {});
+  }
   var videoId = null;
   var cues = [];
   var index = 0;
   var video = null;
   var state = 'idle';        // idle | loading | ready | watching | unavailable
   var attempts = 0;
+
+  /**
+   * Put the subtitles away, or bring them back, for the switch on the
+   * toolbar button. YouTube's own captions were hidden rather than turned
+   * off, so handing the screen back is a matter of not hiding them.
+   */
+  /**
+   * Let the line be dragged up and down, for when it sits over something
+   * worth seeing.
+   *
+   * The words in it still have to be hoverable and clickable, so this cannot
+   * simply swallow the pointer: a press becomes a drag only once it has moved
+   * a few pixels, and only then is the click that follows it thrown away. A
+   * press that does not move is left alone entirely and opens the dictionary
+   * as usual.
+   */
+  function dragging(line) {
+    var from = null;
+    var moved = false;
+
+    line.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      from = { y: e.clientY, bottom: bottom };
+      moved = false;
+    });
+
+    window.addEventListener('pointermove', function (e) {
+      if (!from || !overlay) return;
+      var shift = from.y - e.clientY;
+      if (!moved && Math.abs(shift) < 4) return;
+      moved = true;
+      // Dragging up moves it up the picture, so the gap below it grows.
+      var height = overlay.parentElement ? overlay.parentElement.clientHeight : 0;
+      if (!height) return;
+      bottom = Math.max(0, Math.min(88, from.bottom + (shift / height) * 100));
+      overlay.style.bottom = bottom + '%';
+      // Dragging a box around should not also select the words in it.
+      e.preventDefault();
+    });
+
+    window.addEventListener('pointerup', function () {
+      if (!from) return;
+      var dragged = moved;
+      from = null;
+      moved = false;
+      if (!dragged) return;
+      // The click that ends a drag is not a click on a word.
+      window.addEventListener('click', function (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }, { capture: true, once: true });
+      api.storage.local.set({ subtitleBottom: bottom }).catch(function () {});
+    });
+  }
+
+  function suspend(state) {
+    suspended = !!state;
+    if (hideNative) hideNative.disabled = suspended;
+    if (overlay && suspended) overlay.style.display = 'none';
+  }
 
   function enable() {
     if (enabled) return;
@@ -772,10 +846,15 @@ var LLLSubtitles = (function () {
       'padding:9px 22px',
       'font:500 34px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
         '"Noto Sans JP","Yu Gothic",Meiryo,sans-serif',
-      'text-align:center', 'white-space:pre-wrap'
+      'text-align:center', 'white-space:pre-wrap',
+      // A hint that the box itself can be moved, without taking the text
+      // cursor away from the words inside it.
+      'touch-action:none'
     ].join(';');
     overlay.appendChild(overlayLine);
     player.appendChild(overlay);
+    dragging(overlayLine);
+    overlay.style.bottom = bottom + '%';
   }
 
   /**
@@ -787,7 +866,7 @@ var LLLSubtitles = (function () {
    * would show nothing for whichever line is currently in progress.
    */
   function renderCue() {
-    if (!enabled || !video || (!cues.length && !openCue)) {
+    if (!enabled || suspended || !video || (!cues.length && !openCue)) {
       if (overlay) overlay.style.display = 'none';
       return;
     }
@@ -856,6 +935,7 @@ var LLLSubtitles = (function () {
     enable: enable,
     cueAt: cueAt,
     cueFor: cueFor,
+    suspend: suspend,
     parse: parse,
     parseXml: parseXml,
     findKey: findKey,

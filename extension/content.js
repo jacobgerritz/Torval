@@ -35,7 +35,17 @@
   for (const orphan of document.querySelectorAll('[data-lll-popup]')) orphan.remove();
   document.documentElement.setAttribute(OWNER, instance);
 
+  /**
+   * Is LLL supposed to be doing anything here?
+   *
+   * Two questions in one, because they have the same answer everywhere it
+   * is asked: is this frame still the one that owns the page, and is LLL
+   * switched on at all. The switch lives on the toolbar button, and every
+   * page watches it, so turning it off quietens pages that are already open
+   * rather than only the next one.
+   */
   function isCurrent() {
+    if (off) return false;
     if (document.documentElement.getAttribute(OWNER) === instance) return true;
     if (ui) { ui.host.remove(); ui = null; }
     return false;
@@ -96,6 +106,40 @@
   let hoverFrom = -1;
   let hoverTo = -1;
   let hoverSpan = null;   // the text those positions were measured against
+
+  // The toolbar switch. Read once at the start and watched after that, so a
+  // page open in another tab goes quiet the moment it is turned off.
+  let off = false;
+  api.storage.local.get('off').then((stored) => {
+    if (!stored.off) return;
+    off = true;
+    putAway();
+  }).catch(() => {});
+
+  if (api.storage.onChanged) {
+    api.storage.onChanged.addListener((changes) => {
+      if (!changes.off) return;
+      off = !!changes.off.newValue;
+      if (off) putAway(); else bringBack();
+    });
+  }
+
+  /** Everything LLL had put on this page, taken off it again. */
+  function putAway() {
+    hide();
+    clearHover();
+    if (typeof LLLHighlight !== 'undefined') LLLHighlight.clear();
+    if (typeof LLLBar !== 'undefined') LLLBar.visible(false);
+    if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.suspend(true);
+  }
+
+  /** And put back, without making anybody reload the page. */
+  function bringBack() {
+    if (typeof LLLBar !== 'undefined') LLLBar.visible(true);
+    if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.suspend(false);
+    lastTranscript = '';
+    readPage();
+  }
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 

@@ -120,6 +120,12 @@ var LLLHighlight = (function () {
    * and never wanting to hear about it are different states elsewhere, but on
    * the page they look the same, which is no mark at all.
    */
+  /** Take every mark off the page, for when LLL is switched off. */
+  function clear() {
+    if (!supported()) return;
+    for (var name of [PAGE_A, PAGE_B, LINE_A, LINE_B]) CSS.highlights.delete(name);
+  }
+
   function setMarked(word, shouldMark) {
     if (shouldMark) unknown.add(word); else unknown.delete(word);
     apply();
@@ -366,6 +372,7 @@ var LLLHighlight = (function () {
     start: start,
     read: read,
     setMarked: setMarked,
+    clear: clear,
     refreshLine: refreshLine,
     supported: supported,
     // Exposed for the tests: turning a position in the gathered text back into

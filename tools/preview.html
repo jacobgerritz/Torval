@@ -53,12 +53,21 @@
 <script>
 // --- stand in for the extension's messaging ---------------------------------
 let settings = {};
+const watchers = [];
 window.browser = {
   storage: {
     local: {
       async get(key) { return key in settings ? { [key]: settings[key] } : {}; },
-      async set(values) { Object.assign(settings, values); }
-    }
+      async set(values) {
+        Object.assign(settings, values);
+        // The real storage tells every page what changed, which is how the
+        // switch on the toolbar button reaches pages that are already open.
+        const changes = {};
+        for (const name of Object.keys(values)) changes[name] = { newValue: values[name] };
+        for (const listener of watchers) listener(changes, "local");
+      }
+    },
+    onChanged: { addListener(fn) { watchers.push(fn); } }
   },
   runtime: {
     id: 'preview',

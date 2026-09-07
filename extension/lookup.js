@@ -234,6 +234,12 @@ var LLLLookup = (function () {
   var UNKNOWN_RANK = 60000;     // priced as rarer than the frequency lists reach
   var UNKNOWN_PER = 4;          // and that much again for every extra character
 
+  // How many distinct words to gather up before asking the dictionary about
+  // them. Big enough that a page is a handful of questions rather than one
+  // per sentence, small enough that the answer is not an enormous thing to
+  // hold and hand back at once.
+  var BATCH_TERMS = 4000;
+
   /**
    * What a word costs for being rare. Lower is commoner.
    *
@@ -305,30 +311,35 @@ var LLLLookup = (function () {
    * programme, and the winning path is walked back from the end. Text that
    * matched nothing produces no word at all rather than a bad one.
    */
-  async function segmentRun(text, from, to, db) {
+  /**
+   * Everything the dictionary will be asked about one run, worked out
+   * without asking it anything. Deinflection only, so several runs can be
+   * prepared and then asked about together.
+   */
+  function prepareRun(text, from, to, asking) {
     var n = to - from;
-    if (n <= 0) return { words: [], groupsFor: [], from: from };
-
-    var best = new Array(n + 1).fill(Infinity);
-    var backLength = new Array(n + 1).fill(0);
-    var backWord = new Array(n + 1).fill(false);
-    var groupsFor = new Array(n).fill(null);
-    best[0] = 0;
-
-    // Everything the dictionary is going to be asked about this run, asked
-    // at once. One trip to the database costs about the same as a thousand
-    // questions in it, and this used to make one trip per character: a hover
-    // on a subtitle sat through thirty of them before it could answer, which
-    // is why hovering a line felt slow when hovering a page did not.
     var termsFor = new Array(n).fill(null);
-    var asking = new Set();
     for (var t = 0; t < n; t++) {
       if (splitsCluster(text, from + t)) continue;
       var terms = termsAt(text.slice(from + t, from + t + MAX_SCAN + 1));
       termsFor[t] = terms;
       terms.forEach(function (infos, term) { asking.add(term); });
     }
-    var answer = await db.getEntries(Array.from(asking));
+    return { from: from, to: to, n: n, termsFor: termsFor };
+  }
+
+  /** One run read, given a reply that may cover several of them. */
+  function solveRun(text, run, answer) {
+    var from = run.from;
+    var n = run.n;
+    if (n <= 0) return { words: [], groupsFor: [], from: from };
+
+    var best = new Array(n + 1).fill(Infinity);
+    var backLength = new Array(n + 1).fill(0);
+    var backWord = new Array(n + 1).fill(false);
+    var groupsFor = new Array(n).fill(null);
+    var termsFor = run.termsFor;
+    best[0] = 0;
 
     for (var i = 0; i < n; i++) {
       if (best[i] === Infinity) continue;
@@ -396,22 +407,48 @@ var LLLLookup = (function () {
     return { words: out, groupsFor: groupsFor, from: from };
   }
 
+  /** One run, prepared and answered on its own. What a hover does. */
+  async function segmentRun(text, from, to, db) {
+    if (to - from <= 0) return { words: [], groupsFor: [], from: from };
+    var asking = new Set();
+    var run = prepareRun(text, from, to, asking);
+    return solveRun(text, run, await db.getEntries(Array.from(asking)));
+  }
+
   /** Every word in `text`, wherever it is, run by run. */
   async function segment(text, db) {
     var out = [];
+    var batch = [];
+    var asking = new Set();
+
+    // A page is a great many sentences, and asking about each one on its own
+    // meant a trip to the database per sentence: on a page of 1,400
+    // characters, 130 of them, which at a couple of milliseconds each is most
+    // of the time the page takes to read. Sentences are prepared until there
+    // are enough questions to be worth asking, then asked about together.
+    var flush = async function () {
+      if (!batch.length) return;
+      var answer = await db.getEntries(Array.from(asking));
+      for (var b = 0; b < batch.length; b++) {
+        var read = solveRun(text, batch[b], answer);
+        for (var w = 0; w < read.words.length; w++) out.push(read.words[w]);
+      }
+      batch = [];
+      asking = new Set();
+      // Standing aside here lets whatever else is waiting, a hover being
+      // looked up above all, get a turn rather than wait for the whole page.
+      await pause();
+    };
+
     var i = 0;
-    var steps = 0;
     while (i < text.length) {
       if (!LLLJapanese.test(text.charAt(i))) { i++; continue; }
       var run = runAround(text, i);
-      var read = await segmentRun(text, run.from, run.to, db);
-      for (var w = 0; w < read.words.length; w++) out.push(read.words[w]);
+      batch.push(prepareRun(text, run.from, run.to, asking));
       i = run.to;
-      // A page is a lot of sentences in a row. Standing aside every so often
-      // lets whatever else is waiting, a hover being looked up above all, get
-      // a turn rather than wait behind the entire passage.
-      if ((++steps % 32) === 0) await pause();
+      if (asking.size >= BATCH_TERMS) await flush();
     }
+    await flush();
     return out;
   }
 

@@ -134,6 +134,8 @@ api.runtime.onMessage.addListener((message) => {
 });
 
 // The toolbar button is the way in to the settings.
+// The toolbar button opens switch.html, so this only matters where a popup
+// cannot be shown at all.
 if (api.action && api.action.onClicked) {
   api.action.onClicked.addListener(() => api.runtime.openOptionsPage());
 }
