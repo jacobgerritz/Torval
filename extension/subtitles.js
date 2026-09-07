@@ -40,6 +40,12 @@
  * them is the whole of how it works.
  */
 
+// Loaded first in the extension and already a global; under Node (the test
+// suite) it is pulled in here.
+if (typeof LLLJapanese === 'undefined' && typeof require !== 'undefined') {
+  var LLLJapanese = require('./japanese.js');
+}
+
 var LLLSubtitles = (function () {
   'use strict';
 
@@ -465,10 +471,9 @@ var LLLSubtitles = (function () {
   function segmentText(seg) {
     var snippet = seg && seg.snippet;
     if (!snippet) return '';
-    if (snippet.simpleText) return String(snippet.simpleText).replace(/\s+/g, ' ').trim();
+    if (snippet.simpleText) return squash(snippet.simpleText);
     if (snippet.runs) {
-      return snippet.runs.map(function (r) { return r.text || ''; }).join('')
-        .replace(/\s+/g, ' ').trim();
+      return squash(snippet.runs.map(function (r) { return r.text || ''; }).join(''));
     }
     return '';
   }
@@ -517,7 +522,7 @@ var LLLSubtitles = (function () {
       var dur = parseFloat(node.getAttribute('dur') || '0');
       // DOMParser has already turned &amp; and friends back into real
       // characters, which is why this needs no decoding of its own.
-      var line = (node.textContent || '').replace(/\s+/g, ' ').trim();
+      var line = squash(node.textContent || '');
       if (!line) continue;
       var end = start + dur;
       if (out.length && out[out.length - 1].end > start) out[out.length - 1].end = start;
@@ -719,8 +724,7 @@ var LLLSubtitles = (function () {
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       if (!e.segs) continue;
-      var text = e.segs.map(function (s) { return s.utf8 || ''; }).join('')
-        .replace(/\s+/g, ' ').trim();
+      var text = squash(e.segs.map(function (s) { return s.utf8 || ''; }).join(''));
       if (!text) continue;
       var start = (e.tStartMs || 0) / 1000;
       var end = start + (e.dDurationMs || 0) / 1000;
@@ -802,7 +806,7 @@ var LLLSubtitles = (function () {
 
   function captionText() {
     var el = document.querySelector('.ytp-caption-window-container, .captions-text');
-    return el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+    return el ? squash(el.textContent) : '';
   }
 
   /**
@@ -991,6 +995,18 @@ var LLLSubtitles = (function () {
       if (text && (text.indexOf(wanted) !== -1 || wanted.indexOf(text) !== -1)) return cues[i];
     }
     return video ? cueAt(video.currentTime) : null;
+  }
+
+  // A space between two Japanese characters is not a word boundary; Japanese
+  // does not put spaces between words. It is where the caption renderer wrapped
+  // the line, and it arrives in the text as an ordinary space. Left in, it cuts
+  // the sentence in two for reading: 繋がるわけじゃ ないのかも came out as じゃ
+  // and ない, two words that are one, and 皆 さん as two more.
+  var WRAPPED = new RegExp('(' + LLLJapanese.source + ')\\s+(?=' + LLLJapanese.source + ')', 'g');
+
+  /** One line of caption text, as a line rather than as it was laid out. */
+  function squash(text) {
+    return String(text || '').replace(/\s+/g, ' ').replace(WRAPPED, '$1').trim();
   }
 
   function strip(s) {

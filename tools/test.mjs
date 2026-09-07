@@ -729,6 +729,17 @@ const run = async () => {
       JSON.stringify(back.groups[0] && back.groups[0].surface));
   }
 
+  // The same sentence, with and without the space the player left in it.
+  {
+    const whole = '私の場合は繋がるわけじゃないのかも';
+    const broken = '私の場合は繋がるわけじゃ ないのかも';
+    const read = async (text) => (await Lookup.locateTokens(text, db)).map((t) => t.word);
+    check('a wrapped line reads as words that are not there',
+      (await read(broken)).indexOf('別') !== -1, (await read(broken)).join(' '));
+    check('and without the space it is one expression again',
+      (await read(whole)).indexOf('わけじゃない') !== -1, (await read(whole)).join(' '));
+  }
+
   // --- a line cut in half mid-word ---------------------------------------
   // Automatic captions break wherever the speaker draws breath, which is
   // regularly in the middle of a verb. Read on its own, the end of such a
@@ -1051,11 +1062,26 @@ const run = async () => {
   check('a rolling caption grows into one line rather than four',
     rolling.length === 2, JSON.stringify(rolling.map((c) => c.text)));
   check('and the line kept is the whole of it, not the first word',
-    rolling[0].text === 'きょうは とても あついです', JSON.stringify(rolling[0]));
+    rolling[0].text === 'きょうはとてもあついです', JSON.stringify(rolling[0]));
   check('the rolled line runs from the first word to the end of the last',
     rolling[0].start === 1 && rolling[0].end === 3, JSON.stringify(rolling[0]));
   check('a line that is not a continuation still starts a new one',
     rolling[1].text === 'そうですね', JSON.stringify(rolling[1]));
+
+  // A caption that wraps arrives with a space where it broke, and a space is
+  // not a word boundary in Japanese: it is where the renderer ran out of room.
+  // Left in, it cut 繋がるわけじゃないのかも into 繋がる, 別, じゃ and ない.
+  const wrapped = Subs.parse({ events: [
+    { tStartMs: 0, dDurationMs: 2000, segs: [{ utf8: '私の場合は繋がるわけじゃ\nないのかも' }] }
+  ] });
+  check('a line the player wrapped is read as one line',
+    wrapped[0].text === '私の場合は繋がるわけじゃないのかも', JSON.stringify(wrapped[0].text));
+
+  const latin = Subs.parse({ events: [
+    { tStartMs: 0, dDurationMs: 2000, segs: [{ utf8: 'hello   world' }] }
+  ] });
+  check('a space between words that need one is left alone',
+    latin[0].text === 'hello world', JSON.stringify(latin[0].text));
 
   // Lines that run straight into each other are joined with nothing between
   // them, because that is where an automatic caption cuts a word in half.

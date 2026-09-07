@@ -610,6 +610,14 @@ fall across the line on screen. 見に行っ is then part of 見に行く rather
 of it on each, since that is what is on screen. The whole video is joined the
 same way before it is scored.
 
+There is a second way a line gets cut, inside a single line rather than between
+two. A caption that is too long to fit is wrapped by the player, and the break
+arrives in the text as an ordinary space. Japanese does not put spaces between
+words, so a space between two Japanese characters is not a boundary and is
+removed: with it left in, 繋がるわけじゃないのかも was read as 繋がる, 別, じゃ
+and ない, three of which are not what is written there. A space between anything
+else, Latin words included, is left exactly as it is.
+
 A line that ends a sentence, or that has a gap in the timing after it, keeps
 its break. Joining those would invent words across them.
 
