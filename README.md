@@ -489,9 +489,9 @@ lists, known and ignored, into a single JSON file with the date in its name.
 
 This is the one part of LLL that cannot be rebuilt. The dictionary downloads
 again in a minute and the Anki settings are a minute of typing, but a known
-list is however many months of reading, and it lives in one browser profile,
-belonging to an add-on that still has to be loaded again by hand every time
-Firefox restarts. Worth keeping a copy somewhere.
+list is however many months of reading. LLL keeps a copy for you as well, once
+a day, described below; this is the button for when you want one now, or want
+it somewhere of your own choosing.
 
 Loading a file back **adds** to what is already there. Nothing is removed and
 nothing is overwritten, and where the same word is in both, the earlier of the
@@ -502,6 +502,44 @@ side and ignored on the other, known wins, since the two lists still cannot
 both hold it.
 
 A file that is not one LLL wrote is refused rather than half-read.
+
+### A copy is kept for you as well
+
+Once a day, the first time LLL starts, it writes both lists to
+**Downloads/LLL** with the date in the name. Nothing is asked and nothing is
+shown; the newest file is always the one to load back.
+
+This is not caution for its own sake. Everything LLL keeps lives inside the
+extension: the word lists, the deck settings, the dictionary. When that goes,
+it goes all at once, and an add-on loaded from `about:debugging` is removed by
+Firefox every time the browser closes. Reload it and you have a fresh
+extension: the dictionary rebuilds, the deck settings are blank, and the word
+lists are empty. Nothing LLL can do from inside will save it, which is why the
+copy goes outside.
+
+**The real fix is not to install it that way.** Either run it in Firefox
+Developer Edition with `xpinstall.signatures.required` set to false in
+`about:config` and install the folder as an add-on, or sign it through
+addons.mozilla.org as an unlisted add-on, which gives back an .xpi that
+installs permanently in ordinary Firefox. Until then, expect a restart to cost
+you everything except the copy in Downloads.
+
+### Losing words a few at a time
+
+Two smaller ways the lists could shrink are closed off.
+
+Every change is a read of the whole list, an edit, and a write of the whole
+list back. Two of those at once, marking a word while the settings page
+removes another, meant both read the same list and the second write undid the
+first. Changes now wait their turn. Left alone, three words marked at the same
+moment came out as one.
+
+And a read that comes back empty when it should not looks exactly like an
+empty list, so the write that follows replaces months of reading with one
+word. The number of words in each list is now kept beside it, and a read that
+disagrees with it is treated as the failure it is: nothing is written, and you
+are told to try again. A copy of each list is kept under its own name too, so
+a list going missing on its own is put back at the next start.
 
 ---
 

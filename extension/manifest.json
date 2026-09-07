@@ -13,7 +13,8 @@
     "storage",
     "unlimitedStorage",
     "webRequest",
-    "webRequestBlocking"
+    "webRequestBlocking",
+    "downloads"
   ],
   "background": {
     "scripts": [

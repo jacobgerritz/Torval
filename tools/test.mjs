@@ -1262,7 +1262,13 @@ const run = async () => {
       storage: {
         onChanged: noop,
         local: {
-          async get(key) { return key in stored ? { [key]: stored[key] } : {}; },
+          async get(keys) {
+            const names = typeof keys === 'string' ? [keys]
+              : Array.isArray(keys) ? keys : Object.keys(keys || stored);
+            const out = {};
+            for (const name of names) if (name in stored) out[name] = stored[name];
+            return out;
+          },
           async set(values) { Object.assign(stored, values); }
         }
       },
@@ -1317,6 +1323,56 @@ const run = async () => {
     check('a file from something else is refused', !junk.ok && !nothing.ok);
     check('a refused file leaves both lists exactly as they were',
       JSON.stringify(stored) === before);
+
+    // --- and the two ways a list could be lost altogether -----------------
+
+    // Every change is a read, an edit and a write of the whole list, so a
+    // read that comes back empty when it should not writes one word over
+    // months of reading. It has to refuse instead.
+    stored.knownWords = { '本': 1, '人': 2, '車': 3 };
+    stored.wordCounts = { knownWords: 3 };
+    const realGet = fakeApi.storage.local.get;
+    fakeApi.storage.local.get = async (keys) => {
+      const out = await realGet(keys);
+      if ('knownWords' in out) out.knownWords = {};   // storage having a bad day
+      return out;
+    };
+    const refused = await send({ type: 'setKnown', word: '新しい', known: true });
+    fakeApi.storage.local.get = realGet;
+    check('a list that comes back empty is not written over', !refused.ok, JSON.stringify(refused));
+    check('and the words are all still there afterwards',
+      Object.keys(stored.knownWords).length === 3, JSON.stringify(stored.knownWords));
+
+    // Two changes at once must not undo each other: both read the same list,
+    // and without taking turns the second write loses the first word.
+    stored.knownWords = { '本': 1 };
+    stored.wordCounts = { knownWords: 1 };
+    await Promise.all([
+      send({ type: 'setKnown', word: 'あ', known: true }),
+      send({ type: 'setKnown', word: 'い', known: true }),
+      send({ type: 'setKnown', word: 'う', known: true })
+    ]);
+    check('changes made at the same time all survive',
+      ['本', 'あ', 'い', 'う'].every((w) => w in stored.knownWords),
+      JSON.stringify(Object.keys(stored.knownWords)));
+
+    // A list that has gone missing on its own is put back from the copy
+    // written beside it, which is what a browser restart used to take away
+    // along with everything else.
+    delete stored.knownWords;
+    await sandbox.rescueLists();
+    check('a list that has gone missing comes back from its copy',
+      stored.knownWords && Object.keys(stored.knownWords).length === 4,
+      JSON.stringify(stored.knownWords));
+
+    // Emptying a list on purpose is left exactly as it is.
+    await send({ type: 'forgetWords', words: Object.keys(stored.knownWords) });
+    await sandbox.rescueLists();
+    check('a list emptied on purpose is not filled back in',
+      Object.keys(stored.knownWords).length === 0, JSON.stringify(stored.knownWords));
+
+    // Back to the list the checks below are written against.
+    await send({ type: 'addKnownWords', words: ['本'] });
 
     const saved = await send({ type: 'exportWords' });
     check('a saved file is marked as ours and carries both lists',

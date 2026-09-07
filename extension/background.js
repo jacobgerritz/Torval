@@ -393,10 +393,42 @@ async function wordPlaces(text) {
 const KNOWN = 'knownWords';
 const IGNORED = 'ignoredWords';
 
+/*
+ * The word lists are the one thing in LLL that cannot be rebuilt, and every
+ * change to them is a read, an edit and a write of the whole list. That shape
+ * has two ways of losing everything, and both of them have to be closed.
+ *
+ * The first is a read that comes back empty when it should not have. Storage
+ * answering with nothing looks exactly like an empty list, and writing the
+ * edit then replaces months of reading with one word. So the number of words
+ * in each list is kept alongside it, and a read that comes back empty while
+ * that number says otherwise is treated as the failure it is: nothing is
+ * written and the caller is told.
+ *
+ * The second is two changes at once. Marking a word while the settings page
+ * removes another means both read the same list and the second write undoes
+ * the first. Every change to a list now waits its turn.
+ *
+ * And a copy of each list is kept under its own name, so that a list going
+ * missing on its own is something to recover from at the next start rather
+ * than something to notice weeks later.
+ */
+const COUNTS = 'wordCounts';
+const SAFE = { [KNOWN]: 'knownWordsCopy', [IGNORED]: 'ignoredWordsCopy' };
+
 // Read once and held, because a lookup asks about them on every single hover.
 // Any write clears the copy, including one made from the settings page, which
 // storage.onChanged is what catches.
 const caches = {};
+
+// Changes to the lists happen one at a time, in the order they were asked for.
+let turn = Promise.resolve();
+
+function inTurn(work) {
+  const mine = turn.then(work, work);
+  turn = mine.then(() => {}, () => {});
+  return mine;
+}
 
 async function wordSet(key) {
   if (!caches[key]) {
@@ -415,15 +447,61 @@ if (api.storage.onChanged) {
   });
 }
 
+/**
+ * One list, as it is on disk.
+ *
+ * Throws rather than answering with an empty list when there should be words
+ * in it. Everything above this reads a list, changes it and writes the whole
+ * thing back, so an empty answer here is a wiped list one line later.
+ */
 async function wordMap(key) {
-  const stored = await api.storage.local.get(key);
-  return stored[key] || {};
+  const stored = await api.storage.local.get([key, COUNTS]);
+  const map = stored[key];
+  const expected = (stored[COUNTS] || {})[key] || 0;
+  const have = map && typeof map === 'object' ? Object.keys(map).length : -1;
+
+  if (have < 0 && expected > 0) {
+    throw new Error('Your word list did not come back from storage, so nothing was changed. Try again in a moment.');
+  }
+  if (have === 0 && expected > 0) {
+    throw new Error('Your word list came back empty when it should have ' + expected +
+      ' words in it, so nothing was changed. Try again in a moment.');
+  }
+  return have > 0 ? map : {};
 }
 
+/**
+ * Write one list, its size, and the copy kept in case the list itself goes
+ * missing. One call, so the three cannot disagree.
+ */
 async function saveWords(key, map) {
-  await api.storage.local.set({ [key]: map });
+  const counts = (await api.storage.local.get(COUNTS))[COUNTS] || {};
+  counts[key] = Object.keys(map).length;
+  await api.storage.local.set({ [key]: map, [COUNTS]: counts, [SAFE[key]]: map });
   caches[key] = new Set(Object.keys(map));
-  return Object.keys(map).length;
+  return counts[key];
+}
+
+/**
+ * A list that has gone missing, put back from its copy at the next start.
+ *
+ * Only a list that is missing or empty when it should not be. Emptying a list
+ * on purpose leaves a count of nothing, which is left exactly as it is.
+ */
+async function rescueLists() {
+  const stored = await api.storage.local.get([KNOWN, IGNORED, SAFE[KNOWN], SAFE[IGNORED], COUNTS]);
+  const counts = stored[COUNTS] || {};
+  for (const key of [KNOWN, IGNORED]) {
+    const live = stored[key];
+    const copy = stored[SAFE[key]];
+    if (live && Object.keys(live).length) continue;
+    if (!copy || !Object.keys(copy).length) continue;
+    if (counts[key] === 0) continue;   // emptied on purpose
+    await api.storage.local.set({ [key]: copy });
+    delete caches[key];
+    console.warn('LLL: the ' + key + ' list was missing and has been put back from its copy, ' +
+      Object.keys(copy).length + ' words');
+  }
 }
 
 /** One list, with the date each word joined it, newest first, for browsing. */
@@ -436,31 +514,35 @@ async function wordList(key) {
 
 /** Add words to the known list. Ones already on it are left alone. */
 async function addKnownWords(words) {
-  const map = await wordMap(KNOWN);
-  let added = 0;
-  for (const word of words) {
-    if (!map[word]) { map[word] = Date.now(); added++; }
-  }
-  return { added, total: await saveWords(KNOWN, map) };
+  return inTurn(async () => {
+    const map = await wordMap(KNOWN);
+    let added = 0;
+    for (const word of words) {
+      if (!map[word]) { map[word] = Date.now(); added++; }
+    }
+    return { added, total: await saveWords(KNOWN, map) };
+  });
 }
 
 /**
  * Put one word on a list or take it off, what the popup's ✓ and ⊘ do, and
- * what 3 and 4 do from the keyboard. Going on one list comes off the other,
+ * what 2 and 3 do from the keyboard. Going on one list comes off the other,
  * since "I know this" and "never mention this again" cannot both be true.
  */
 async function setWordOn(key, word, on) {
-  const map = await wordMap(key);
-  if (on) { if (!map[word]) map[word] = Date.now(); }
-  else delete map[word];
-  const total = await saveWords(key, map);
+  return inTurn(async () => {
+    const map = await wordMap(key);
+    if (on) { if (!map[word]) map[word] = Date.now(); }
+    else delete map[word];
+    const total = await saveWords(key, map);
 
-  if (on) {
-    const other = key === KNOWN ? IGNORED : KNOWN;
-    const otherMap = await wordMap(other);
-    if (otherMap[word]) { delete otherMap[word]; await saveWords(other, otherMap); }
-  }
-  return { word, on: !!on, total };
+    if (on) {
+      const other = key === KNOWN ? IGNORED : KNOWN;
+      const otherMap = await wordMap(other);
+      if (otherMap[word]) { delete otherMap[word]; await saveWords(other, otherMap); }
+    }
+    return { word, on: !!on, total };
+  });
 }
 
 /**
@@ -496,6 +578,10 @@ async function importWords(data) {
   if (!data || typeof data !== 'object') throw new Error('That file is not a saved word list.');
   if (data.format !== 'lll-words') throw new Error('That is not a file LLL saved.');
 
+  return inTurn(async () => merged(data));
+}
+
+async function merged(data) {
   const known = await wordMap(KNOWN);
   const ignored = await wordMap(IGNORED);
   const added = { known: 0, ignored: 0 };
@@ -520,14 +606,60 @@ async function importWords(data) {
   };
 }
 
+/*
+ * A copy of the word lists, in the Downloads folder, once a day.
+ *
+ * Everything else LLL keeps lives inside the extension: the lists, the deck
+ * settings, the dictionary. When that goes, it all goes at once, which is
+ * what a browser restart can do to an add-on loaded from about:debugging.
+ * The dictionary downloads again and the settings are a minute of typing,
+ * but a known list is months of reading, so it is written out where nothing
+ * about the extension can reach it.
+ *
+ * Once a day at most, and only when there is something to save. The file is
+ * named for the day, so a week of them is a week of files rather than a
+ * thousand, and the newest is always the one to load back.
+ */
+const LAST_COPY = 'wordsCopiedOn';
+
+async function keepACopy() {
+  if (!api.downloads || !api.downloads.download) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const stored = await api.storage.local.get([LAST_COPY, COUNTS]);
+  if (stored[LAST_COPY] === today) return;
+
+  const counts = stored[COUNTS] || {};
+  if (!counts[KNOWN] && !counts[IGNORED]) return;   // nothing worth keeping yet
+
+  const words = await exportWords();
+  const blob = new Blob([JSON.stringify(words)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  try {
+    await api.downloads.download({
+      url,
+      filename: 'LLL/lll-words-' + today + '.json',
+      conflictAction: 'overwrite',
+      saveAs: false
+    });
+    await api.storage.local.set({ [LAST_COPY]: today });
+    console.log('LLL: kept a copy of your words in Downloads/LLL');
+  } catch (err) {
+    console.warn('LLL: could not keep a copy of your words:', err && err.message);
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+}
+
 /** Take words back off a list. */
 async function forgetFrom(key, words) {
-  const map = await wordMap(key);
-  let removed = 0;
-  for (const word of words) {
-    if (map[word]) { delete map[word]; removed++; }
-  }
-  return { removed, total: await saveWords(key, map) };
+  return inTurn(async () => {
+    const map = await wordMap(key);
+    let removed = 0;
+    for (const word of words) {
+      if (map[word]) { delete map[word]; removed++; }
+    }
+    return { removed, total: await saveWords(key, map) };
+  });
 }
 
 function loadTags() {
@@ -607,6 +739,13 @@ ready.catch((err) => {
 });
 
 async function start() {
+  // Before anything else: a list that has gone missing since last time is
+  // put back, and a copy of both is written somewhere the extension cannot
+  // lose. Neither depends on the dictionary, and both matter most in exactly
+  // the case where the dictionary is about to be rebuilt from nothing.
+  await rescueLists().catch((err) => console.warn('LLL: could not check the word lists:', err && err.message));
+  keepACopy().catch(() => {});
+
   const db = await openDatabase();
   const meta = await fetchJson('data/meta.json');
   const installed = await get(db, STATE, 'meta');
