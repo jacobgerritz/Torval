@@ -188,7 +188,9 @@ var LLLVideo = (function () {
       await until(function () { return video.currentTime >= from + length; },
         length * 1000 + 5000);
       recorder.stop();
-      await finished;
+      // A recorder that never says it stopped would otherwise hold the card
+      // for ever. Whatever has been captured by then is what there is.
+      await Promise.race([finished, wait(3000)]);
     } catch (err) {
       try { recorder.stop(); } catch (ignored) { /* already stopped */ }
       return null;
@@ -213,6 +215,10 @@ var LLLVideo = (function () {
       await seeked(video);
       if (paused) video.pause(); else video.play();
     } catch (err) { /* the page took the video away mid-capture */ }
+  }
+
+  function wait(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
   }
 
   function seeked(video) {

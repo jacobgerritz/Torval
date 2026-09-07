@@ -326,6 +326,25 @@ const run = async () => {
   check('alreadyHave reports no duplicate for a genuinely new word',
     !(await Anki.alreadyHave(mining, { word: '新語' })));
 
+  // A call that never answers must end in something being said, rather than in
+  // the + on a card showing a dot for ever, which is what it did.
+  Anki._deadlines(0.05, 0.05);
+  globalThis.fetch = (url, init) => new Promise((resolve, reject) => {
+    // No deadline set means the old behaviour: this would hang for ever, so
+    // it fails quickly instead, and with a different message.
+    if (!init || !init.signal) { setTimeout(() => reject(new Error('no deadline')), 20); return; }
+    init.signal.addEventListener('abort', () => {
+      const stop = new Error('aborted');
+      stop.name = 'AbortError';
+      reject(stop);
+    });
+  });
+  let said = null;
+  await Anki.addNote(mining, { word: '待つ', sentence: 'D' }).catch((e) => { said = e.message; });
+  check('a request that never answers ends in a message, not in silence',
+    /did not answer/.test(said || ''), String(said));
+  Anki._deadlines(10, 8);
+
   // Deck names nest with colons, which must survive; a word's own colon must not.
   check('deck names keep their colons, field values do not',
     Anki.escapeSearch('A::B') === 'A::B' && Anki.escapeSearch('a:b', true) === 'a\\:b',

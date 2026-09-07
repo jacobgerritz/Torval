@@ -46,21 +46,44 @@ var LLLAnki = (function () {
     [/^(sentence ?audio|expression ?audio|context ?audio)$/i, 'sentenceAudio']
   ];
 
+  // Every request gets a deadline. Without one, a call that simply never
+  // answers leaves the + on a card showing a dot for ever, with nothing said
+  // and nothing to be done about it. Anki waiting on a dialog of its own is
+  // enough to cause that, and so is a network that accepts a connection and
+  // then goes quiet.
+  var ANKI_SECONDS = 10;
+  var AUDIO_SECONDS = 8;
+
+  function deadline(seconds) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, seconds * 1000);
+    return { signal: controller.signal, done: function () { clearTimeout(timer); } };
+  }
+
   async function invoke(url, action, params) {
+    var limit = deadline(ANKI_SECONDS);
     var res;
     try {
       res = await fetch(url || DEFAULT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: action, version: 6, params: params || {} })
+        body: JSON.stringify({ action: action, version: 6, params: params || {} }),
+        signal: limit.signal
       });
     } catch (err) {
-      throw new Error('Anki is not answering. Is it running, with the AnkiConnect add-on installed?');
+      limit.done();
+      throw new Error(err && err.name === 'AbortError'
+        ? 'Anki did not answer within ' + ANKI_SECONDS + ' seconds. Is it waiting on a dialog?'
+        : 'Anki is not answering. Is it running, with the AnkiConnect add-on installed?');
     }
-    if (!res.ok) throw new Error('AnkiConnect replied with ' + res.status);
-    var data = await res.json();
-    if (data.error) throw new Error(data.error);
-    return data.result;
+    try {
+      if (!res.ok) throw new Error('AnkiConnect replied with ' + res.status);
+      var data = await res.json();
+      if (data.error) throw new Error(data.error);
+      return data.result;
+    } finally {
+      limit.done();
+    }
   }
 
   /** Everything the options page needs to draw itself. */
@@ -99,12 +122,18 @@ var LLLAnki = (function () {
     var url = AUDIO_URL + '?kanji=' + encodeURIComponent(word) +
       '&kana=' + encodeURIComponent(reading || word);
     var buffer;
+    var limit = deadline(AUDIO_SECONDS);
     try {
-      var res = await fetch(url);
+      var res = await fetch(url, { signal: limit.signal });
       if (!res.ok) return null;
       buffer = await res.arrayBuffer();
     } catch (err) {
-      return null;   // no audio is not a reason to lose the card
+      // No audio is not a reason to lose the card, and a pronunciation
+      // service that has stopped answering is certainly not a reason to
+      // leave somebody watching a dot.
+      return null;
+    } finally {
+      limit.done();
     }
     if (buffer.byteLength < MIN_AUDIO_BYTES) return null;
     if (await sha256(buffer) === NO_AUDIO_SHA256) return null;
@@ -251,6 +280,8 @@ var LLLAnki = (function () {
     fieldFor: fieldFor,
     alreadyHave: alreadyHave,
     fetchAudio: fetchAudio,
+    // Exposed so the tests can watch a deadline pass without waiting for one.
+    _deadlines: function (anki, audio) { ANKI_SECONDS = anki; AUDIO_SECONDS = audio; },
     audioFilename: audioFilename,
     addNote: addNote
   };
