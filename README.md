@@ -618,6 +618,11 @@ removed: with it left in, 繋がるわけじゃないのかも was read as 繋�
 and ない, three of which are not what is written there. A space between anything
 else, Latin words included, is left exactly as it is.
 
+When the transcript could not be fetched and LLL is reading captions off the
+screen, a line is only known once it has ended, so the line showing has no
+line after it yet: only what came before it can be used. The last word of a
+line stays cut until the next line arrives, and is whole from then on.
+
 A line that ends a sentence, or that has a gap in the timing after it, keeps
 its break. Joining those would invent words across them.
 

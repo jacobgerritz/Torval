@@ -1104,6 +1104,28 @@ const run = async () => {
   check('a line after a gap is left to stand on its own',
     Subs.around('今日は雨です。').before === '' && Subs.around('今日は雨です。').after === '',
     JSON.stringify(Subs.around('今日は雨です。')));
+  // Reading captions off the screen, which is what happens whenever the
+  // transcript cannot be fetched, files a line only once it has ended. The
+  // line being read is the open one and the line after it has not been said,
+  // so looking only through the finished lines found nothing at all and left
+  // every line without the context this was built to give it.
+  Subs._setCues([{ start: 0, end: 2, text: '私の場合は繋がるわけじゃ' }]);
+  Subs._setOpen({ start: 2, text: 'ないのかもっていうことなんですよね。皆' });
+  check('the line on screen is told what came before it, even before it ends',
+    Subs.around('ないのかもっていうことなんですよね。皆').before === '私の場合は繋がるわけじゃ',
+    JSON.stringify(Subs.around('ないのかもっていうことなんですよね。皆')));
+
+  Subs._setCues([
+    { start: 0, end: 2, text: '私の場合は繋がるわけじゃ' },
+    { start: 2, end: 4, text: 'ないのかもっていうことなんですよね。皆' }
+  ]);
+  Subs._setOpen({ start: 4, text: 'さんがこう日常とか仕事の中で何を軸に' });
+  check('and so is the one after that, when it arrives',
+    Subs.around('さんがこう日常とか仕事の中で何を軸に').before ===
+      'ないのかもっていうことなんですよね。皆',
+    JSON.stringify(Subs.around('さんがこう日常とか仕事の中で何を軸に')));
+
+  Subs._setOpen(null);
   Subs._setCues(parsed);
 
   // A roll that never stops must not grow into one cue covering half the

@@ -1047,15 +1047,35 @@ var LLLSubtitles = (function () {
   function around(text) {
     var wanted = strip(text || '');
     if (!wanted) return { before: '', after: '' };
+
+    // The line on screen is very often not in `cues` at all. Reading captions
+    // off the screen, which is what happens whenever the transcript cannot be
+    // fetched, only files a line once it has ended: the one being read now is
+    // the open one, and the line after it has not been said yet. Looking only
+    // through the finished lines found nothing and gave the line no context,
+    // which is exactly the case this was written for.
+    if (openCue && sameLine(openCue.text, wanted)) {
+      var last = cues.length ? cues[cues.length - 1] : null;
+      return {
+        before: last && continues(last, openCue) ? last.text : '',
+        after: ''
+      };
+    }
+
     for (var i = 0; i < cues.length; i++) {
-      var here = strip(cues[i].text);
-      if (!here || (here.indexOf(wanted) === -1 && wanted.indexOf(here) === -1)) continue;
+      if (!sameLine(cues[i].text, wanted)) continue;
       return {
         before: i > 0 && continues(cues[i - 1], cues[i]) ? cues[i - 1].text : '',
         after: i + 1 < cues.length && continues(cues[i], cues[i + 1]) ? cues[i + 1].text : ''
       };
     }
     return { before: '', after: '' };
+  }
+
+  /** Is this cue the line that is being asked about? */
+  function sameLine(text, wanted) {
+    var here = strip(text);
+    return !!here && (here.indexOf(wanted) !== -1 || wanted.indexOf(here) !== -1);
   }
 
   /** Enough to tell whether the transcript has changed since last asked. */
@@ -1081,7 +1101,10 @@ var LLLSubtitles = (function () {
     insertObserved: insertObserved,
     isContinuation: isContinuation,
     status: function () { return state; },
-    _setCues: function (list) { cues = list; state = 'ready'; }
+    _setCues: function (list) { cues = list; state = 'ready'; },
+    // The line in progress, which is where a line lives while it is on
+    // screen when captions are being read off the screen.
+    _setOpen: function (cue) { openCue = cue; }
   };
 })();
 
