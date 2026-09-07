@@ -740,6 +740,35 @@ const run = async () => {
       (await read(whole)).indexOf('わけじゃない') !== -1, (await read(whole)).join(' '));
   }
 
+  // --- hovering a word that the caption cut in half ----------------------
+  // Three consecutive subtitles from a real video, cut mid-word at both
+  // joins. Hovering the first character of a line has to see the line before
+  // it, or the popup answers with a fragment: ない rather than わけじゃない,
+  // さん rather than 皆さん. This is the path a hover takes, tokenAt to find
+  // which word the cursor is in and then search for what to show.
+  {
+    const one = '私の場合は繋がるわけじゃ';
+    const two = 'ないのかもっていうことなんですよね。皆';
+    const three = 'さんがこう日常とか仕事の中で何を軸に';
+
+    const hover = async (before, line, after, at) => {
+      const text = before + line + after;
+      const found = await Lookup.tokenAt(text, before.length + at, db);
+      const groups = await Lookup.search(text.slice(found.start), db, found.length);
+      return groups.length ? groups[0].hits[0].word : null;
+    };
+
+    check('a line read on its own answers a hover with a fragment',
+      await hover('', two, '', 0) === 'ない', await hover('', two, '', 0));
+    check('with the line before it, the word is whole',
+      await hover(one, two, three, 0) === 'わけじゃない', await hover(one, two, three, 0));
+    check('and the word cut off the end of a line is whole too',
+      await hover(one, two, three, two.length - 1) === '皆さん',
+      await hover(one, two, three, two.length - 1));
+    check('as it is from the other side of the join',
+      await hover(two, three, '', 0) === '皆さん', await hover(two, three, '', 0));
+  }
+
   // --- a line cut in half mid-word ---------------------------------------
   // Automatic captions break wherever the speaker draws breath, which is
   // regularly in the middle of a verb. Read on its own, the end of such a
@@ -1093,16 +1122,20 @@ const run = async () => {
     { start: 9, end: 11, text: '今日は雨です。' },
     { start: 11, end: 13, text: '明日は晴れます' }
   ]);
+  // The whole video is one continuous text, the way a book is. Where a line
+  // ends is where the renderer ran out of room or the speaker drew breath,
+  // and neither has anything to do with where a word ends, so no break is put
+  // in at all. Sentences still stop the reading on their own, because 。 is
+  // not a Japanese character and ends a run wherever it appears.
   check('a word split across two lines is joined back up for reading',
     Subs.allText().indexOf('見に行ったので') !== -1, JSON.stringify(Subs.allText()));
-  check('a finished sentence keeps its break',
-    Subs.allText().indexOf('\u96e8\u3067\u3059\u3002\n\u660e\u65e5') !== -1,
-    JSON.stringify(Subs.allText()));
-  check('a line that carries on is told what came before it',
+  check('no breaks are put between the lines at all',
+    Subs.allText().indexOf('\n') === -1, JSON.stringify(Subs.allText()));
+  check('a line is told what came before it',
     Subs.around('たので楽しかった').before === '昨日は友達と映画を見に行っ',
     JSON.stringify(Subs.around('たので楽しかった')));
-  check('a line after a gap is left to stand on its own',
-    Subs.around('今日は雨です。').before === '' && Subs.around('今日は雨です。').after === '',
+  check('and what comes after it',
+    Subs.around('今日は雨です。').after === '明日は晴れます',
     JSON.stringify(Subs.around('今日は雨です。')));
   // Reading captions off the screen, which is what happens whenever the
   // transcript cannot be fetched, files a line only once it has ended. The

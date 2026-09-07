@@ -603,12 +603,17 @@ in the middle of a word: one line ends 見に行っ and the next begins たの�
 on its own, the end of that line is fragments that are not words, and every one
 of them looks unknown.
 
-So a subtitle line is read together with the lines either side of it, where
-they run straight on from each other, and what gets marked is the words as they
-fall across the line on screen. 見に行っ is then part of 見に行く rather than 見,
-に and 行. A word lying across the join is marked on both lines, cut to the part
-of it on each, since that is what is on screen. The whole video is joined the
-same way before it is scored.
+So a subtitle line is never read on its own. It is read with the line before
+and the line after it, for the popup as well as for the marking: hovering the
+ない at the start of a line answers わけじゃない, because the わけじゃ that ended
+the line before it is there to be seen. What gets marked is the words as they
+fall across the line on screen, and a word lying across a join is marked on both
+lines, cut to the part of it on each.
+
+The whole video is one continuous text for the same reason, with no breaks put
+between the lines at all, the way a book is one text. Sentences still stop the
+reading on their own, since 。 and 、 are not Japanese characters and end a run
+wherever they appear.
 
 There is a second way a line gets cut, inside a single line rather than between
 two. A caption that is too long to fit is wrapped by the player, and the break
@@ -623,8 +628,6 @@ screen, a line is only known once it has ended, so the line showing has no
 line after it yet: only what came before it can be used. The last word of a
 line stays cut until the next line arrives, and is whole from then on.
 
-A line that ends a sentence, or that has a gap in the timing after it, keeps
-its break. Joining those would invent words across them.
 
 ### What it still gets wrong
 

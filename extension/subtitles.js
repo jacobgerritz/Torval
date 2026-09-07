@@ -1020,17 +1020,18 @@ var LLLSubtitles = (function () {
    * are in here, and the answer can only ever describe what has been seen so
    * far rather than what is coming.
    */
+  /**
+   * The whole video as one continuous text, the way a book is one text.
+   *
+   * No breaks between the lines at all. Where a line ends is where the
+   * caption renderer ran out of room or the speaker drew breath, and neither
+   * has anything to do with where a word ends. Sentences still break the
+   * reading, because 。 and 、 are not Japanese characters and stop a run on
+   * their own; a caption with no punctuation in it, which is most automatic
+   * ones, is simply read straight through.
+   */
   function allText() {
-    var out = [];
-    for (var i = 0; i < cues.length; i++) {
-      // A line that runs straight into the next one is joined to it with
-      // nothing in between, because that is where automatic captions cut a
-      // word in half. A line that ends a sentence, or that has a gap after
-      // it, keeps the break: joining those would invent words across it.
-      if (i > 0) out.push(continues(cues[i - 1], cues[i]) ? '' : '\n');
-      out.push(cues[i].text);
-    }
-    return out.join('');
+    return cues.map(function (cue) { return cue.text; }).join('');
   }
 
   /** Does this line carry straight on from the one before it? */
@@ -1056,17 +1057,14 @@ var LLLSubtitles = (function () {
     // which is exactly the case this was written for.
     if (openCue && sameLine(openCue.text, wanted)) {
       var last = cues.length ? cues[cues.length - 1] : null;
-      return {
-        before: last && continues(last, openCue) ? last.text : '',
-        after: ''
-      };
+      return { before: last ? last.text : '', after: '' };
     }
 
     for (var i = 0; i < cues.length; i++) {
       if (!sameLine(cues[i].text, wanted)) continue;
       return {
-        before: i > 0 && continues(cues[i - 1], cues[i]) ? cues[i - 1].text : '',
-        after: i + 1 < cues.length && continues(cues[i], cues[i + 1]) ? cues[i + 1].text : ''
+        before: i > 0 ? cues[i - 1].text : '',
+        after: i + 1 < cues.length ? cues[i + 1].text : ''
       };
     }
     return { before: '', after: '' };

@@ -454,6 +454,33 @@
       found.at >= hoverFrom && found.at < hoverTo;
   }
 
+  /**
+   * What to send to be looked up, and where the answer will be measured from.
+   *
+   * Ordinarily that is the sixteen characters around the cursor, counted from
+   * where they start in the block. On a subtitle it is the whole line with
+   * the lines either side of it, because a caption ends where the speaker
+   * drew breath and not where a word does: hovering ない at the start of a
+   * line has to be able to see the わけじゃ that ended the line before it, or
+   * the popup answers with ない, which is not the word on the screen.
+   */
+  function askFor(found) {
+    const plain = { text: found.text, point: found.point, origin: found.base };
+    if (typeof LLLSubtitles === 'undefined' || !LLLSubtitles.around) return plain;
+    const block = found.block;
+    if (!block || !block.closest || !block.closest('[data-lll-subtitle]')) return plain;
+
+    const beside = LLLSubtitles.around(found.whole);
+    const before = beside.before || '';
+    const after = beside.after || '';
+    if (!before && !after) return plain;
+    return {
+      text: before + found.whole + after,
+      point: before.length + found.at,
+      origin: -before.length
+    };
+  }
+
   async function hoverScan(found) {
     if (!found) { clearHover(); return; }
 
@@ -473,9 +500,10 @@
     hoverState = 'unknown';
     const token = ++hoverToken;
 
+    const asked = askFor(found);
     let reply;
     try {
-      reply = await api.runtime.sendMessage({ type: 'lookup', text: found.text, point: found.point });
+      reply = await api.runtime.sendMessage({ type: 'lookup', text: asked.text, point: asked.point });
     } catch (err) {
       return;   // background restarting; the next hover will retry
     }
@@ -489,14 +517,18 @@
     // The word may genuinely have begun before the character the cursor
     // happened to land on, hovering anywhere inside ネカフェ still finds
     // and marks the whole word, not just whatever was directly underneath.
-    const from = found.base + (typeof reply.start === 'number' ? reply.start : found.point);
+    const answered = asked.origin + (typeof reply.start === 'number' ? reply.start : asked.point);
+    // A word that began on the line before this one starts, for marking
+    // purposes, at the beginning of this one, and stops where this one does.
+    const from = Math.max(0, answered);
+    const length = Math.min(top.length - (from - answered), found.whole.length - from);
     hoverBlock = found.block;
     hoverSpan = found.text;
     hoverFrom = from;
-    hoverTo = from + top.length;
+    hoverTo = from + length;
 
-    const start = locateInPieces(found.pieces, from);
-    if (start) paintHover(start.node, start.offset, top.length);
+    const start = length > 0 ? locateInPieces(found.pieces, from) : null;
+    if (start) paintHover(start.node, start.offset, length);
   }
 
   function clearHover() {
@@ -613,6 +645,10 @@
     return {
       text: block.text.slice(start, end), node: loc.node, offset: loc.offset,
       point: at - start, pieces: block.pieces, base: start,
+      // The whole of what this block says, for the times when sixteen
+      // characters either side of the cursor is not enough to know what a
+      // word is.
+      whole: block.text,
       // Where the cursor is in the block's own terms, and which block that
       // is, so hovering can tell "still the same word" from "the next word
       // along" without asking the dictionary again.
