@@ -1005,7 +1005,41 @@ var LLLSubtitles = (function () {
    * far rather than what is coming.
    */
   function allText() {
-    return cues.map(function (cue) { return cue.text; }).join('\n');
+    var out = [];
+    for (var i = 0; i < cues.length; i++) {
+      // A line that runs straight into the next one is joined to it with
+      // nothing in between, because that is where automatic captions cut a
+      // word in half. A line that ends a sentence, or that has a gap after
+      // it, keeps the break: joining those would invent words across it.
+      if (i > 0) out.push(continues(cues[i - 1], cues[i]) ? '' : '\n');
+      out.push(cues[i].text);
+    }
+    return out.join('');
+  }
+
+  /** Does this line carry straight on from the one before it? */
+  function continues(previous, next) {
+    if (!previous || !next) return false;
+    if (next.start - previous.end > 0.4) return false;
+    return !/[。．.!?！？」』、]\s*$/.test(previous.text);
+  }
+
+  /**
+   * The lines either side of the one showing, so it can be read without its
+   * ends being cut off mid-word.
+   */
+  function around(text) {
+    var wanted = strip(text || '');
+    if (!wanted) return { before: '', after: '' };
+    for (var i = 0; i < cues.length; i++) {
+      var here = strip(cues[i].text);
+      if (!here || (here.indexOf(wanted) === -1 && wanted.indexOf(here) === -1)) continue;
+      return {
+        before: i > 0 && continues(cues[i - 1], cues[i]) ? cues[i - 1].text : '',
+        after: i + 1 < cues.length && continues(cues[i], cues[i + 1]) ? cues[i + 1].text : ''
+      };
+    }
+    return { before: '', after: '' };
   }
 
   /** Enough to tell whether the transcript has changed since last asked. */
@@ -1019,6 +1053,7 @@ var LLLSubtitles = (function () {
     enable: enable,
     cueAt: cueAt,
     cueFor: cueFor,
+    around: around,
     suspend: suspend,
     parse: parse,
     parseXml: parseXml,

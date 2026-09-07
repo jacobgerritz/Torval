@@ -948,6 +948,37 @@ var LLLLookup = (function () {
    * counting them as known would say the opposite; neither is true, so they
    * come out of the total altogether.
    */
+  /**
+   * The words of a longer text as they fall across one stretch of it, counted
+   * from the start of that stretch.
+   *
+   * Reading a subtitle line on its own gets its ends wrong whenever the line
+   * was cut mid-word, which automatic captions do constantly: a line ending
+   * 見に行っ and the next beginning たので are two fragments, and neither is a
+   * word. Read together the word is whole again.
+   *
+   * A word lying across the join is kept on both lines, cut to the part of it
+   * that is actually on each. It is the same word either way, and what is on
+   * screen is what gets marked: leaving it off whichever line it did not
+   * start on would put an unmarked hole in the middle of a sentence.
+   */
+  function within(tokens, from, length) {
+    var out = [];
+    var end = from + length;
+    for (var i = 0; i < tokens.length; i++) {
+      var token = tokens[i];
+      var start = Math.max(token.start, from);
+      var stop = Math.min(token.start + token.length, end);
+      if (stop <= start) continue;
+      var moved = {};
+      for (var key in token) moved[key] = token[key];
+      moved.start = start - from;
+      moved.length = stop - start;
+      out.push(moved);
+    }
+    return out;
+  }
+
   function coverage(tokens, known, ignored) {
     var counts = {};
     var hits = 0;
@@ -1004,6 +1035,7 @@ var LLLLookup = (function () {
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
     coverage: coverage,
+    within: within,
     isKnown: isKnown,
     MAX_SCAN: MAX_SCAN
   };

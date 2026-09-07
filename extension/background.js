@@ -113,7 +113,7 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     case 'extractWords': return guard(() => extractWords(message.text));
     case 'comprehension': return guard(() => comprehension(message.text));
-    case 'wordPlaces':   return guard(() => wordPlaces(message.text));
+    case 'wordPlaces':   return guard(() => wordPlaces(message.text, message.before, message.after));
     case 'knownList':    return guard(() => wordList(KNOWN));
     case 'ignoredList':  return guard(() => wordList(IGNORED));
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
@@ -342,10 +342,17 @@ async function effectiveKnown(text, tokens, reader, known) {
  * rather than recomputed when a word is later marked known, so ticking one
  * word does not shuffle the colour of every unrelated word after it.
  */
-async function wordPlaces(text) {
+async function wordPlaces(text, before, after) {
   await requireDictionary();
   const reader = cachingReader();
-  const tokens = await LLLLookup.locateTokens(text, reader);
+  // Read with whatever came before and after, so that a line cut mid-word,
+  // which automatic captions do constantly, is still read as the word it is.
+  // Only the words starting inside this line are kept.
+  const lead = String(before || '').slice(-CONTEXT);
+  const trail = String(after || '').slice(0, CONTEXT);
+  const whole = lead + text + trail;
+  const found = await LLLLookup.locateTokens(whole, reader);
+  const tokens = LLLLookup.within(found, lead.length, text.length);
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   const ignored = await ignoredSet();
 
@@ -390,6 +397,11 @@ async function wordPlaces(text) {
  * A word is one or the other or neither, never both: putting it on one list
  * takes it off the other.
  */
+// How much of the lines either side of a subtitle to read along with it.
+// Enough to finish a word that was cut in half, not so much that the line
+// takes noticeably longer to read.
+const CONTEXT = 24;
+
 const KNOWN = 'knownWords';
 const IGNORED = 'ignoredWords';
 

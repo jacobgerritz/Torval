@@ -363,6 +363,7 @@ const run = async () => {
   check('a colon in the word is escaped, not read as a search field',
     sentToAnki.params.query.indexOf('a\\:b') !== -1, sentToAnki.params.query);
 
+
   // Deck names nest with colons, which must survive; a word's own colon must not.
   check('deck names keep their colons, field values do not',
     Anki.escapeSearch('A::B') === 'A::B' && Anki.escapeSearch('a:b', true) === 'a\\:b',
@@ -728,6 +729,45 @@ const run = async () => {
       JSON.stringify(back.groups[0] && back.groups[0].surface));
   }
 
+  // --- a line cut in half mid-word ---------------------------------------
+  // Automatic captions break wherever the speaker draws breath, which is
+  // regularly in the middle of a verb. Read on its own, the end of such a
+  // line is a handful of fragments that are not words; read with the line
+  // that follows it, the word is whole.
+  {
+    const line = '昨日は友達と映画を見に行っ';
+    const next = 'たので、とても楽しかった';
+
+    const alone = (await Lookup.locateTokens(line, db)).map((t) => t.word);
+    check('a line cut mid-verb reads as fragments on its own',
+      alone.indexOf('見に行く') === -1, alone.join(' '));
+
+    const whole = await Lookup.locateTokens(line + next, db);
+    const together = Lookup.within(whole, 0, line.length);
+    check('read with the line after it, the verb is whole again',
+      together.some((t) => t.word === '見に行く'), together.map((t) => t.word).join(' '));
+    check('and the fragments it was read as are gone',
+      !together.some((t) => t.word === '行'), together.map((t) => t.word).join(' '));
+
+    // The part of that verb on each line is marked on that line, so neither
+    // is left with an unmarked hole in it.
+    check('the first line marks the part of the word that is on it',
+      together.some((t) => t.word === '見に行く' &&
+        line.slice(t.start, t.start + t.length) === '見に行っ'),
+      JSON.stringify(together.map((t) => [t.word, line.slice(t.start, t.start + t.length)])));
+
+    const second = Lookup.within(whole, line.length, next.length);
+    check('and the second line marks the rest of it',
+      second.some((t) => t.word === '見に行く' && t.start === 0 && t.length === 1),
+      JSON.stringify(second.map((t) => [t.word, t.start, t.length])));
+
+    // Nothing is asked for, nothing changes: a line read with no neighbours
+    // comes back exactly as it was.
+    const plain = await Lookup.locateTokens(line, db);
+    check('with nothing either side, the words are left as they are',
+      JSON.stringify(Lookup.within(plain, 0, line.length)) === JSON.stringify(plain));
+  }
+
   // --- crediting a transparent phrase for parts already known -------------
   // お元気ですか ("how are you") is filed in JMdict as one "exp" entry, but it
   // is nothing more than the honorific お, 元気, the copula です and the
@@ -1016,6 +1056,29 @@ const run = async () => {
     rolling[0].start === 1 && rolling[0].end === 3, JSON.stringify(rolling[0]));
   check('a line that is not a continuation still starts a new one',
     rolling[1].text === 'そうですね', JSON.stringify(rolling[1]));
+
+  // Lines that run straight into each other are joined with nothing between
+  // them, because that is where an automatic caption cuts a word in half.
+  // A finished sentence, or a gap in the timing, keeps its break: joining
+  // those would invent words across them.
+  Subs._setCues([
+    { start: 0, end: 2, text: '昨日は友達と映画を見に行っ' },
+    { start: 2, end: 4, text: 'たので楽しかった' },
+    { start: 9, end: 11, text: '今日は雨です。' },
+    { start: 11, end: 13, text: '明日は晴れます' }
+  ]);
+  check('a word split across two lines is joined back up for reading',
+    Subs.allText().indexOf('見に行ったので') !== -1, JSON.stringify(Subs.allText()));
+  check('a finished sentence keeps its break',
+    Subs.allText().indexOf('\u96e8\u3067\u3059\u3002\n\u660e\u65e5') !== -1,
+    JSON.stringify(Subs.allText()));
+  check('a line that carries on is told what came before it',
+    Subs.around('たので楽しかった').before === '昨日は友達と映画を見に行っ',
+    JSON.stringify(Subs.around('たので楽しかった')));
+  check('a line after a gap is left to stand on its own',
+    Subs.around('今日は雨です。').before === '' && Subs.around('今日は雨です。').after === '',
+    JSON.stringify(Subs.around('今日は雨です。')));
+  Subs._setCues(parsed);
 
   // A roll that never stops must not grow into one cue covering half the
   // video: A would then take you to the start of that rather than back a line.

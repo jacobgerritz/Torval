@@ -99,7 +99,12 @@ var LLLHighlight = (function () {
 
     var reply;
     try {
-      reply = await api.runtime.sendMessage({ type: 'wordPlaces', text: found.text });
+      var beside = typeof LLLSubtitles !== 'undefined' && LLLSubtitles.around
+        ? LLLSubtitles.around(found.text)
+        : { before: '', after: '' };
+      reply = await api.runtime.sendMessage({
+        type: 'wordPlaces', text: found.text, before: beside.before, after: beside.after
+      });
     } catch (err) {
       return null;
     }

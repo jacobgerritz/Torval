@@ -596,6 +596,23 @@ followed it, which produced 科である read as 科, さです as 差 and と�
 two of which are not things anyone would say. The copula does still conjugate as
 itself, so でした is read as the past of です.
 
+### Lines cut in half
+
+Automatic captions break wherever the speaker draws breath, which is regularly
+in the middle of a word: one line ends 見に行っ and the next begins たので. Read
+on its own, the end of that line is fragments that are not words, and every one
+of them looks unknown.
+
+So a subtitle line is read together with the lines either side of it, where
+they run straight on from each other, and what gets marked is the words as they
+fall across the line on screen. 見に行っ is then part of 見に行く rather than 見,
+に and 行. A word lying across the join is marked on both lines, cut to the part
+of it on each, since that is what is on screen. The whole video is joined the
+same way before it is scored.
+
+A line that ends a sentence, or that has a gap in the timing after it, keeps
+its break. Joining those would invent words across them.
+
 ### What it still gets wrong
 
 Names. ちえこ is not in any dictionary, and neither ちえ nor こさん being real
