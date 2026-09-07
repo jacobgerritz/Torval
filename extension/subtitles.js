@@ -217,11 +217,23 @@ var LLLSubtitles = (function () {
    */
   function step(now, direction, current) {
     if (direction < 0) {
-      // A little grace, so that pressing A part-way through a line takes you to
-      // the start of it, and pressing it again takes you to the line before.
-      for (var i = cues.length - 1; i >= 0; i--) {
-        if (cues[i].start < now - 0.4) return cues[i];
+      // A goes to the line before the one playing, not to the start of the
+      // one playing. Hearing something and wanting it again is far and away
+      // the commoner reason to reach for it; the start of the line you are
+      // already in is A and then D, which costs one more key on the rarer
+      // of the two.
+      if (current && current.start <= now + 0.05) {
+        return cues.length ? cues[cues.length - 1] : current;
       }
+      var at = -1;
+      for (var i = 0; i < cues.length; i++) {
+        if (cues[i].start <= now + 0.05) at = i; else break;
+      }
+      if (at > 0) return cues[at - 1];
+      // Inside the first line: its own start is as far back as there is to go.
+      if (at === 0) return cues[0];
+      // And before the first line there is nowhere to go at all. A must never
+      // move the video forwards.
       return null;
     }
     var best = null;
@@ -681,9 +693,22 @@ var LLLSubtitles = (function () {
       if (!text) continue;
       var start = (e.tStartMs || 0) / 1000;
       var end = start + (e.dDurationMs || 0) / 1000;
+      // Automatic captions roll: the line is sent again and again, a word
+      // longer each time, so taking every event at face value gives a dozen
+      // half-lines each repeating the last. Where an event carries on the
+      // line before it, that line grows rather than a new one starting, so
+      // nothing is lost and nothing is said twice.
+      var previous = out.length ? out[out.length - 1] : null;
+      if (previous && start <= previous.end + 0.05 && previous.text.length > 1 &&
+          text.indexOf(previous.text) === 0) {
+        previous.text = text;
+        previous.end = Math.max(previous.end, end);
+        continue;
+      }
+
       // Consecutive events sometimes overlap; a line should end where the next
       // begins, or the recording of it runs into the following line.
-      if (out.length && out[out.length - 1].end > start) out[out.length - 1].end = start;
+      if (previous && previous.end > start) previous.end = start;
       out.push({ start: start, end: end, text: text });
     }
     return out;

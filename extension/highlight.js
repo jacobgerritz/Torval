@@ -347,9 +347,32 @@ var LLLHighlight = (function () {
     checkLine(lineOverlay);
   }
 
+  /**
+   * Are the ranges held for the line still attached to the page?
+   *
+   * A player that redraws its caption box puts the same words back in a new
+   * text node, and ranges into the old one point at nothing: the line looks
+   * unmarked and stays that way, since the text has not changed and there
+   * was nothing to notice. Marking a word and unmarking it again fixed it,
+   * which is how this was found.
+   */
+  function stillOnThePage() {
+    var whole = true;
+    lineRanges.forEach(function (marks) {
+      for (var i = 0; i < marks.length; i++) {
+        // A range whose text was taken out from under it does not become
+        // detached, which is the obvious thing to look for and the wrong one:
+        // both of its ends slide onto the parent and it collapses to nothing.
+        // A mark that covers no characters is a mark that paints none.
+        if (marks[i].range.collapsed) whole = false;
+      }
+    });
+    return whole;
+  }
+
   async function checkLine(overlay) {
     var text = overlay.textContent;
-    if (text === lastLine) return;
+    if (text === lastLine && stillOnThePage()) return;
     lastLine = text;
 
     if (!text) { lineRanges = new Map(); apply(); return; }

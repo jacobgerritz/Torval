@@ -961,6 +961,25 @@ const run = async () => {
   check('a line ends where the next begins',
     overlapping[0].end === 3, JSON.stringify(overlapping));
 
+  // Automatic captions roll: the line is sent again and again, a word longer
+  // each time. Taken at face value that is four half-lines that each repeat
+  // the last, which is what made auto-subtitled videos look so strange.
+  const rolling = Subs.parse({ events: [
+    { tStartMs: 1000, dDurationMs: 500, segs: [{ utf8: 'きょうは' }] },
+    { tStartMs: 1500, dDurationMs: 500, aAppend: 1, segs: [{ utf8: '\n' }] },
+    { tStartMs: 1500, dDurationMs: 600, segs: [{ utf8: 'きょうは とても' }] },
+    { tStartMs: 2100, dDurationMs: 900, segs: [{ utf8: 'きょうは とても あついです' }] },
+    { tStartMs: 4000, dDurationMs: 1000, segs: [{ utf8: 'そうですね' }] }
+  ] });
+  check('a rolling caption grows into one line rather than four',
+    rolling.length === 2, JSON.stringify(rolling.map((c) => c.text)));
+  check('and the line kept is the whole of it, not the first word',
+    rolling[0].text === 'きょうは とても あついです', JSON.stringify(rolling[0]));
+  check('the rolled line runs from the first word to the end of the last',
+    rolling[0].start === 1 && rolling[0].end === 3, JSON.stringify(rolling[0]));
+  check('a line that is not a continuation still starts a new one',
+    rolling[1].text === 'そうですね', JSON.stringify(rolling[1]));
+
   // Reading captions off the screen: rewatching a scene must not duplicate a
   // line, or A/D would stutter on two entries that say the same thing.
   let observed = [];
@@ -1000,12 +1019,19 @@ const run = async () => {
   check('the bolded sentence from a card still matches',
     Subs.cueFor('<b>食べなかった</b>').start === 12);
 
-  // A steps back a line, D forward. Part-way through a line, A restarts it;
-  // pressing it again goes to the line before, which is how you rewatch.
-  check('A part-way through a line goes back to its start',
+  // A steps back a line, D forward. A goes to the line *before* the one
+  // playing rather than to the start of it: hearing something and wanting it
+  // again is much the commoner reason to reach for the key, and the start of
+  // the line you are in is A and then D.
+  check('A part-way through a line goes to the line before it',
+    Subs.step(5, -1).start === 1, JSON.stringify(Subs.step(5, -1)));
+  check('A inside the first line goes to its own start, having nowhere earlier',
     Subs.step(2.2, -1).start === 1, JSON.stringify(Subs.step(2.2, -1)));
   check('A at the start of a line goes to the one before',
     Subs.step(3.0, -1).start === 1, JSON.stringify(Subs.step(3.0, -1)));
+  check('A while a line is still in progress goes to the last finished one',
+    Subs.step(21, -1, { start: 20, text: 'still being said' }).start === 12,
+    JSON.stringify(Subs.step(21, -1, { start: 20, text: 'still being said' })));
   check('D goes to the next line', Subs.step(2.2, 1).start === 3, JSON.stringify(Subs.step(2.2, 1)));
   check('D from a gap goes to the line after it', Subs.step(7, 1).start === 12);
   check('D past the last line has nowhere to go', Subs.step(99, 1) === null);

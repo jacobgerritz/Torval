@@ -1337,6 +1337,15 @@
    * script, which is the only part that may reach your local Anki; which field
    * each piece lands in is set once in LLL's options.
    */
+  /** A line of plain text under an entry, while something is going on. */
+  function note(entryEl, text) {
+    const said = document.createElement('div');
+    said.className = 'note doing';
+    said.textContent = text;
+    entryEl.appendChild(said);
+    return said;
+  }
+
   async function mine(button, entryEl, { word, reading, entry, surface, senses }) {
     button.disabled = true;
     button.textContent = '·';
@@ -1344,13 +1353,23 @@
     if (old) old.remove();
 
     // The line's exact timing comes from LLL's own subtitles; the video is sent
-    // back over it to record it, so this takes as long as the line does.
+    // back over it to record it, so this takes as long as the line does. That
+    // wait is the one part of mining that looks like nothing happening, so it
+    // says what it is doing: anything that goes wrong afterwards is then
+    // plainly afterwards, rather than looking like a card that failed before
+    // it was ever recorded.
     const sentence = context ? context.text : '';
     const cue = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.cueFor(sentence) : null;
     const settings = await api.storage.local.get('ankiConfig').catch(() => ({}));
-    const media = typeof LLLVideo !== 'undefined'
-      ? await LLLVideo.capture(sentence, cue, { lead: (settings.ankiConfig || {}).lead })
-      : {};
+    let media = {};
+    if (typeof LLLVideo !== 'undefined') {
+      const doing = cue ? note(entryEl, 'Recording the line…') : null;
+      try {
+        media = await LLLVideo.capture(sentence, cue, { lead: (settings.ankiConfig || {}).lead });
+      } finally {
+        if (doing) doing.remove();
+      }
+    }
 
     const note = {
       media,

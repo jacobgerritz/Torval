@@ -62,7 +62,7 @@ that actually reaches it.
 | **Shift** with text selected | look up the selection |
 | **Esc**, a click outside, a scroll | close |
 | **other matches** | other words that start at the same place |
-| **A** / **D** | step back and forward a subtitle line |
+| **A** / **D** | the line before, and the line after |
 | **1** | mark the word under the cursor as one you do not know |
 | **2** | mark it as one you do, popup or not |
 | **3** | ignore it instead: never mention this one again |
