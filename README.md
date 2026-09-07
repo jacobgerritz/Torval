@@ -66,18 +66,18 @@ that actually reaches it.
 | **1** | mark the word under the cursor as one you do not know |
 | **2** | mark it as one you do, popup or not |
 | **3** | ignore it instead: never mention this one again |
-| **B** | open Anki's card browser on this word |
+| **B** | look this word up in Anki |
 | **click a sense** | put only that meaning on the card |
 | **+** | add the word to Anki |
 | **✓** | mark as known, or unmark it |
 | **⊘** | ignore, or stop ignoring |
 
-**B** looks the word up in Anki itself: it opens the card browser on the same
-search LLL uses to say a word is already in your collection, that field in that
-deck, and brings Anki to the front. It acts on what you have selected if you
-have selected something, otherwise on whatever the cursor is over. Unlike the
-numbers it leaves the key alone when there is nothing to look up, since a
-letter is a letter and plenty of sites have their own use for it.
+**B** looks the word up in Anki itself: it opens the card browser searching for
+that word, in every deck and every field, and brings Anki to the front. It acts
+on what you have selected if you have selected something, otherwise on whatever
+the cursor is over. Unlike the numbers it leaves the key alone when there is
+nothing to look up, since a letter is a letter and plenty of sites have their
+own use for it.
 
 **1**, **2** and **3** are taken from the page whether or not a word is under
 the cursor, since YouTube reads them as "jump to 30% of the video" and a key

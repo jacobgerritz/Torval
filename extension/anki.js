@@ -261,19 +261,18 @@ var LLLAnki = (function () {
   /**
    * Open Anki's card browser on a word, and bring Anki to the front.
    *
-   * The same search the duplicate check uses, so what you are shown is
-   * exactly what LLL means when it says a word is already in the
-   * collection: that field, in that deck. Without a field mapped for the
-   * word there is nothing to search by name, so it falls back to looking
-   * for the text anywhere in the deck.
+   * The word and nothing else: every deck, every field, whatever is in the
+   * collection. Searching the deck and field LLL mines into would answer a
+   * narrower question than the one being asked, which is simply "what do I
+   * have with this word in it".
+   *
+   * Quoted and escaped so that a word is a word: a colon in it would
+   * otherwise be read as Anki's field:value syntax, and an underscore or an
+   * asterisk as a wildcard.
    */
   async function browse(config, word) {
     if (!word) throw new Error('No word to look up.');
-    var deck = config && config.deck ? '"deck:' + escapeSearch(config.deck) + '" ' : '';
-    var field = fieldFor(config, 'word');
-    var query = field
-      ? deck + '"' + escapeSearch(field) + ':' + escapeSearch(word, true) + '"'
-      : deck + '"' + escapeSearch(word, true) + '"';
+    var query = '"' + escapeSearch(word, true) + '"';
     await invoke(config && config.url, 'guiBrowse', { query: query });
     return query;
   }

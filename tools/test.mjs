@@ -355,9 +355,8 @@ const run = async () => {
   };
   await Anki.browse(mining, '食べる');
   check('B asks Anki to open its browser', sentToAnki.action === 'guiBrowse', JSON.stringify(sentToAnki));
-  check('and searches the mapped field in the chosen deck',
-    sentToAnki.params.query === '"deck:' + mining.deck + '" "Target Word:食べる"',
-    sentToAnki.params.query);
+  check('and searches for the word alone, in every deck and every field',
+    sentToAnki.params.query === '"食べる"', sentToAnki.params.query);
 
   // A word with a colon in it must not turn into search syntax.
   await Anki.browse(mining, 'a:b');
