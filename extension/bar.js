@@ -60,10 +60,13 @@ var LLLBar = (function () {
   function alwaysDown() {
     always = true;
     pinned = true;
-    if (host) {
-      setExpanded(true);
-      els.pin.hidden = true;
-    }
+    // Built at once rather than waiting for something to measure. The reader
+    // asks for this, and its shelf has no Japanese on it at all: without the
+    // bar there from the start, the room the page leaves for it would just be
+    // an empty strip along the top.
+    build();
+    setExpanded(true);
+    els.pin.hidden = true;
   }
 
   /**
@@ -297,8 +300,52 @@ var LLLBar = (function () {
   function makeRoom(yes) {
     var root = document.documentElement;
     if (!root || !root.style) return;
+    // Slide rather than jump, in step with the bar coming down.
+    root.style.setProperty('transition', 'margin-top .22s ease');
     if (yes) root.style.setProperty('margin-top', BAR_HEIGHT + 'px', 'important');
     else root.style.removeProperty('margin-top');
+    moveHeaders(yes);
+  }
+
+  // Whatever was moved out of the way, and what it looked like before.
+  var moved = [];
+
+  /**
+   * A margin on the root element moves everything in the flow of the page and
+   * nothing that was taken out of it, which on a site with a header pinned to
+   * the top means the header stays exactly where the bar now is. YouTube is
+   * the obvious one, and it is the one this was reported on.
+   *
+   * So the pinned headers move too. Only things that really look like one: at
+   * the very top, most of the way across, and no taller than a header gets.
+   * A full-screen overlay or a sidebar is left alone, and everything moved is
+   * written down so it can be put back exactly as it was.
+   */
+  function moveHeaders(yes) {
+    for (var i = 0; i < moved.length; i++) {
+      moved[i].el.style.transform = moved[i].was;
+      moved[i].el.style.transition = moved[i].wasTransition;
+    }
+    moved = [];
+    if (!yes) return;
+
+    var all = document.body ? document.body.querySelectorAll('*') : [];
+    for (var j = 0; j < all.length; j++) {
+      var el = all[j];
+      if (el === host) continue;
+      var style = getComputedStyle(el);
+      if (style.position !== 'fixed') continue;
+      var box = el.getBoundingClientRect();
+      if (box.height === 0 || box.height > 200) continue;
+      if (box.width < window.innerWidth * 0.6) continue;
+      // Already below the bar, so it needs no help.
+      if (box.top >= BAR_HEIGHT - 1) continue;
+
+      moved.push({ el: el, was: el.style.transform, wasTransition: el.style.transition });
+      el.style.transition = 'transform .22s ease';
+      el.style.transform = (el.style.transform ? el.style.transform + ' ' : '') +
+        'translateY(' + BAR_HEIGHT + 'px)';
+    }
   }
 
   function setExpanded(value) {

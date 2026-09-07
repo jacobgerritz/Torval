@@ -661,6 +661,9 @@ node tools/serve.mjs
   out of step with what ships.
 - <http://localhost:8137/tools/switch-preview.html>, the panel behind the
   toolbar button.
+- <http://localhost:8137/tools/fixed-header-preview.html>, a page shaped like
+  YouTube, with a header pinned to the top, for checking that a pinned bar
+  pushes both the page and the header out of its way.
 - <http://localhost:8137/tools/reader-preview.html>, the book reader. It comes
   with two sample books and a button that checks the reader against both.
   `sample.epub` is what an epub looks like when everything goes right;

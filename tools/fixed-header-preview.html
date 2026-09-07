@@ -1,0 +1,72 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>a page shaped like YouTube</title>
+<!--
+  Not YouTube, but the shape of it: a full-width header pinned to the top with
+  position: fixed, and the page itself in the flow underneath. A margin on the
+  root element moves the flow and leaves the header exactly where it was, which
+  is why the bar covered YouTube's masthead.
+-->
+<style>
+  body { margin: 0; background: #0f0f0f; color: #f1f1f1;
+         font: 15px/1.6 -apple-system, "Segoe UI", sans-serif; }
+  #masthead { position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 2000;
+              display: flex; align-items: center; padding: 0 16px; background: #202020; }
+  main { padding: 72px 24px 400px; }
+  .video { width: 640px; height: 200px; background: #181818; border-radius: 8px; }
+</style>
+
+<div id="masthead">a header pinned to the top, like YouTube's</div>
+<main>
+  <div class="video"></div>
+  <p>日本語を勉強しています。</p>
+  <p>友達と図書館で本を読んでいました。</p>
+</main>
+
+<script src="../extension/japanese.js"></script>
+<script src="../extension/deinflect.js"></script>
+<script src="../extension/lookup.js"></script>
+<script src="preview-words.js"></script>
+<script>
+const watchers = [];
+const settings = {};
+window.browser = {
+  storage: {
+    local: {
+      async get(key) { return key in settings ? { [key]: settings[key] } : {}; },
+      async set(values) {
+        Object.assign(settings, values);
+        const changes = {};
+        for (const name of Object.keys(values)) changes[name] = { newValue: values[name] };
+        for (const listener of watchers) listener(changes, "local");
+      }
+    },
+    onChanged: { addListener(fn) { watchers.push(fn); } }
+  },
+  runtime: {
+    id: "preview",
+    getURL: (p) => "../extension/" + p,
+    async sendMessage(msg) {
+      if (msg.type === "status") return { status: { state: "ready", progress: 1 } };
+      if (msg.type === "wordPlaces" || msg.type === "comprehension") {
+        const tokens = await LLLLookup.locateTokens(msg.text, db);
+        const score = LLLLookup.coverage(tokens, known, ignored);
+        if (msg.type === "comprehension") return { ok: true, result: score };
+        const places = {}; const unmarked = [];
+        tokens.forEach((t, i) => {
+          if (!places[t.word]) {
+            places[t.word] = [];
+            if (ignored.has(t.word) || LLLLookup.isKnown(t, known)) unmarked.push(t.word);
+          }
+          places[t.word].push(t.start, t.length, i % 2);
+        });
+        return { ok: true, result: { ...score, places, unmarked } };
+      }
+      return { ok: true, result: null };
+    }
+  }
+};
+</script>
+<script src="../extension/bar.js"></script>
+<script src="../extension/highlight.js"></script>
+<script src="../extension/content.js"></script>

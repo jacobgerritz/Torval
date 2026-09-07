@@ -312,3 +312,9 @@ input[type="file"] {
 }
 
 .word-row .remove:hover { background: none; color: var(--warn); }
+
+/* A checkbox and its words, which want none of the two-column layout the
+   text fields use. */
+.check { align-items: flex-start; gap: 10px; margin-bottom: 0; }
+.check input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; padding: 0; }
+.check > span { flex: 1 1 auto; white-space: normal; color: var(--ink); }

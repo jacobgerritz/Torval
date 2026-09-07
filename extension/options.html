@@ -8,6 +8,7 @@
     <h1>LLL</h1>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="words">Words</button>
+    <button class="tab" data-panel="video">Video</button>
     <button class="tab" data-panel="reader">Reader</button>
     <button class="tab" data-panel="backup">Backup</button>
   </nav>
@@ -39,14 +40,6 @@
         <input id="tags" type="text" placeholder="lll" spellcheck="false">
       </label>
 
-      <label>
-        <span>Audio lead-in</span>
-        <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.25">
-      </label>
-      <p class="note hint">
-        Roughly, because a recorder swallows an unpredictable moment at the
-        start, which LLL allows for.
-      </p>
     </section>
 
     <section id="mapping-section" hidden>
@@ -114,6 +107,36 @@
 
       <div id="list-ignored" class="words"></div>
       <p id="more-ignored" class="note more" hidden></p>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-video" hidden>
+    <section>
+      <h2>Subtitles</h2>
+      <p class="note">
+        LLL reads the Japanese track itself, so its subtitles appear whatever
+        YouTube is set to, including nothing at all. The two have nothing to
+        do with each other.
+      </p>
+      <label class="check">
+        <input type="checkbox" id="show-native">
+        <span>Leave YouTube&rsquo;s own subtitles showing as well</span>
+      </label>
+    </section>
+
+    <section>
+      <h2>Recording a line</h2>
+      <label>
+        <span>Audio lead-in</span>
+        <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.3">
+      </label>
+      <p class="note hint">
+        Seconds of sound kept from before the line, so the first word is not
+        clipped. Roughly, because a recorder swallows an unpredictable moment
+        when it starts, which LLL allows for.
+      </p>
     </section>
   </div>
 

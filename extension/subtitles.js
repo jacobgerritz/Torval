@@ -49,12 +49,30 @@ var LLLSubtitles = (function () {
   var enabled = false;
   var suspended = false;   // the toolbar switch is off
 
+  // Whether YouTube's own subtitles are left showing under LLL's. They are
+  // hidden by default, since seeing the same line twice is no use, but the
+  // two have nothing to do with each other: LLL reads the Japanese track
+  // itself, so its line appears whatever YouTube is set to, or nothing at
+  // all, and either can be shown without the other.
+  var showNative = false;
+
   // How far up the video the line sits, as a percentage of its height, and
   // where it started. Kept in storage so a video watched tomorrow puts them
   // back where you left them.
   var BOTTOM_DEFAULT = 4;
   var bottom = BOTTOM_DEFAULT;
   if (api && api.storage) {
+    api.storage.local.get('showNativeSubs').then(function (stored) {
+      showNative = !!stored.showNativeSubs;
+      applyNative();
+    }).catch(function () {});
+    if (api.storage.onChanged) {
+      api.storage.onChanged.addListener(function (changes) {
+        if (!changes.showNativeSubs) return;
+        showNative = !!changes.showNativeSubs.newValue;
+        applyNative();
+      });
+    }
     api.storage.local.get('subtitleBottom').then(function (stored) {
       if (typeof stored.subtitleBottom !== 'number') return;
       bottom = stored.subtitleBottom;
@@ -122,9 +140,19 @@ var LLLSubtitles = (function () {
     });
   }
 
+  /**
+   * Hide YouTube's own captions, or stop hiding them. They are hidden with a
+   * stylesheet rather than turned off, because in the on-screen fallback
+   * their text is still what LLL is reading the timing from: they have to go
+   * on being drawn, they just should not also be seen under LLL's own line.
+   */
+  function applyNative() {
+    if (hideNative) hideNative.disabled = showNative || suspended;
+  }
+
   function suspend(state) {
     suspended = !!state;
-    if (hideNative) hideNative.disabled = suspended;
+    applyNative();
     if (overlay && suspended) overlay.style.display = 'none';
   }
 
@@ -222,13 +250,23 @@ var LLLSubtitles = (function () {
       // the commoner reason to reach for it; the start of the line you are
       // already in is A and then D, which costs one more key on the rarer
       // of the two.
-      if (current && current.start <= now + 0.05) {
-        return cues.length ? cues[cues.length - 1] : current;
-      }
+      //
+      // Which line is playing has to be worked out rather than assumed. The
+      // one still in progress is not in `cues` yet, so both are looked at,
+      // and only the later of the two counts. Reaching for the end of `cues`
+      // instead is what sent A to the end of the video: with the whole
+      // transcript known up front, the last line in the list is the last
+      // line of the film.
       var at = -1;
       for (var i = 0; i < cues.length; i++) {
         if (cues[i].start <= now + 0.05) at = i; else break;
       }
+      var playing = current && current.start <= now + 0.05 &&
+        (at < 0 || current.start > cues[at].start) ? current : null;
+
+      // The line in progress is playing, so the one before it is the last
+      // one that finished.
+      if (playing) return at >= 0 ? cues[at] : null;
       if (at > 0) return cues[at - 1];
       // Inside the first line: its own start is as far back as there is to go.
       if (at === 0) return cues[0];
@@ -851,6 +889,7 @@ var LLLSubtitles = (function () {
     hideNative.textContent =
       '.ytp-caption-window-container,.captions-text{opacity:0!important;pointer-events:none!important;}';
     document.head.appendChild(hideNative);
+    applyNative();
 
     var player = document.querySelector('.html5-video-player') || document.body;
     overlay = document.createElement('div');

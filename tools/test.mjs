@@ -1032,6 +1032,16 @@ const run = async () => {
   check('A while a line is still in progress goes to the last finished one',
     Subs.step(21, -1, { start: 20, text: 'still being said' }).start === 12,
     JSON.stringify(Subs.step(21, -1, { start: 20, text: 'still being said' })));
+
+  // A line left marked as in progress from earlier in the video must not
+  // drag A to the end of it. Taking the last line in the list as "the one
+  // before" did exactly that, and with a whole transcript loaded the last
+  // line in the list is the last line of the film.
+  const stale = { start: 1.5, text: 'started long ago' };
+  check('A does not jump forward when an old line is still marked as playing',
+    Subs.step(5, -1, stale).start === 1, JSON.stringify(Subs.step(5, -1, stale)));
+  check('A twice in a row keeps going backwards, never to the end',
+    Subs.step(3.0, -1, stale).start === 1, JSON.stringify(Subs.step(3.0, -1, stale)));
   check('D goes to the next line', Subs.step(2.2, 1).start === 3, JSON.stringify(Subs.step(2.2, 1)));
   check('D from a gap goes to the line after it', Subs.step(7, 1).start === 12);
   check('D past the last line has nowhere to go', Subs.step(99, 1) === null);
