@@ -59,17 +59,6 @@ const modelSelect = document.getElementById('model');
 const tagsInput = document.getElementById('tags');
 const leadInput = document.getElementById('lead');
 
-// Whether YouTube's own subtitles stay visible. Nothing to do with cards,
-// so it is saved on the spot rather than waiting for the Save button.
-const nativeSubs = document.getElementById('show-native');
-if (nativeSubs) {
-  api.storage.local.get('showNativeSubs')
-    .then((stored) => { nativeSubs.checked = !!stored.showNativeSubs; })
-    .catch(() => {});
-  nativeSubs.addEventListener('change', () => {
-    api.storage.local.set({ showNativeSubs: nativeSubs.checked }).catch(() => {});
-  });
-}
 const mappingBox = document.getElementById('mapping');
 const mappingSection = document.getElementById('mapping-section');
 const statusText = document.getElementById('status');

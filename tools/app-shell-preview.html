@@ -1,27 +1,34 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>a page shaped like YouTube</title>
+<title>a page that ignores a margin on the root</title>
 <!--
-  Not YouTube, but the shape of it: a full-width header pinned to the top with
-  position: fixed, and the page itself in the flow underneath. A margin on the
-  root element moves the flow and leaves the header exactly where it was, which
-  is why the bar covered YouTube's masthead.
+  The other shape a site comes in, and the one a margin on the root element
+  cannot move: the whole application in a container of its own, pinned over the
+  viewport and scrolling inside itself. The root can be given any margin you
+  like and nothing in here shifts by a pixel.
+
+      node tools/serve.mjs  ->  http://localhost:8137/tools/app-shell-preview.html
+
+  A pinned bar has to notice that and push the application itself instead.
 -->
 <style>
-  body { margin: 0; background: #0f0f0f; color: #f1f1f1;
-         font: 15px/1.6 -apple-system, "Segoe UI", sans-serif; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: #0f0f0f; color: #f1f1f1; font: 15px/1.6 -apple-system, "Segoe UI", sans-serif; }
+  #app { position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow-y: auto; }
   #masthead { position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 2000;
               display: flex; align-items: center; padding: 0 16px; background: #202020; }
   main { padding: 72px 24px 400px; }
   .video { width: 640px; height: 200px; background: #181818; border-radius: 8px; }
 </style>
 
-<div id="masthead" data-ignores-margin="no">a header pinned to the top, like YouTube's</div>
-<main>
-  <div class="video"></div>
-  <p>日本語を勉強しています。</p>
-  <p>友達と図書館で本を読んでいました。</p>
-</main>
+<div id="app">
+  <div id="masthead">a header pinned to the top</div>
+  <main>
+    <div class="video"></div>
+    <p>日本語を勉強しています。</p>
+    <p>友達と図書館で本を読んでいました。</p>
+  </main>
+</div>
 
 <script src="../extension/japanese.js"></script>
 <script src="../extension/deinflect.js"></script>

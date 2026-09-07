@@ -300,12 +300,83 @@ var LLLBar = (function () {
   function makeRoom(yes) {
     var root = document.documentElement;
     if (!root || !root.style) return;
-    // Slide rather than jump, in step with the bar coming down.
-    root.style.setProperty('transition', 'margin-top .22s ease');
-    if (yes) root.style.setProperty('margin-top', BAR_HEIGHT + 'px', 'important');
-    else root.style.removeProperty('margin-top');
+    pushApp(false);
+    if (yes) {
+      var works = rootMarginMoves();
+      // Slide rather than jump, in step with the bar coming down.
+      root.style.setProperty('transition', 'margin-top .22s ease');
+      root.style.setProperty('margin-top', BAR_HEIGHT + 'px', 'important');
+      if (!works) pushApp(true);
+    } else {
+      root.style.removeProperty('margin-top');
+    }
     moveHeaders(yes);
   }
+
+  /**
+   * Does a margin on the root element move this page at all?
+   *
+   * On an ordinary page it does, and that is the polite way to ask for room.
+   * An application that lays itself out in a container pinned over the
+   * viewport can ignore it completely, and then the bar goes on covering the
+   * top of the page exactly as before. So it is tried rather than assumed:
+   * set it, measure, put it back, all without giving the browser a chance to
+   * paint anything in between.
+   */
+  function rootMarginMoves() {
+    var app = biggestThing();
+    if (!app) return true;
+    var root = document.documentElement;
+    var hadTransition = root.style.transition;
+    var hadMargin = root.style.marginTop;
+    root.style.setProperty('transition', 'none');
+    var before = app.getBoundingClientRect().top;
+    root.style.setProperty('margin-top', BAR_HEIGHT + 'px', 'important');
+    var after = app.getBoundingClientRect().top;
+    root.style.marginTop = hadMargin;
+    root.style.transition = hadTransition;
+    return after - before >= BAR_HEIGHT - 2;
+  }
+
+  var pushed = null;   // the app container moved, and what it looked like
+
+  /**
+   * The biggest thing on the page, which on an application like YouTube is
+   * the whole application. Only ever asked about as a last resort.
+   */
+  function biggestThing() {
+    var best = null;
+    var area = 0;
+    var kids = document.body ? document.body.children : [];
+    for (var i = 0; i < kids.length; i++) {
+      var el = kids[i];
+      if (el === host || el.tagName === 'SCRIPT' || el.tagName === 'STYLE' ||
+          el.tagName === 'LINK') continue;
+      var box = el.getBoundingClientRect();
+      var size = box.width * box.height;
+      if (size > area) { area = size; best = el; }
+    }
+    return best;
+  }
+
+  function pushApp(yes) {
+    if (pushed) {
+      pushed.el.style.paddingTop = pushed.was;
+      pushed.el.style.transition = pushed.wasTransition;
+      pushed = null;
+    }
+    if (!yes) return;
+    var app = biggestThing();
+    if (!app) return;
+    // Added to whatever padding the page already had, not put in place of
+    // it: a site with room of its own at the top would otherwise lose it and
+    // end up higher than it started.
+    var already = parseFloat(getComputedStyle(app).paddingTop) || 0;
+    pushed = { el: app, was: app.style.paddingTop, wasTransition: app.style.transition };
+    app.style.setProperty('transition', 'padding-top .22s ease');
+    app.style.setProperty('padding-top', (already + BAR_HEIGHT) + 'px', 'important');
+  }
+
 
   // Whatever was moved out of the way, and what it looked like before.
   var moved = [];

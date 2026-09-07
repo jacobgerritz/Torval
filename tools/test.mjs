@@ -980,6 +980,22 @@ const run = async () => {
   check('a line that is not a continuation still starts a new one',
     rolling[1].text === 'そうですね', JSON.stringify(rolling[1]));
 
+  // A roll that never stops must not grow into one cue covering half the
+  // video: A would then take you to the start of that rather than back a line.
+  const forever = [];
+  let saying = '';
+  for (let i = 0; i < 40; i++) {
+    saying += (i ? ' ' : '') + 'ことば' + i;
+    forever.push({ tStartMs: i * 400, dDurationMs: 400, segs: [{ utf8: saying }] });
+  }
+  const bounded = Subs.parse({ events: forever });
+  check('a roll that never stops is still cut into lines',
+    bounded.length > 1, bounded.length + ' lines');
+  check('and no line is longer than a line',
+    bounded.every((c) => c.text.length <= 80), JSON.stringify(bounded.map((c) => c.text.length)));
+  check('and none of them runs for half the video',
+    bounded.every((c) => c.end - c.start <= 11), JSON.stringify(bounded.map((c) => Math.round(c.end - c.start))));
+
   // Reading captions off the screen: rewatching a scene must not duplicate a
   // line, or A/D would stutter on two entries that say the same thing.
   let observed = [];
@@ -1042,6 +1058,20 @@ const run = async () => {
     Subs.step(5, -1, stale).start === 1, JSON.stringify(Subs.step(5, -1, stale)));
   check('A twice in a row keeps going backwards, never to the end',
     Subs.step(3.0, -1, stale).start === 1, JSON.stringify(Subs.step(3.0, -1, stale)));
+
+  // Stepping back onto a copy of the line being left looks exactly like A
+  // doing nothing, which is what it looked like when the same line was being
+  // filed twice, once as written and once as seen.
+  Subs._setCues([
+    { start: 1, end: 3, text: 'いちばんめ' },
+    { start: 3, end: 5, text: 'にばんめ' },
+    { start: 5.2, end: 7, text: 'にばんめ' },
+    { start: 7, end: 9, text: 'さんばんめ' }
+  ]);
+  check('A steps over a duplicate of the line it is leaving',
+    Subs.step(5.5, -1).start === 1, JSON.stringify(Subs.step(5.5, -1)));
+  // Back to the lines the rest of these checks are written against.
+  Subs._setCues(parsed);
   check('D goes to the next line', Subs.step(2.2, 1).start === 3, JSON.stringify(Subs.step(2.2, 1)));
   check('D from a gap goes to the line after it', Subs.step(7, 1).start === 12);
   check('D past the last line has nowhere to go', Subs.step(99, 1) === null);

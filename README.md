@@ -205,12 +205,15 @@ from two different words onto one card.
 
 LLL times YouTube's Japanese subtitles so it knows exactly when each line
 starts and ends, that timing is what lets a line be replayed and recorded
-precisely, and what lets **A** and **D** jump between lines. **Keep YouTube's
-own captions turned on**; LLL needs a genuine one active to work at its best,
-for reasons covered below, and as a source of text to read either way. What
-you actually see is drawn by LLL itself, in the same look as the popup, 
-YouTube's own caption box is hidden underneath it, so a line always reads as
-LLL's.
+precisely, and what lets **A** and **D** jump between lines. What you see is
+drawn by LLL itself, in the same look as the popup.
+
+LLL never touches YouTube's own captions. The CC button is YouTube's and means
+what it says, LLL's line comes from the Japanese track it fetched itself, and
+either can be on without the other. Both at once is then a choice rather than
+an accident. The one exception is the last of the four ways of getting the
+timing below, which works by reading YouTube's captions off the screen, and so
+needs them running.
 
 There are four ways it gets the timing, tried in the order below, each a
 fallback for the one before it, not a choice between them. The first three all
@@ -664,6 +667,9 @@ node tools/serve.mjs
 - <http://localhost:8137/tools/fixed-header-preview.html>, a page shaped like
   YouTube, with a header pinned to the top, for checking that a pinned bar
   pushes both the page and the header out of its way.
+- <http://localhost:8137/tools/app-shell-preview.html>, the other shape a site
+  comes in: the whole application in a container pinned over the viewport,
+  which a margin on the root element cannot move at all.
 - <http://localhost:8137/tools/reader-preview.html>, the book reader. It comes
   with two sample books and a button that checks the reader against both.
   `sample.epub` is what an epub looks like when everything goes right;

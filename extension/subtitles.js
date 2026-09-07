@@ -32,10 +32,12 @@
  *      is known ahead of watching it. D cannot jump to an unseen line, and
  *      nothing here can tell you the whole video's vocabulary in advance.
  *
- * Either way, keep YouTube's own captions turned on. LLL needs a source of
- * text to read, whichever method supplies the timing. What is actually shown
- * on screen is drawn by LLL itself, in its own look, so a line always reads as
- * LLL's rather than being mistaken for YouTube's plain caption box.
+ * LLL never touches YouTube's own captions. The CC button is YouTube's, it
+ * means what it says, and LLL draws its own line from the track it fetched
+ * itself: either can be on without the other, and both at once is a choice
+ * rather than an accident. Only the last of the four ways below reads what is
+ * on screen, and that one does need YouTube's captions running, since reading
+ * them is the whole of how it works.
  */
 
 var LLLSubtitles = (function () {
@@ -49,30 +51,19 @@ var LLLSubtitles = (function () {
   var enabled = false;
   var suspended = false;   // the toolbar switch is off
 
-  // Whether YouTube's own subtitles are left showing under LLL's. They are
-  // hidden by default, since seeing the same line twice is no use, but the
-  // two have nothing to do with each other: LLL reads the Japanese track
-  // itself, so its line appears whatever YouTube is set to, or nothing at
-  // all, and either can be shown without the other.
-  var showNative = false;
 
   // How far up the video the line sits, as a percentage of its height, and
   // where it started. Kept in storage so a video watched tomorrow puts them
   // back where you left them.
+  // How far a rolling caption is allowed to grow before it counts as a new
+  // line: about as long as a subtitle gets, and about as long as one stays
+  // on screen.
+  var ROLL_CHARACTERS = 60;
+  var ROLL_SECONDS = 10;
+
   var BOTTOM_DEFAULT = 4;
   var bottom = BOTTOM_DEFAULT;
   if (api && api.storage) {
-    api.storage.local.get('showNativeSubs').then(function (stored) {
-      showNative = !!stored.showNativeSubs;
-      applyNative();
-    }).catch(function () {});
-    if (api.storage.onChanged) {
-      api.storage.onChanged.addListener(function (changes) {
-        if (!changes.showNativeSubs) return;
-        showNative = !!changes.showNativeSubs.newValue;
-        applyNative();
-      });
-    }
     api.storage.local.get('subtitleBottom').then(function (stored) {
       if (typeof stored.subtitleBottom !== 'number') return;
       bottom = stored.subtitleBottom;
@@ -140,19 +131,8 @@ var LLLSubtitles = (function () {
     });
   }
 
-  /**
-   * Hide YouTube's own captions, or stop hiding them. They are hidden with a
-   * stylesheet rather than turned off, because in the on-screen fallback
-   * their text is still what LLL is reading the timing from: they have to go
-   * on being drawn, they just should not also be seen under LLL's own line.
-   */
-  function applyNative() {
-    if (hideNative) hideNative.disabled = showNative || suspended;
-  }
-
   function suspend(state) {
     suspended = !!state;
-    applyNative();
     if (overlay && suspended) overlay.style.display = 'none';
   }
 
@@ -267,7 +247,15 @@ var LLLSubtitles = (function () {
       // The line in progress is playing, so the one before it is the last
       // one that finished.
       if (playing) return at >= 0 ? cues[at] : null;
-      if (at > 0) return cues[at - 1];
+      if (at > 0) {
+        // A copy of the line being left is not the line before it. Nothing
+        // should be filing the same line twice any more, but stepping onto a
+        // duplicate is indistinguishable from A doing nothing at all, so it is
+        // worth being sure.
+        var back = at - 1;
+        while (back > 0 && cues[back].text === cues[at].text) back--;
+        return cues[back];
+      }
       // Inside the first line: its own start is as far back as there is to go.
       if (at === 0) return cues[0];
       // And before the first line there is nowhere to go at all. A must never
@@ -723,6 +711,11 @@ var LLLSubtitles = (function () {
   function parse(json) {
     var out = [];
     var events = json.events || [];
+    // Everything the caption rolling now has said, and where in it the line
+    // being built began. A rolling caption is one long stream of words sent
+    // over and over, so where the lines fall is for this to decide.
+    var rolled = '';
+    var lineFrom = 0;
     for (var i = 0; i < events.length; i++) {
       var e = events[i];
       if (!e.segs) continue;
@@ -737,11 +730,31 @@ var LLLSubtitles = (function () {
       // line before it, that line grows rather than a new one starting, so
       // nothing is lost and nothing is said twice.
       var previous = out.length ? out[out.length - 1] : null;
-      if (previous && start <= previous.end + 0.05 && previous.text.length > 1 &&
-          text.indexOf(previous.text) === 0) {
-        previous.text = text;
-        previous.end = Math.max(previous.end, end);
-        continue;
+      var carriesOn = previous && start <= previous.end + 0.05 &&
+        rolled.length > 1 && text.indexOf(rolled) === 0;
+
+      if (carriesOn) {
+        var before = rolled;
+        rolled = text;
+        var line = rolled.slice(lineFrom).trim();
+        // Still a line: the one being built grows rather than a new one
+        // starting, which is what stops a rolling caption arriving as a
+        // dozen half-lines that each repeat the last.
+        if (line.length <= ROLL_CHARACTERS && end - previous.start <= ROLL_SECONDS) {
+          previous.text = line;
+          previous.end = Math.max(previous.end, end);
+          continue;
+        }
+        // As long as a line gets, so the words that arrived with this event
+        // begin the next one. Without a limit the roll would grow into a
+        // single line covering half the video, and A would take you to the
+        // start of that rather than back a line.
+        lineFrom = before.length;
+        text = rolled.slice(lineFrom).trim();
+        if (!text) continue;
+      } else {
+        rolled = text;
+        lineFrom = 0;
       }
 
       // Consecutive events sometimes overlap; a line should end where the next
@@ -806,6 +819,13 @@ var LLLSubtitles = (function () {
    */
   function checkCaption() {
     if (!enabled || !video) return;
+    // Reading the screen is the fallback for when the transcript could not be
+    // fetched. With the transcript in hand it is worse than useless: the same
+    // line goes in twice, once as it was written and once as it was seen, a
+    // second or two apart and so not recognised as the same. A then stepped
+    // back onto a copy of the line already playing, which looked exactly like
+    // A going to the start of the current line instead of back one.
+    if (state === ready) return;
     var text = captionText();
     var current = openCue ? openCue.text : '';
     if (text === current) return;
@@ -876,20 +896,20 @@ var LLLSubtitles = (function () {
   // LLL, so it never gets mistaken for YouTube's own plain caption box.
   var overlay = null;
   var overlayLine = null;
-  var hideNative = null;
+
+  /*
+   * LLL does not touch YouTube's own captions, and never has anything to say
+   * about them. It used to hide them, so that the same line was not showing
+   * twice, and that was a mistake in kind rather than degree: the CC button
+   * is YouTube's, it means what it says, and an extension quietly overruling
+   * it is exactly the sort of thing that makes a page feel haunted. LLL draws
+   * its own line from the Japanese track it fetched itself, and the two have
+   * nothing to do with each other. Both on at once is a choice, made with the
+   * CC button and LLL's own switch.
+   */
 
   function ensureOverlay() {
     if (overlay) return;
-
-    // YouTube's own caption box is hidden rather than touched any other way:
-    // in the on-screen fallback its text is still being read as the source of
-    // the timing, so it has to go on updating, it just should not also be
-    // visible sitting underneath LLL's version of the same line.
-    hideNative = document.createElement('style');
-    hideNative.textContent =
-      '.ytp-caption-window-container,.captions-text{opacity:0!important;pointer-events:none!important;}';
-    document.head.appendChild(hideNative);
-    applyNative();
 
     var player = document.querySelector('.html5-video-player') || document.body;
     overlay = document.createElement('div');

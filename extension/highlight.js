@@ -327,6 +327,13 @@ var LLLHighlight = (function () {
       if (!overlay) return;
       clearInterval(attach);
       lineOverlay = overlay;
+      // Going fullscreen moves the player about, and the marks on the line
+      // are ranges into text that is no longer where they were made. There
+      // is no mutation to notice, so the change of screen is the signal.
+      document.addEventListener('fullscreenchange', function () {
+        setTimeout(refreshLine, 60);
+        setTimeout(refreshLine, 500);
+      });
       observer = new MutationObserver(function () { checkLine(overlay); });
       observer.observe(overlay, { characterData: true, childList: true, subtree: true });
       checkLine(overlay);
@@ -370,6 +377,27 @@ var LLLHighlight = (function () {
     return whole;
   }
 
+  var askingAgain = null;
+
+  /**
+   * Ask about this line again in a moment.
+   *
+   * The first line of a video usually arrives before the dictionary has
+   * finished opening, and the answer comes back as a failure. Forgetting
+   * that the line was seen is the part that matters: without that, the same
+   * text is never asked about again, and the line stays unmarked until the
+   * next one replaces it. That is why the first line only ever coloured
+   * after pressing A or D, which is what put a different line on screen.
+   */
+  function askAgain(overlay) {
+    lastLine = null;
+    if (askingAgain) return;
+    askingAgain = setTimeout(function () {
+      askingAgain = null;
+      checkLine(overlay);
+    }, 800);
+  }
+
   async function checkLine(overlay) {
     var text = overlay.textContent;
     if (text === lastLine && stillOnThePage()) return;
@@ -383,10 +411,13 @@ var LLLHighlight = (function () {
     try {
       reply = await api.runtime.sendMessage({ type: 'wordPlaces', text: found.text });
     } catch (err) {
-      return;
+      return askAgain(overlay);
     }
-    if (!reply || !reply.ok) return;
-    if (overlay.textContent !== text) return;   // the line moved on while this was asked
+    if (!reply || !reply.ok) return askAgain(overlay);
+    // The line moved on while this was being asked, so this answer is about
+    // the wrong words. Forgetting the line rather than just dropping the
+    // answer, since nothing else will come along to ask about the new one.
+    if (overlay.textContent !== text) return askAgain(overlay);
     lineRanges = build(found, reply.result);
     apply();
   }
