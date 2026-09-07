@@ -466,6 +466,7 @@
    */
   function askFor(found) {
     const plain = { text: found.text, point: found.point, origin: found.base };
+    if (typeof found.at !== 'number' || !found.whole) return plain;
     if (typeof LLLSubtitles === 'undefined' || !LLLSubtitles.around) return plain;
     const block = found.block;
     if (!block || !block.closest || !block.closest('[data-lll-subtitle]')) return plain;
@@ -991,12 +992,19 @@
     // inside it, and the sentence context has to move with it or the bold
     // in an exported card would land in the wrong place.
     context = where ? sentenceAt(where.node, where.offset) : null;
+    // The popup asks with the lines either side of a subtitle, exactly as
+    // plain hovering does. This was the one place still reading a caption
+    // line on its own, which is why hovering わけじゃない opened a popup
+    // about ない: the わけじゃ was at the end of the line before.
+    const asked = where && where.text === text
+      ? askFor(where)
+      : { text: text, point: where && typeof where.point === 'number' ? where.point : undefined,
+          origin: where ? where.base : 0 };
     const token = ++queryToken;
     let reply;
     try {
       reply = await api.runtime.sendMessage({
-        type: 'lookup', text,
-        point: where && typeof where.point === 'number' ? where.point : undefined
+        type: 'lookup', text: asked.text, point: asked.point
       });
     } catch (err) {
       return;   // background restarting; the next hover will retry
@@ -1011,7 +1019,7 @@
     // began somewhere other than the pointer, which is a different question
     // and true far less often.
     if (where && where.pieces && typeof reply.start === 'number') {
-      const loc = locateInPieces(where.pieces, where.base + reply.start);
+      const loc = locateInPieces(where.pieces, Math.max(0, asked.origin + reply.start));
       if (loc) context = sentenceAt(loc.node, loc.offset);
     }
 
@@ -1022,17 +1030,24 @@
     // a word the popup was opened on by a click.
     const top = reply.groups && reply.groups[0];
     if (where && where.pieces && top) {
-      const from = where.base + (typeof reply.start === 'number' ? reply.start : where.point);
+      // A word that began on the line before this one is marked from the
+      // start of this one, and stops where this one does.
+      const answered = asked.origin +
+        (typeof reply.start === 'number' ? reply.start : asked.point);
+      const from = Math.max(0, answered);
+      const reach = where.whole
+        ? Math.min(top.length - (from - answered), where.whole.length - from)
+        : top.length;
       hoverBlock = where.block;
       hoverSpan = where.text;
       hoverFrom = from;
-      hoverTo = from + top.length;
+      hoverTo = from + reach;
       hoverWord = top.hits[0].word;
       hoverState = stateOf(top.hits[0]);
       // Which word the popup is about to be showing, which is not the same
       // question as which word the cursor is over: the mouse moves on and
       // the popup stays put.
-      shown = { block: where.block, from: from, to: from + top.length };
+      shown = { block: where.block, from: from, to: from + reach };
     }
 
     if (reply.status.state === 'loading') {
@@ -1488,6 +1503,12 @@
     if (reply && reply.ok) {
       button.textContent = '✓';
       button.classList.add('done');
+      // The tick alone is easy to miss, and a card quietly not being made
+      // looks exactly the same as one that was. So it says so, and then
+      // takes itself away again rather than leaving the popup taller.
+      const said = saying(entryEl, 'Added to Anki.');
+      said.className = 'note added';
+      setTimeout(function () { said.remove(); }, 2500);
       return;
     }
     button.textContent = '+';

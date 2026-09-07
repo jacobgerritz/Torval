@@ -76,6 +76,48 @@ var LLLSubtitles = (function () {
       if (overlay) overlay.style.bottom = bottom + '%';
     }).catch(function () {});
   }
+  /**
+   * The handful of things that are not the same on every video site.
+   *
+   * Everything else, the timing, the overlay, hovering, mining, A and D, is
+   * the same work wherever the video is playing. Only four questions have a
+   * different answer per site: is this one of them, which video is playing,
+   * where the player draws its own caption text, and where LLL should hang
+   * its own line.
+   *
+   * Netflix has no transcript worth asking for: its subtitle files are
+   * signed for the player alone and expire. So it reads the lines off the
+   * screen, the same fallback YouTube uses when a fetch fails. The only
+   * thing lost by that is that the percentage describes what has been
+   * watched so far rather than the whole episode.
+   */
+  var SITES = {
+    youtube: {
+      host: /(^|[.])youtube[.]com$/,
+      fetches: true,
+      id: function () { return new URLSearchParams(location.search).get('v'); },
+      captions: '.ytp-caption-window-container, .captions-text',
+      player: '.html5-video-player'
+    },
+    netflix: {
+      host: /(^|[.])netflix[.]com$/,
+      fetches: false,
+      id: function () {
+        var match = /[/]watch[/]([0-9]+)/.exec(location.pathname);
+        return match ? match[1] : null;
+      },
+      captions: '.player-timedtext',
+      player: '.watch-video--player-view, .watch-video, .VideoContainer'
+    }
+  };
+  var site = null;
+
+  /** Which of the sites above this address belongs to, if any. */
+  function siteFor(hostname) {
+    for (var name in SITES) if (SITES[name].host.test(hostname)) return name;
+    return null;
+  }
+
   var videoId = null;
   var cues = [];
   var index = 0;
@@ -144,7 +186,11 @@ var LLLSubtitles = (function () {
 
   function enable() {
     if (enabled) return;
-    if (!/(^|\.)youtube\.com$/.test(location.hostname)) return;
+    site = null;
+    for (var name in SITES) {
+      if (SITES[name].host.test(location.hostname)) { site = SITES[name]; break; }
+    }
+    if (!site) return;
     enabled = true;
     window.addEventListener('keydown', keys, true);
     setInterval(watch, 1000);
@@ -281,7 +327,7 @@ var LLLSubtitles = (function () {
   function watch() {
     if (!enabled) return;
 
-    var id = new URLSearchParams(location.search).get('v');
+    var id = site.id();
     if (id !== videoId) {
       videoId = id;
       cues = [];
@@ -296,9 +342,9 @@ var LLLSubtitles = (function () {
     // exists, so the first look almost always finds nothing; giving up on that
     // would mean never loading subtitles at all. Once a definite answer comes
     // back, ready, watching, or genuinely unavailable, this stops retrying.
-    if (id && state === 'idle' && attempts < MAX_LOOKUP_ATTEMPTS) {
-      attempts++;
-      load(id);
+    if (id && state === 'idle') {
+      if (!site.fetches) fallBackToWatching();
+      else if (attempts < MAX_LOOKUP_ATTEMPTS) { attempts++; load(id); }
     }
 
     video = document.querySelector('video');
@@ -794,7 +840,7 @@ var LLLSubtitles = (function () {
   }
 
   function attachObserver() {
-    var container = document.querySelector('.ytp-caption-window-container, .captions-text');
+    var container = document.querySelector(site.captions);
     if (container === observedContainer) return;
     if (captionObserver) captionObserver.disconnect();
     observedContainer = container;
@@ -805,7 +851,7 @@ var LLLSubtitles = (function () {
   }
 
   function captionText() {
-    var el = document.querySelector('.ytp-caption-window-container, .captions-text');
+    var el = document.querySelector(site.captions);
     return el ? squash(el.textContent) : '';
   }
 
@@ -829,7 +875,7 @@ var LLLSubtitles = (function () {
     // second or two apart and so not recognised as the same. A then stepped
     // back onto a copy of the line already playing, which looked exactly like
     // A going to the start of the current line instead of back one.
-    if (state === ready) return;
+    if (state === 'ready') return;
     var text = captionText();
     var current = openCue ? openCue.text : '';
     if (text === current) return;
@@ -915,7 +961,7 @@ var LLLSubtitles = (function () {
   function ensureOverlay() {
     if (overlay) return;
 
-    var player = document.querySelector('.html5-video-player') || document.body;
+    var player = document.querySelector(site.player) || document.body;
     overlay = document.createElement('div');
     overlay.setAttribute('data-lll-subtitle', '');
     overlay.style.cssText = [
@@ -1098,6 +1144,7 @@ var LLLSubtitles = (function () {
     pickTrack: pickTrack,
     insertObserved: insertObserved,
     isContinuation: isContinuation,
+    siteFor: siteFor,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; },
     // The line in progress, which is where a line lives while it is on

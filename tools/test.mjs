@@ -1159,6 +1159,15 @@ const run = async () => {
     JSON.stringify(Subs.around('さんがこう日常とか仕事の中で何を軸に')));
 
   Subs._setOpen(null);
+  // A video site is recognised by its address, and nothing else on the web
+  // is: an extension that started drawing subtitles over some unrelated
+  // page would be worse than one that missed a site.
+  check('YouTube is a video site', Subs.siteFor('www.youtube.com') === 'youtube');
+  check('so is Netflix', Subs.siteFor('www.netflix.com') === 'netflix');
+  check('and so is Netflix in another country', Subs.siteFor('netflix.com') === 'netflix');
+  check('a site that merely mentions one is not', Subs.siteFor('notnetflix.com') === null);
+  check('and nor is anywhere else', Subs.siteFor('example.com') === null);
+
   Subs._setCues(parsed);
 
   // A roll that never stops must not grow into one cue covering half the

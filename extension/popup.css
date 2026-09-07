@@ -208,6 +208,12 @@
   color: #949aa3;
 }
 
+/* A card was made. Green because nothing else in here is. */
+.note.added {
+  margin-top: 5px;
+  color: #8fbf87;
+}
+
 /*
  * Picking senses to mine. Clicking one puts only that meaning on the card;
  * picking none means all of them, so the ordinary case needs no clicks.

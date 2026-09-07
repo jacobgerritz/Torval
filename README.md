@@ -223,6 +223,20 @@ an accident. The one exception is the last of the four ways of getting the
 timing below, which works by reading YouTube's captions off the screen, and so
 needs them running.
 
+### Netflix
+
+Netflix works too, by that last route only: LLL reads the Japanese subtitle
+off the screen as it plays, so Japanese has to be the subtitle language
+chosen in the player. Everything else is the same, the words are hoverable,
+**A** and **D** step between lines, and a card can be mined from one.
+
+Two things are different, both because there is no file to fetch. The
+comprehension percentage describes what has been watched so far rather than
+the whole episode, and it grows as you watch. And the audio on a mined card
+may not record, since Netflix video is encrypted and the browser will not
+hand its sound to an extension; the card is still made, with the sentence
+and the word on it.
+
 There are four ways it gets the timing, tried in the order below, each a
 fallback for the one before it, not a choice between them. The first three all
 build a caption web address themselves, out of data YouTube's own page

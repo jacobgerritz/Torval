@@ -44,6 +44,11 @@
   <p>単子葉植物の一つの科である。全世界で約70属3700種がある。</p>
   <p>でもそれって、すごいですね。</p>
   <p>僕もちえこさんも猫です。</p>
+
+  <p class="hint">The line below stands in for a caption. It is the middle of
+  three, and the word 皆さん is cut in half by the join, so pointing at the
+  皆 has to answer 皆さん rather than 皆.</p>
+  <p data-lll-subtitle>ないのかもっていうことなんですよね。皆</p>
 </main>
 
 <script src="../extension/japanese.js"></script>
@@ -61,7 +66,10 @@ window.LLLSubtitles = {
   suspend() {},
   // Standing in for three consecutive captions, so the line on screen can be
   // looked up with the lines either side of it.
-  around(text) { return window.__around || { before: '', after: '' }; },
+  around(text) {
+    if (window.__around) return window.__around;
+    return { before: '私の場合は繋がるわけじゃ', after: 'さんがこう日常とか' };
+  },
   cueFor(sentence) { return sentence ? { start: 1, end: 3, text: sentence } : null; },
   allText() { return ""; },
   count() { return 1; }

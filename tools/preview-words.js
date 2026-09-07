@@ -44,6 +44,12 @@ const SAMPLE = [
   { k: ['鰺'], kv: 1, q: 22000, r: ['アジ'], f: 0, s: [{ p: ['n'], m: ['uk'], g: ['horse mackerel'] }] },
   { k: [], kv: 0, q: 30000, r: ['ニーズ'], f: 0, s: [{ p: ['n'], g: ['needs'] }] },
   { k: ['仲間'], kv: 1, q: 900, r: ['なかま'], f: 50, s: [{ p: ['n'], g: ['companion', 'fellow', 'comrade'] }] },
+  // A word that an automatic caption cuts in half: 皆 ends one line and さん
+  // begins the next. All three are here, so a popup that reads the line on
+  // its own can answer 皆 and be plainly wrong.
+  { k: ['皆さん'], kv: 1, q: 1200, r: ['みなさん'], f: 55, s: [{ p: ['n'], m: ['uk'], g: ['everyone', 'everybody', 'all of you'] }] },
+  { k: ['皆'], kv: 1, q: 2600, r: ['みな'], f: 45, s: [{ p: ['n'], m: ['uk'], g: ['all', 'everyone', 'everything'] }] },
+  { k: [], kv: 0, q: 500, r: ['さん'], f: 60, s: [{ p: ['suf'], g: ['Mr.', 'Ms.', 'polite suffix'] }] },
   // A second, separate entry spelled exactly like the 本 above it. Two entries
   // sharing a spelling is ordinary, こと is both a particle and a noun, and
   // it means one popup can show the same word twice, each with its own tick.
