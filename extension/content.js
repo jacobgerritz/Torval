@@ -1121,6 +1121,13 @@
         entry,
         surface,
         senses: chosenSenses(list)
+      }).catch((err) => {
+        // Whatever went wrong in there, the one thing that must not happen
+        // is the button sitting on a dot with nothing said.
+        add.textContent = '+';
+        add.disabled = false;
+        const failed = saying(el, (err && err.message) || 'Something went wrong making the card.');
+        failed.className = 'error';
       });
     });
 
@@ -1337,8 +1344,16 @@
    * script, which is the only part that may reach your local Anki; which field
    * each piece lands in is set once in LLL's options.
    */
-  /** A line of plain text under an entry, while something is going on. */
-  function note(entryEl, text) {
+  /**
+   * A line of plain text under an entry, while something is going on.
+   *
+   * Not called `note`, though that is what it is, because the card being
+   * built inside mine() is called that: a `const note` further down the same
+   * function put this name out of reach above it, and calling it threw before
+   * anything else could happen. The + then sat on a dot for ever, since
+   * nobody was listening for the failure.
+   */
+  function saying(entryEl, text) {
     const said = document.createElement('div');
     said.className = 'note doing';
     said.textContent = text;
@@ -1363,7 +1378,7 @@
     const settings = await api.storage.local.get('ankiConfig').catch(() => ({}));
     let media = {};
     if (typeof LLLVideo !== 'undefined') {
-      const doing = cue ? note(entryEl, 'Recording the line…') : null;
+      const doing = cue ? saying(entryEl, 'Recording the line…') : null;
       try {
         media = await LLLVideo.capture(sentence, cue, { lead: (settings.ankiConfig || {}).lead });
       } finally {

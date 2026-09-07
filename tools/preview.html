@@ -53,6 +53,24 @@
 <script>
 // --- stand in for the extension's messaging ---------------------------------
 let settings = {};
+// Mining from a video, without a video. The real thing records the line, which
+// needs YouTube; what matters here is that mine() takes the same path, since
+// that path is where a card once vanished into a spinning dot.
+window.LLLSubtitles = {
+  enable() {},
+  suspend() {},
+  cueFor(sentence) { return sentence ? { start: 1, end: 3, text: sentence } : null; },
+  allText() { return ""; },
+  count() { return 1; }
+};
+window.LLLVideo = {
+  async capture(sentence, cue) {
+    window.__captured = { sentence, cue };
+    await new Promise((r) => setTimeout(r, 50));
+    return {};
+  }
+};
+
 const watchers = [];
 window.browser = {
   storage: {
