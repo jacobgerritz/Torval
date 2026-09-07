@@ -34,9 +34,12 @@ function showPanel(name) {
   }
 }
 
-// Opened with #known, what the bar's ⚙ could later point straight at, and what
-// makes the word list linkable rather than only reachable by clicking.
-showPanel(location.hash === '#known' ? 'known' : 'anki');
+// A name after the # opens that page, which is what makes the word list
+// linkable rather than only reachable by clicking. #known still works, since
+// that is what the page was called when anything started linking to it.
+const asked = (location.hash || '').slice(1);
+showPanel(asked === 'known' ? 'words'
+  : document.getElementById('panel-' + asked) ? asked : 'words');
 
 // -------------------------------------------------------------------------
 // Anki

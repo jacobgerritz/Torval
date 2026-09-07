@@ -275,8 +275,9 @@
         const added = await api.runtime.sendMessage({ type: 'addKnownWords', words: found.result });
         if (!added.ok) throw new Error(added.error);
 
-        const already = found.result.length - added.result.added;
-        resultEl.textContent = `Found ${found.result.length} words, ` +
+        const many = found.result.length;
+        const already = many - added.result.added;
+        resultEl.textContent = `Found ${many} word${many === 1 ? '' : 's'}, ` +
           `${added.result.added} new, ${already} already known.`;
         if (refreshKnown) await refreshKnown();
       } catch (err) {

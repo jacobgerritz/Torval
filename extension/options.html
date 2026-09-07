@@ -6,23 +6,95 @@
 <div class="layout">
   <nav class="sidebar">
     <h1>LLL</h1>
-    <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="words">Words</button>
-    <button class="tab" data-panel="video">Video</button>
-    <button class="tab" data-panel="reader">Reader</button>
-    <button class="tab" data-panel="backup">Backup</button>
+    <button class="tab" data-panel="anki">Anki</button>
+    <span class="sidebar-spacer"></span>
+    <button id="open-reader" class="sidebar-action">Open your books</button>
   </nav>
 
   <main>
 
   <!-- ------------------------------------------------------------------ -->
 
-  <div class="panel" id="panel-anki">
+  <div class="panel" id="panel-words">
+    <div class="parting first"><h2>Known words</h2><span class="count" id="count">…</span></div>
+    <p class="note count-note">
+      What a page is measured against. Press ✓ in the popup, or 2.
+    </p>
+
+    <section>
+      <h2>Add from a text</h2>
+      <p class="note">
+        Something you have already read. たべました is added as 食べる.
+      </p>
+
+      <textarea id="text" rows="6" spellcheck="false"
+        placeholder="日本語のテキストをここに貼り付けてください…"></textarea>
+
+      <p class="row">
+        <input type="file" id="file" accept=".txt,text/plain">
+        <span class="spacer"></span>
+        <button id="add" class="primary">Add these words</button>
+      </p>
+
+      <p id="result" class="note"></p>
+    </section>
+
+    <section>
+      <label class="search">
+        <span>Search</span>
+        <input id="search" type="search" placeholder="食べる" spellcheck="false">
+      </label>
+
+      <div id="list" class="words"></div>
+      <p id="more" class="note more" hidden></p>
+    </section>
+
+    <div class="parting"><h2>Ignored words</h2><span class="count" id="count-ignored">…</span></div>
+    <p class="note count-note">
+      Names, English, misreadings. Left out of the score rather than counting
+      either way. Press ⊘ in the popup, or 3.
+    </p>
+
+    <section>
+      <label class="search">
+        <span>Search</span>
+        <input id="search-ignored" type="search" placeholder="ネカフェ" spellcheck="false">
+      </label>
+
+      <div id="list-ignored" class="words"></div>
+      <p id="more-ignored" class="note more" hidden></p>
+    </section>
+
+    <div class="parting"><h2>Keeping a copy</h2></div>
+    <p class="note count-note">
+      Both lists in one file. This is the only part of LLL that cannot be
+      rebuilt, and it lives in one browser profile.
+    </p>
+
+    <section>
+      <p class="row">
+        <button id="save-words" class="primary">Save to a file</button>
+        <span id="save-note" class="note"></span>
+      </p>
+      <p class="row">
+        <input type="file" id="load-words" accept=".json,application/json">
+        <span id="load-note" class="note"></span>
+      </p>
+      <p class="note">
+        Loading adds to what is here. Nothing is removed, so an old copy is safe.
+      </p>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-anki" hidden>
     <section>
       <h2>Where cards go</h2>
       <p class="note">
-        Cards are added through AnkiConnect, which listens on your own machine.
-        Anki has to be open.
+        Through AnkiConnect, which listens on your own machine. Anki has to be
+        open.
       </p>
 
       <label>
@@ -39,7 +111,6 @@
         <span>Tags</span>
         <input id="tags" type="text" placeholder="lll" spellcheck="false">
       </label>
-
     </section>
 
     <section id="mapping-section" hidden>
@@ -50,133 +121,23 @@
       <div id="mapping"></div>
     </section>
 
-    <p class="actions">
-      <button id="save" class="primary">Save</button>
-      <span id="status" role="status"></span>
-    </p>
-  </div>
-
-  <!-- ------------------------------------------------------------------ -->
-
-  <div class="panel" id="panel-words" hidden>
-    <div class="parting first"><h2>Known words</h2><span class="count" id="count">…</span></div>
-    <p class="note count-note">
-      What a page is measured against. Press ✓ in the popup, or 2.
-    </p>
-
     <section>
-      <h2>Add from a text</h2>
-      <p class="note">
-        Something you have already read. たべました is added as 食べる.
-      </p>
-
-      <textarea id="text" rows="8" spellcheck="false"
-        placeholder="日本語のテキストをここに貼り付けてください…"></textarea>
-
-      <p class="row">
-        <input type="file" id="file" accept=".txt,text/plain">
-        <span class="spacer"></span>
-        <button id="add" class="primary">Add words from this text</button>
-      </p>
-
-      <p id="result" class="note"></p>
-    </section>
-
-    <section>
-      <h2>Browse</h2>
-      <label class="search">
-        <span>Search</span>
-        <input id="search" type="search" placeholder="食べる" spellcheck="false">
-      </label>
-
-      <div id="list" class="words"></div>
-      <p id="more" class="note more" hidden></p>
-    </section>
-
-    <div class="parting"><h2>Ignored words</h2><span class="count" id="count-ignored">…</span></div>
-    <p class="note count-note">
-      Names, English, misreadings. Left out of the score entirely rather
-      than counting either way. Press ⊘ in the popup, or 3.
-    </p>
-
-    <section>
-      <label class="search">
-        <span>Search</span>
-        <input id="search-ignored" type="search" placeholder="ネカフェ" spellcheck="false">
-      </label>
-
-      <div id="list-ignored" class="words"></div>
-      <p id="more-ignored" class="note more" hidden></p>
-    </section>
-  </div>
-
-  <!-- ------------------------------------------------------------------ -->
-
-  <div class="panel" id="panel-video" hidden>
-    <section>
-      <h2>Subtitles</h2>
-      <p class="note">
-        LLL fetches the Japanese track itself and draws its own line from it,
-        so its subtitles have nothing to do with YouTube&rsquo;s. The CC button
-        is YouTube&rsquo;s alone, and either can be on without the other.
-      </p>
-    </section>
-
-    <section>
-      <h2>Recording a line</h2>
+      <h2>Recording from video</h2>
       <label>
         <span>Audio lead-in</span>
         <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.3">
       </label>
       <p class="note hint">
-        Seconds of sound kept from before the line, so the first word is not
-        clipped. Roughly, because a recorder swallows an unpredictable moment
-        when it starts, which LLL allows for.
-      </p>
-    </section>
-  </div>
-
-  <!-- ------------------------------------------------------------------ -->
-
-  <div class="panel" id="panel-reader" hidden>
-    <section>
-      <h2>Your books</h2>
-      <p class="note">
-        Epub and txt files, read in a tab of their own, with hovering, marking
-        and the comprehension bar working as they do on any page. The shelf
-        says how much of each book you would understand.
-      </p>
-      <p class="row">
-        <button id="open-reader" class="primary">Open the reader</button>
-      </p>
-    </section>
-  </div>
-
-  <!-- ------------------------------------------------------------------ -->
-
-  <div class="panel" id="panel-backup" hidden>
-    <section>
-      <h2>Save a copy</h2>
-      <p class="note">
-        Both lists in one file. The only part of LLL that cannot be rebuilt,
-        and it lives in one browser profile.
-      </p>
-      <p class="row">
-        <button id="save-words" class="primary">Save my words to a file</button>
-        <span id="save-note" class="note"></span>
+        Seconds kept from before the line, so the first word is not clipped.
+        Roughly, since a recorder swallows an unpredictable moment when it
+        starts.
       </p>
     </section>
 
-    <section>
-      <h2>Load a copy back</h2>
-      <p class="note">
-        Adds to what is here. Nothing is removed, so an old copy is safe.
-      </p>
-      <p class="row">
-        <input type="file" id="load-words" accept=".json,application/json">
-        <span id="load-note" class="note"></span>
-      </p>
-    </section>
+    <p class="actions">
+      <button id="save" class="primary">Save</button>
+      <span id="status" role="status"></span>
+    </p>
   </div>
 
   </main>

@@ -52,13 +52,30 @@ main {
 .sidebar {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
   flex: 0 0 216px;
   box-sizing: border-box;
   height: 100vh;
-  padding: 40px 14px;
+  padding: 40px 14px 20px;
   background: #121316;
   border-right: 1px solid var(--line);
 }
+
+.sidebar-spacer { flex: 1; }
+
+/* Not a place to be, so not one of the tabs: it opens a page of its own. */
+.sidebar-action {
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink-quiet);
+  font: inherit;
+  text-align: left;
+}
+.sidebar-action:hover { background: #1b1d21; color: var(--ink); }
 
 h1 {
   margin: 0 0 26px;
@@ -264,7 +281,7 @@ input[type="file"] {
 .search > span { flex: 0 0 auto; }
 
 .words {
-  max-height: 420px;
+  max-height: 320px;
   overflow-y: auto;
   background: var(--sunk);
   border: 1px solid var(--line);

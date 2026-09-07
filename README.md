@@ -349,7 +349,7 @@ per word for the ones added by mistake.
 
 ## Reading a book
 
-**Reader** in LLL's settings opens a page that takes an **epub** or a **txt**
+**Open your books**, at the foot of LLL's settings, opens a page that takes an **epub** or a **txt**
 file and shows it as an ordinary web page. That is the whole trick: the reader
 loads the same scripts LLL puts on any website, so hovering, the popup, the
 marking and the comprehension bar work on a book exactly as they do on a page,
@@ -476,7 +476,7 @@ reason; the difference is that this happens without being asked.
 
 ## Keeping a copy of your words
 
-Under **Backup** in LLL's settings, **Save my words to a file** writes both
+At the end of the **Words** page in LLL's settings, **Save to a file** writes both
 lists, known and ignored, into a single JSON file with the date in its name.
 
 This is the one part of LLL that cannot be rebuilt. The dictionary downloads
