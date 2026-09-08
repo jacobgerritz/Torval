@@ -923,6 +923,7 @@
     document.addEventListener('lll-reread', () => { lastTranscript = ''; readPage(); });
     await waitForDictionary();
     setTimeout(readPage, 1500);   // let the page finish putting itself together
+    watchAddress();
 
     // Subtitles arrive well after the page does, and replace it as the thing
     // worth measuring the moment they do.
@@ -1033,6 +1034,33 @@
       readingPage = false;
       reading = false;
     }
+  }
+
+  /**
+   * Read the page again when it becomes a different page.
+   *
+   * A site that never reloads still changes what it says. Netflix is one
+   * page from the moment you open it: its home page fills itself in some
+   * seconds after loading, and going from there to an episode and from one
+   * episode to the next never loads anything. LLL read once, a second and a
+   * half in, found an empty shell, said there was no Japanese here and never
+   * looked again, which is why the handle was missing on a page plainly full
+   * of it. YouTube is the same shape.
+   *
+   * The address is the signal, plus one later look on the way in for a page
+   * that fills itself in without changing address.
+   */
+  function watchAddress() {
+    let seen = location.href;
+    setTimeout(() => { lastTranscript = ''; readPage(); }, 5000);
+    setInterval(() => {
+      if (location.href === seen) return;
+      seen = location.href;
+      lastTranscript = '';
+      // A moment for the new page to put something on the screen. Reading
+      // the instant the address changes reads the page being left.
+      setTimeout(readPage, 1200);
+    }, 1000);
   }
 
   // How far through the page the background script has got. It says so as

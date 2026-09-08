@@ -36,16 +36,7 @@
       ],
       "run_at": "document_start"
     },
-    {
-      "matches": [
-        "*://*.netflix.com/*"
-      ],
-      "js": [
-        "netflix-page.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
+
     {
       "matches": [
         "<all_urls>"
@@ -65,8 +56,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "popup.css",
-        "netflix-page.js"
+        "popup.css"
       ],
       "matches": [
         "<all_urls>"
@@ -81,7 +71,9 @@
     "http://127.0.0.1:8765/*",
     "http://localhost:8765/*",
     "https://assets.languagepod101.com/*",
-    "https://www.youtube.com/*"
+    "https://www.youtube.com/*",
+    "*://*.nflxvideo.net/*",
+    "*://*.nflxso.net/*"
   ],
   "options_ui": {
     "page": "options.html",

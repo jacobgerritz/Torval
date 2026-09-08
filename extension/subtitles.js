@@ -389,8 +389,8 @@ var LLLSubtitles = (function () {
   /**
    * The subtitle file Netflix's own player was handed, if one has come in.
    *
-   * The catching happens in netflix-page.js, which is a different world
-   * entirely and explains itself there. All that is left here is to read it,
+   * The catching happens in netflix.js, which explains itself there. All
+   * that is left here is to read what it caught,
    * and to be sure it belongs to the episode actually playing: Netflix is one
    * page from beginning to end, so the file for the last episode is still
    * sitting there when the next one starts.

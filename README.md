@@ -265,11 +265,19 @@ unencrypted address for every subtitle track in it, Japanese included.
 
 So LLL adds it. `JSON.stringify` is where the request becomes text, which is
 the last moment before it is sent, and `JSON.parse` is where the answer stops
-being text, which is the first moment it can be read. Both live in
-`netflix-page.js`, which runs in the page’s own world because the player’s
-`JSON` is not an extension’s `JSON`. Netflix’s player is not affected either
-way: the extra format is one more line in a list it ignores, and the answer
-is handed back exactly as it arrived.
+being text, which is the first moment it can be read. Netflix’s player is not
+affected either way: the extra format is one more line in a list it ignores,
+and the answer is handed back exactly as it arrived.
+
+Both hooks have to go on the page’s own `JSON`, which is not the same object
+as an extension’s `JSON`, and `wrappedJSObject` is how a content script
+reaches across that line in Firefox. Two earlier attempts went the other way,
+putting a file into the page to run there: a content script declared
+`"world": "MAIN"`, which never ran, and then a `<script>` tag, which never ran
+either, most likely stopped by Netflix’s content security policy. Neither
+could say why, because neither got far enough to say anything. Reaching the
+page’s objects from here has nothing to inject and no policy to satisfy, and
+it is what subtitles.js already does to read YouTube’s player.
 
 If that comes up empty, for a title with no Japanese subtitles or because the
 extension was loaded halfway through an episode, LLL reads the lines off the

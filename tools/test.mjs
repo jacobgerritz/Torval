@@ -1247,11 +1247,12 @@ const run = async () => {
   }
 
   // --- asking Netflix for a format that can be read -------------------------
-  // The half of this that runs in the page's own world, where it can reach
-  // the player's JSON. Everything it does happens inside those two methods,
-  // so a sandbox with its own JSON is the whole test rig it needs.
+  // netflix.js reaches into the page's own JSON and wraps both halves of it.
+  // Here the "page" is a sandbox with a JSON of its own, which is exactly the
+  // shape of the real thing: a separate JSON that has to be reached rather
+  // than the one this file is holding. Firefox's two helpers for crossing
+  // that wall, wrappedJSObject and exportFunction, stand in as themselves.
   {
-    let posted = null;
     let asked = null;
     const sandbox = {
       console: { log() {}, warn() {}, error() {} },
@@ -1259,20 +1260,20 @@ const run = async () => {
         asked = url;
         return { ok: true, text: async () => 'WEBVTT' };
       },
-      window: {
-        addEventListener() {},
-        postMessage(message) { posted = message; }
-      }
+      exportFunction: (fn) => fn
     };
     sandbox.globalThis = sandbox;
+    sandbox.window = sandbox;
+    sandbox.window.wrappedJSObject = sandbox;
     vm.createContext(sandbox);
-    vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix-page.js'), 'utf8'),
-      sandbox, { filename: 'netflix-page.js' });
+    const Netflix = vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix.js'), 'utf8') +
+      ';LLLNetflix', sandbox, { filename: 'netflix.js' });
 
-    const stringify = (value) => vm.runInContext(
-      'JSON.stringify(value)', Object.assign(sandbox, { value }));
+    const stringify = (value) => vm.runInContext('JSON.stringify(value)',
+      Object.assign(sandbox, { value }));
 
-    const request = { url: '/nq/msl_v1/cadmium/pbo_manifests', manifest: { profiles: ['playready-h264'] } };
+    const request = { url: '/nq/msl_v1/cadmium/pbo_manifests',
+      manifest: { profiles: ['playready-h264'] } };
     check('the request for a title asks for a subtitle format LLL can read',
       JSON.parse(stringify(request)).manifest.profiles[0] === 'webvtt-lssdh-ios8',
       stringify(request));
@@ -1280,8 +1281,8 @@ const run = async () => {
       (stringify(request), JSON.parse(stringify(request)).manifest.profiles.length) === 2,
       stringify(request));
     check('every other request is left exactly as it was',
-      stringify({ url: '/nq/msl_v1/cadmium/pbo_licenses', manifest: { profiles: ['playready-h264'] } })
-        .indexOf('webvtt') === -1);
+      stringify({ url: '/nq/msl_v1/cadmium/pbo_licenses',
+        profiles: ['playready-h264'] }).indexOf('webvtt') === -1);
 
     // The answer to that request, cut down to the parts this reads. Two
     // Japanese tracks, because a title very often has both, and the one that
@@ -1289,7 +1290,8 @@ const run = async () => {
     const answer = JSON.stringify({ result: {
       movieId: 81234567,
       timedtexttracks: [
-        { language: 'en', ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/en.vtt' }] } } },
+        { language: 'en',
+          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/en.vtt' }] } } },
         { language: 'ja', rawTrackType: 'closedcaptions',
           ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja-cc.vtt' }] } } },
         { language: 'ja', rawTrackType: 'subtitles',
@@ -1298,18 +1300,19 @@ const run = async () => {
           ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja-forced.vtt' }] } } }
       ]
     } });
-    const parsed = vm.runInContext(
-      'JSON.parse(answer)', Object.assign(sandbox, { answer }));
+    const parsedAnswer = vm.runInContext('JSON.parse(answer)',
+      Object.assign(sandbox, { answer }));
     check('the answer is handed back untouched, whatever was read out of it',
-      parsed.result.movieId === 81234567 && parsed.result.timedtexttracks.length === 4);
+      parsedAnswer.result.movieId === 81234567 &&
+      parsedAnswer.result.timedtexttracks.length === 4);
     await new Promise((r) => setTimeout(r, 10));
     check('the Japanese subtitles are fetched, not the English',
       asked === 'https://x/ja.vtt', asked);
     check('and the plain track is preferred to the closed captions',
       asked !== 'https://x/ja-cc.vtt', asked);
-    check('the file reaches the rest of LLL, with the episode it belongs to',
-      posted && posted.lll === 'lll-netflix-subtitles' && posted.movie === '81234567' &&
-      posted.vtt === 'WEBVTT', JSON.stringify(posted));
+    check('the file is then there for the rest of LLL, with the episode it is of',
+      Netflix.track() && Netflix.track().movie === '81234567' &&
+      Netflix.track().vtt === 'WEBVTT', JSON.stringify(Netflix.track()));
   }
   check('and nor is anywhere else', Subs.siteFor('example.com') === null);
 
