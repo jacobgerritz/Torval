@@ -1263,6 +1263,8 @@ const run = async () => {
       // A reply becomes an object by one of three routes, and only one of
       // them is JSON.parse. These are the other two.
       Response: function Response() {},
+      location: { href: 'https://www.netflix.com/watch/81234567' },
+      navigator: {},
       XMLHttpRequest: function XMLHttpRequest() {},
       // The page script sets a timer to say so if nothing ever comes back.
       // Let go of it, or the tests would sit and wait out its twenty-five

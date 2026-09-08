@@ -349,7 +349,79 @@
     });
   }
 
-  say('watching for this title’s subtitle file');
+  /**
+   * Is the request even sent from here?
+   *
+   * Everything so far has assumed it is: the payload is built here, so the
+   * request must go out from here and its answer must come back here. The
+   * first half of that is proved, the second half is only an assumption, and
+   * every place the answer could arrive has now been watched and found empty.
+   * So the assumption is what to test. If nothing carrying "manifest" is ever
+   * fetched from this frame, the payload is going somewhere else to be sent,
+   * and where it goes is the whole answer.
+   */
+  var sent = 0;
+  if (typeof fetch === 'function') {
+    var realFetch = fetch;
+    fetch = function (input, init) {
+      try {
+        var where = typeof input === 'string' ? input : (input && input.url) || '';
+        if (MANIFEST.test(where) && !sent++) {
+          say('the request goes out from this frame, to', String(where).slice(0, 120));
+        }
+      } catch (err) { /* leave the request alone */ }
+      return realFetch.apply(this || window, arguments);
+    };
+  }
+
+  /**
+   * Messages from a service worker, and messages down a channel.
+   *
+   * There were no Workers at all, which rules out the obvious answer and
+   * leaves the two quieter ones. A service worker is not a Worker and would
+   * not have been counted; neither is a MessageChannel, which is how a page
+   * and a service worker usually talk once they have been introduced.
+   *
+   * The port is watched by wrapping the setter for its `onmessage`, rather
+   * than by adding a listener of our own. A listener would need the port
+   * started, and starting a port before the page is ready for it would
+   * deliver its messages to nobody. Wrapping the handler the page installs
+   * changes no timing at all: the page still gets every message, in order,
+   * and this sees a copy on the way past.
+   */
+  if (typeof navigator !== 'undefined' && navigator.serviceWorker) {
+    try {
+      navigator.serviceWorker.addEventListener('message', function (e) {
+        fromWorker(e.data);
+      });
+    } catch (err) { /* nothing to listen to */ }
+  }
+
+  var ports = 0;
+
+  if (typeof MessagePort !== 'undefined') {
+    try {
+      var onmessage = Object.getOwnPropertyDescriptor(MessagePort.prototype, 'onmessage');
+      if (onmessage && onmessage.set) {
+        Object.defineProperty(MessagePort.prototype, 'onmessage', {
+          configurable: true,
+          enumerable: onmessage.enumerable,
+          get: onmessage.get,
+          set: function (handler) {
+            var wrapped = typeof handler === 'function' ? function (e) {
+              try { ports++; fromWorker(e.data); } catch (err) { /* not ours */ }
+              return handler.apply(this, arguments);
+            } : handler;
+            return onmessage.set.call(this, wrapped);
+          }
+        });
+      }
+    } catch (err) {
+      say('could not listen to the channels:', err && err.message);
+    }
+  }
+
+  say('watching for this title’s subtitle file, in', location.href.slice(0, 90));
 
   /**
    * Say so if the request went out and nothing ever came back through here.
@@ -362,11 +434,14 @@
    */
   setTimeout(function () {
     if (got || !asked) return;
-    say(seenReply
-      ? 'the reply came back but had no track list in it, so the format was ' +
-        'added in the wrong place or under the wrong name.'
-      : 'the request went out and its reply was never seen, in this page or ' +
-        'in anything ' + (workers ? 'the ' + workers + ' workers said.' :
-          'said by a worker, of which there were none.'));
+    if (seenReply) {
+      say('the reply came back but had no track list in it, so the format was ' +
+        'added in the wrong place or under the wrong name.');
+      return;
+    }
+    say('nothing found. Sent from this frame:', sent, '| workers:', workers,
+      '| channel messages:', ports,
+      '| a service worker is', (navigator.serviceWorker &&
+        navigator.serviceWorker.controller) ? 'running this page' : 'not running this page');
   }, 25000);
 })();
