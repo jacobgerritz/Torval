@@ -1335,11 +1335,15 @@ const run = async () => {
     // The same answer, arriving the way fetch delivers one. response.json()
     // never calls JSON.parse, the browser parses the body itself, so a site
     // that reads its replies this way goes straight past the hook above.
-    // Netflix is such a site, which is why nothing was ever caught.
+    //
+    // The address is deliberately nothing to do with "manifest". Filtering
+    // replies by their address is what hid this on the real site: the word
+    // manifest is Netflix's own name for the request, inside the payload,
+    // and says nothing about where the request is sent.
     posted = null;
     asked = null;
     const reply = new sandbox.Response();
-    reply.url = 'https://www.netflix.com/nq/msl_v1/cadmium/pbo_manifests';
+    reply.url = 'https://www.netflix.com/nq/nogo/msl_v1/cadmium/pbo';
     // A different episode, or the same track would be recognised as one
     // already fetched and quite rightly left alone.
     reply.body = answer.split('/ja.vtt').join('/ja2.vtt');
@@ -1353,15 +1357,17 @@ const run = async () => {
     check('the subtitles are found in it all the same',
       asked === 'https://x/ja2.vtt', asked);
 
-    // Every other reply on the site is left alone, whatever is in it.
+    // What a reply is judged on is what is in it, and only that. Every other
+    // reply on the site passes through the same hook and is dropped after one
+    // property lookup.
     posted = null;
     asked = null;
     const other = new sandbox.Response();
     other.url = 'https://www.netflix.com/api/shakti/whatever';
-    other.body = answer;
+    other.body = JSON.stringify({ result: { movieId: 5, episodes: ['a', 'b'] } });
     await other.json();
     await new Promise((r) => setTimeout(r, 10));
-    check('a reply to anything else is not read at all', asked === null, asked);
+    check('a reply with no track list in it is left alone', asked === null, asked);
   }
   check('and nor is anywhere else', Subs.siteFor('example.com') === null);
 

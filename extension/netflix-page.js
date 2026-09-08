@@ -170,12 +170,18 @@
     var realJson = Response.prototype.json;
     Response.prototype.json = function () {
       var answer = realJson.apply(this, arguments);
+      var where = this.url;
       try {
-        if (MANIFEST.test(this.url || '')) {
-          // A derived promise, so a failure here can never become an
-          // unhandled rejection on the one the player is waiting for.
-          answer.then(function (value) { fromReply(value); }, function () {});
-        }
+        // Every reply, not only those whose address says "manifest". That
+        // filter is what hid this: the address in the payload is Netflix's
+        // own name for the request and has nothing to do with where the
+        // request is actually sent, which is why no fetch matching it was
+        // ever seen leaving this frame either. What each reply costs now is
+        // one property lookup, which is nothing.
+        //
+        // A derived promise, so a failure here can never become an
+        // unhandled rejection on the one the player is waiting for.
+        answer.then(function (value) { fromReply(value, where); }, function () {});
       } catch (err) { /* leave the reply alone */ }
       return answer;
     };
@@ -191,20 +197,21 @@
     var realSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function () {
       try {
-        if (MANIFEST.test(this.__lllUrl || '')) {
-          this.addEventListener('load', function () {
-            try {
-              if (this.responseType && this.responseType !== 'text') {
-                if (this.responseType === 'json') fromReply(this.response);
-                return;
-              }
-              var text = this.responseText;
-              if (text && text.indexOf('timedtexttracks') !== -1) {
-                fromReply(parse(text));
-              }
-            } catch (err) { /* not ours to read */ }
-          });
-        }
+        noteRequest(this.__lllUrl);
+        this.addEventListener('load', function () {
+          try {
+            if (this.responseType && this.responseType !== 'text') {
+              if (this.responseType === 'json') fromReply(this.response, this.__lllUrl);
+              return;
+            }
+            // A string search that nearly always fails, which is cheaper
+            // than parsing a reply that was already parsed once.
+            var text = this.responseText;
+            if (text && text.indexOf('timedtexttracks') !== -1) {
+              fromReply(parse(text), this.__lllUrl);
+            }
+          } catch (err) { /* not ours to read */ }
+        });
       } catch (err) { /* leave the request alone */ }
       return realSend.apply(this, arguments);
     };
@@ -279,13 +286,16 @@
     return false;
   }
 
-  /** A reply to the manifest request, however it was read. */
-  function fromReply(value) {
+  /** A reply, however it was read. Only the ones with tracks say anything. */
+  function fromReply(value, where) {
     try {
+      if (!value || typeof value !== 'object') return;
+      var tracks = value.timedtexttracks ||
+        (value.result && value.result.timedtexttracks);
+      if (!tracks) return;
       if (!seenReply) {
         seenReply = true;
-        say('the reply to that request came back. It holds:',
-          (value && typeof value === 'object' ? Object.keys(value) : [typeof value]).join(', '));
+        say('found the track list, in the reply from', String(where || 'somewhere').slice(0, 110));
       }
       collect(value);
     } catch (err) { /* said what there was to say */ }
@@ -365,13 +375,25 @@
     var realFetch = fetch;
     fetch = function (input, init) {
       try {
-        var where = typeof input === 'string' ? input : (input && input.url) || '';
-        if (MANIFEST.test(where) && !sent++) {
-          say('the request goes out from this frame, to', String(where).slice(0, 120));
-        }
+        noteRequest(typeof input === 'string' ? input : (input && input.url) || '');
       } catch (err) { /* leave the request alone */ }
       return realFetch.apply(this || window, arguments);
     };
+  }
+
+  /**
+   * The first few addresses asked for once a title has been asked about.
+   *
+   * No request matching "manifest" was ever sent from this frame, and yet
+   * the payload that says "manifest" is built here. Both are true because
+   * that word is Netflix's own name for the request, inside the payload, and
+   * has nothing to do with the address it is sent to. So the addresses
+   * themselves are worth seeing once, rather than guessed at again.
+   */
+  function noteRequest(where) {
+    if (!asked || sent >= 6 || !where) return;
+    sent++;
+    say('request', sent + ':', String(where).slice(0, 110));
   }
 
   /**
@@ -439,7 +461,7 @@
         'added in the wrong place or under the wrong name.');
       return;
     }
-    say('nothing found. Sent from this frame:', sent, '| workers:', workers,
+    say('nothing found. Requests noted:', sent, '| workers:', workers,
       '| channel messages:', ports,
       '| a service worker is', (navigator.serviceWorker &&
         navigator.serviceWorker.controller) ? 'running this page' : 'not running this page');
