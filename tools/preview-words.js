@@ -50,6 +50,7 @@ const SAMPLE = [
   { k: ['皆さん'], kv: 1, q: 1200, r: ['みなさん'], f: 55, s: [{ p: ['n'], m: ['uk'], g: ['everyone', 'everybody', 'all of you'] }] },
   { k: ['皆'], kv: 1, q: 2600, r: ['みな'], f: 45, s: [{ p: ['n'], m: ['uk'], g: ['all', 'everyone', 'everything'] }] },
   { k: [], kv: 0, q: 500, r: ['さん'], f: 60, s: [{ p: ['suf'], g: ['Mr.', 'Ms.', 'polite suffix'] }] },
+  { k: ['嬉しい'], kv: 1, q: 1800, r: ['うれしい'], f: 55, s: [{ p: ['adj-i'], g: ['happy', 'glad', 'pleased'] }] },
   // A second, separate entry spelled exactly like the 本 above it. Two entries
   // sharing a spelling is ordinary, こと is both a particle and a noun, and
   // it means one popup can show the same word twice, each with its own tick.

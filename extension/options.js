@@ -54,7 +54,9 @@ const SOURCE_LABELS = [
   ['audio', 'Word audio'],
   ['pitch', 'Pitch accent'],
   ['image', 'Video frame'],
-  ['sentenceAudio', 'Sentence audio']
+  ['sentenceAudio', 'Sentence audio'],
+  ['sentenceBefore', 'Sentence before'],
+  ['sentenceAfter', 'Sentence after']
 ];
 
 const deckSelect = document.getElementById('deck');

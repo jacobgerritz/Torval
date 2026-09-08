@@ -65,7 +65,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "popup.css"
+        "popup.css",
+        "netflix-page.js"
       ],
       "matches": [
         "<all_urls>"

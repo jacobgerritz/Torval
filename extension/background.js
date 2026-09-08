@@ -101,7 +101,27 @@ if (api.webRequest && api.webRequest.onHeadersReceived) {
 // Messages
 // ---------------------------------------------------------------------------
 
-api.runtime.onMessage.addListener((message) => {
+/**
+ * Tell a page how far through reading it we are.
+ *
+ * Reading a long page is several seconds of work, and several seconds of
+ * "Reading this page…" with nothing moving looks exactly like nothing
+ * happening. Sent at most five times a second: the point is to show that
+ * something is going on, not to be exact about it.
+ */
+function reporting(sender) {
+  const tabId = sender && sender.tab && sender.tab.id;
+  if (typeof tabId !== 'number') return undefined;
+  let said = 0;
+  return (done, total) => {
+    const now = Date.now();
+    if (now - said < 200 || !total) return;
+    said = now;
+    api.tabs.sendMessage(tabId, { type: 'reading', done, total }).catch(() => {});
+  };
+}
+
+api.runtime.onMessage.addListener((message, sender) => {
   switch (message && message.type) {
     case 'lookup': return handleLookup(message.text, message.point);
     case 'status': return Promise.resolve({ status });
@@ -112,8 +132,11 @@ api.runtime.onMessage.addListener((message) => {
     case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
     case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
     case 'extractWords': return guard(() => extractWords(message.text));
-    case 'comprehension': return guard(() => comprehension(message.text));
-    case 'wordPlaces':   return guard(() => wordPlaces(message.text, message.before, message.after));
+    case 'comprehension': return guard(() => comprehension(message.text, reporting(sender)));
+    case 'wordPlaces':   return guard(() => wordPlaces(message.text, message.before, message.after,
+      // A subtitle line is thirty characters and answers instantly. Only a
+      // page is worth saying anything about.
+      message.text.length > 2000 ? reporting(sender) : undefined));
     case 'knownList':    return guard(() => wordList(KNOWN));
     case 'ignoredList':  return guard(() => wordList(IGNORED));
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
@@ -292,10 +315,10 @@ async function extractWords(text) {
  * known can move the number straight away, a word's count is exactly how much
  * the total shifts, rather than needing the whole page read again.
  */
-async function comprehension(text) {
+async function comprehension(text, say) {
   await requireDictionary();
   const reader = cachingReader();
-  const tokens = await LLLLookup.locateTokens(text, reader);
+  const tokens = await LLLLookup.locateTokens(text, reader, say);
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   return LLLLookup.coverage(tokens, known, await ignoredSet());
 }
@@ -342,7 +365,7 @@ async function effectiveKnown(text, tokens, reader, known) {
  * rather than recomputed when a word is later marked known, so ticking one
  * word does not shuffle the colour of every unrelated word after it.
  */
-async function wordPlaces(text, before, after) {
+async function wordPlaces(text, before, after, say) {
   await requireDictionary();
   const reader = cachingReader();
   // Read with whatever came before and after, so that a line cut mid-word,
@@ -351,7 +374,7 @@ async function wordPlaces(text, before, after) {
   const lead = String(before || '').slice(-CONTEXT);
   const trail = String(after || '').slice(0, CONTEXT);
   const whole = lead + text + trail;
-  const found = await LLLLookup.locateTokens(whole, reader);
+  const found = await LLLLookup.locateTokens(whole, reader, say);
   const tokens = LLLLookup.within(found, lead.length, text.length);
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   const ignored = await ignoredSet();

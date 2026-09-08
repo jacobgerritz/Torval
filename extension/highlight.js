@@ -458,9 +458,24 @@ var LLLHighlight = (function () {
     var found = gather(overlay, false);
     if (!found.text) { lineRanges = new Map(); apply(); return; }
 
+    // The lines either side, for the same reason the popup asks with them:
+    // a caption ends where the speaker drew breath and not where a word does.
+    // Without them a line ending 嬉しかっ was read as 嬉し and かっ, and the
+    // かっ was marked as a word of its own, while clicking the very same
+    // characters answered 嬉しかった. Only the marks that begin inside this
+    // line are kept, so a word running over the join is marked as far as the
+    // line goes and no further.
+    var beside = { before: "", after: "" };
+    if (typeof LLLSubtitles !== 'undefined' && LLLSubtitles.around) {
+      beside = LLLSubtitles.around(text) || beside;
+    }
+
     var reply;
     try {
-      reply = await api.runtime.sendMessage({ type: 'wordPlaces', text: found.text });
+      reply = await api.runtime.sendMessage({
+        type: 'wordPlaces', text: found.text,
+        before: beside.before, after: beside.after
+      });
     } catch (err) {
       return askAgain(overlay);
     }

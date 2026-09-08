@@ -18,7 +18,7 @@ var LLLAnki = (function () {
   // What LLL can put on a card. The options page lets you point each field of
   // your note type at one of these.
   var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio', 'pitch',
-    'image', 'sentenceAudio'];
+    'image', 'sentenceAudio', 'sentenceBefore', 'sentenceAfter'];
 
   // JapanesePod101's dictionary endpoint. It answers every request with an mp3
   // and a 200, whether or not it actually has the word: when it does not, you
@@ -43,7 +43,9 @@ var LLLAnki = (function () {
     [/^(word ?audio|audio|term ?audio)$/i, 'audio'],
     [/^(pitch|pitch ?accent|accent)$/i, 'pitch'],
     [/^(images?|screenshot|picture|photo)$/i, 'image'],
-    [/^(sentence ?audio|expression ?audio|context ?audio)$/i, 'sentenceAudio']
+    [/^(sentence ?audio|expression ?audio|context ?audio)$/i, 'sentenceAudio'],
+    [/^(sentence ?before|previous ?(sentence|line)|line ?before|before)$/i, 'sentenceBefore'],
+    [/^(sentence ?after|next ?(sentence|line)|line ?after|after)$/i, 'sentenceAfter']
   ];
 
   // Every request gets a deadline. Without one, a call that simply never

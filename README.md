@@ -170,6 +170,8 @@ Four things can be put on a card:
 | **Word audio** | a recording of the word, if one can be found |
 | **Pitch accent** | the accent diagram, drawn as an SVG |
 | **Video frame** | the frame on screen when you pressed + |
+| **Sentence before** | what was said just before, off unless a field asks for it. One line of a conversation can be genuinely ambiguous on its own, これはちょっと… means nothing without the question it answers |
+| **Sentence after** | and what was said just after |
 | **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says roughly how much sound to keep from before the line, a tenth of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said. Roughly, because a recorder swallows an unpredictable moment when it starts, measured at anything from 0.05 to 0.4 seconds, so LLL starts it early and lets it |
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
@@ -228,6 +230,11 @@ More of a transcript arriving is likewise a reason to work out the number
 again and not a reason to read the page again, which used to happen every
 twenty seconds for the whole length of a video.
 
+While a page is being read, the handle counts up. It is the background
+script saying how far through the text it has got, each time it stops to ask
+the dictionary something. Several seconds of “Reading this page…” with
+nothing moving is indistinguishable from nothing happening.
+
 ---
 
 ## Subtitles, and mining from video
@@ -267,7 +274,15 @@ is handed back exactly as it arrived.
 If that comes up empty, for a title with no Japanese subtitles or because the
 extension was loaded halfway through an episode, LLL reads the lines off the
 screen as it does on YouTube, and Japanese has to be the subtitle language
-turned on in the player for it to have anything to read.
+turned on in the player for it to have anything to read. Reading the screen
+is a poor second: the percentage can only describe the lines already watched,
+and **D** has nowhere to go, because the next line has not been said yet.
+The console says which of the two is in use.
+
+**A** and **D** ask Netflix’s own player to move rather than setting
+`currentTime` on the video element, which is what works everywhere else.
+Netflix streams in pieces chosen in advance, and moving the element under it
+ends the session with error F7375 and an error page.
 
 One thing is different from YouTube either way: the audio on a mined card may
 not record, because Netflix video is encrypted and the browser will not hand

@@ -102,7 +102,8 @@ var LLLSubtitles = (function () {
       catches: false,
       id: function () { return new URLSearchParams(location.search).get('v'); },
       captions: '.ytp-caption-window-container, .captions-text',
-      player: '.html5-video-player'
+      player: '.html5-video-player',
+      seek: null            // moving the video element is enough here
     },
     netflix: {
       host: /(^|[.])netflix[.]com$/,
@@ -113,7 +114,15 @@ var LLLSubtitles = (function () {
         return match ? match[1] : null;
       },
       captions: '.player-timedtext',
-      player: '.watch-video--player-view, .watch-video, .VideoContainer'
+      player: '.watch-video--player-view, .watch-video, .VideoContainer',
+      // Netflix streams in pieces it chose in advance, and moving the
+      // video element under it ends the session with error F7375 and an
+      // error page. Its player has a seek of its own; that is the one.
+      seek: function (seconds) {
+        var reader = typeof LLLNetflix !== 'undefined' ? LLLNetflix
+          : (typeof window !== 'undefined' ? window.LLLNetflix : null);
+        if (reader) reader.seek(seconds);
+      }
     }
   };
   var site = null;
@@ -267,7 +276,9 @@ var LLLSubtitles = (function () {
 
   function jump(direction) {
     var target = step(video.currentTime, direction, openCue);
-    if (target) video.currentTime = target.start;
+    if (!target) return;
+    if (site.seek) site.seek(target.start);
+    else video.currentTime = target.start;
   }
 
   /**

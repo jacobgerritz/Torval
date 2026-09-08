@@ -415,11 +415,19 @@ var LLLLookup = (function () {
     return solveRun(text, run, await db.getEntries(Array.from(asking)));
   }
 
-  /** Every word in `text`, wherever it is, run by run. */
-  async function segment(text, db) {
+  /**
+   * Every word in `text`, wherever it is, run by run.
+   *
+   * `say`, when given, is told how far through the text this has got each
+   * time it stops to ask the dictionary something. Reading a long page is
+   * seconds of work, and seconds of "reading this page" with nothing
+   * moving is indistinguishable from nothing happening.
+   */
+  async function segment(text, db, say) {
     var out = [];
     var batch = [];
     var asking = new Set();
+    var reached = 0;
 
     // A page is a great many sentences, and asking about each one on its own
     // meant a trip to the database per sentence: on a page of 1,400
@@ -435,6 +443,7 @@ var LLLLookup = (function () {
       }
       batch = [];
       asking = new Set();
+      if (say) say(reached, text.length);
       // Standing aside here lets whatever else is waiting, a hover being
       // looked up above all, get a turn rather than wait for the whole page.
       await pause();
@@ -446,6 +455,7 @@ var LLLLookup = (function () {
       var run = runAround(text, i);
       batch.push(prepareRun(text, run.from, run.to, asking));
       i = run.to;
+      reached = i;
       if (asking.size >= BATCH_TERMS) await flush();
     }
     await flush();
@@ -778,8 +788,8 @@ var LLLLookup = (function () {
    * text as given, so whoever assembled that text can map them back to
    * wherever it came from.
    */
-  async function locateTokens(text, db) {
-    var words = await segment(text, db);
+  async function locateTokens(text, db, say) {
+    var words = await segment(text, db, say);
     return words.map(function (found) {
       var hit = found.hits[0];
       return {

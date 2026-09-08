@@ -823,7 +823,58 @@
 
     const slice = text.slice(start, end);
     const lead = slice.length - slice.trimStart().length;
-    return { text: slice.trim().slice(0, 300), index: index - start - lead };
+    return {
+      text: slice.trim().slice(0, 300), index: index - start - lead,
+      before: sentenceBefore(block, text, start),
+      after: sentenceAfter(block, text, end)
+    };
+  }
+
+  /**
+   * What was said just before this, and just after it.
+   *
+   * Optional on a card, and off unless a field asks for it. One line of a
+   * conversation on its own can be genuinely ambiguous, これはちょっと…
+   * means nothing without the question it answers, and a card you cannot
+   * read is a card you will fail for the wrong reason.
+   *
+   * A subtitle has no sentences either side of it inside its own block,
+   * the block is the line, so the lines either side come from the
+   * transcript. Anywhere else they are the sentences either side within
+   * the same paragraph, and not the paragraph before: the sentence before
+   * a paragraph is somebody changing the subject.
+   */
+  function sentenceBefore(block, text, start) {
+    if (isSubtitle(block)) return besideLine(block, text).before;
+    if (start <= 0) return '';
+    let from = start - 1;
+    while (from > 0 && !SENTENCE_END.test(text[from - 1])) from--;
+    return tidy(text.slice(from, start));
+  }
+
+  function sentenceAfter(block, text, end) {
+    if (isSubtitle(block)) return besideLine(block, text).after;
+    if (end >= text.length) return '';
+    let to = end;
+    while (to < text.length && !SENTENCE_END.test(text[to])) to++;
+    if (to < text.length) to++;
+    return tidy(text.slice(end, to));
+  }
+
+  function isSubtitle(block) {
+    return !!(block && block.closest && block.closest('[data-lll-subtitle]'));
+  }
+
+  function besideLine(block, text) {
+    if (typeof LLLSubtitles === 'undefined' || !LLLSubtitles.around) {
+      return { before: '', after: '' };
+    }
+    const beside = LLLSubtitles.around(text) || { before: '', after: '' };
+    return { before: tidy(beside.before || ''), after: tidy(beside.after || '') };
+  }
+
+  function tidy(text) {
+    return String(text).trim().slice(0, 300);
   }
 
   /** The sentence with the looked-up word wrapped in bold, ready for a card. */
@@ -944,6 +995,7 @@
     if (readingPage || !isCurrent()) return;
     readingPage = true;
     let scored = false;
+    reading = true;
 
     // Wrapped so that anything unexpected still lets go of the flag. Left
     // stuck true, this page would never read itself again for as long as it
@@ -979,7 +1031,19 @@
       // the corner that reads "still working on it" for ever.
       if (!scored) LLLBar.quiet();
       readingPage = false;
+      reading = false;
     }
+  }
+
+  // How far through the page the background script has got. It says so as
+  // it goes; without this the handle reads "Reading this page…" for several
+  // seconds together and there is no telling it from a page that has hung.
+  let reading = false;
+  if (api.runtime.onMessage) {
+    api.runtime.onMessage.addListener((message) => {
+      if (!message || message.type !== 'reading' || !reading) return;
+      LLLBar.busy('Reading this page…', message.done / message.total);
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -1492,6 +1556,9 @@
       sentence: context ? markSentence(context, surface.length) : '',
       // Kept so a mapping saved before the two were merged still fills in.
       sentenceMarked: context ? markSentence(context, surface.length) : '',
+      // Only ever used if a field on your note type asks for them.
+      sentenceBefore: context ? escapeHtml(context.before || '') : '',
+      sentenceAfter: context ? escapeHtml(context.after || '') : '',
       definition: definitionHtml(entry, senses)
     };
 

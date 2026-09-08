@@ -279,6 +279,30 @@ const run = async () => {
   check('the line’s audio is stored and referenced as a sound',
     added['Sentence Audio'] === '[sound:lll-abc.webm]', JSON.stringify(added));
 
+  // What was said just before and just after. Optional: they go on the card
+  // only where a field on the note type asks for them, so nobody who has not
+  // asked for them gets them.
+  mediaCalls = [];
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: {
+      Sentence: 'sentence', Before: 'sentenceBefore', After: 'sentenceAfter' } },
+    { sentence: '\u5b09\u3057\u304b\u3063\u305f\u3067\u3059\u3002',
+      sentenceBefore: '\u306a\u3063\u3066\u308b\u306e\u3067',
+      sentenceAfter: '\u3042\u308a\u304c\u3068\u3046' });
+  const around = mediaCalls.find((c) => c.action === 'addNote').params.note.fields;
+  check('the lines either side go on the card when a field asks for them',
+    around['Before'] === '\u306a\u3063\u3066\u308b\u306e\u3067' &&
+    around['After'] === '\u3042\u308a\u304c\u3068\u3046', JSON.stringify(around));
+
+  mediaCalls = [];
+  await Anki.addNote(
+    { deck: 'D', model: 'M', fields: { Sentence: 'sentence' } },
+    { sentence: '\u5b09\u3057\u304b\u3063\u305f\u3067\u3059\u3002',
+      sentenceBefore: '\u306a\u3063\u3066\u308b\u306e\u3067' });
+  const only = mediaCalls.find((c) => c.action === 'addNote').params.note.fields;
+  check('and nowhere at all when no field does',
+    Object.keys(only).join(',') === 'Sentence', JSON.stringify(only));
+
   // A page with no video, or one that refuses to be captured, still makes cards.
   mediaCalls = [];
   await Anki.addNote(
@@ -1162,6 +1186,31 @@ const run = async () => {
   // A video site is recognised by its address, and nothing else on the web
   // is: an extension that started drawing subtitles over some unrelated
   // page would be worse than one that missed a site.
+  // Reading a long page is seconds of work, and seconds of "Reading this
+  // page…" with nothing moving looks exactly like nothing happening. So the
+  // segmenter says how far through the text it has got, every time it stops
+  // to ask the dictionary something.
+  {
+    // Varied text, not one sentence over and over: the reading stops to ask
+    // the dictionary once it has enough new questions, and the same sentence
+    // repeated has nothing new to ask after the first time.
+    const glue = ['\u306f', '\u3092', '\u306b', '\u304c', '\u3067', '\u3057\u305f', '\u3067\u3059\u3002'];
+    const headwords = [...index.keys()].filter((t) => t.length >= 2 && t.length <= 4);
+    let long = '';
+    for (let i = 0; long.length < 20000; i++) {
+      long += headwords[(i * 7919) % headwords.length] + glue[i % glue.length];
+    }
+    const steps = [];
+    await Lookup.locateTokens(long, db, (done, total) => steps.push([done, total]));
+    check('reading a page says how far through it is', steps.length > 1, steps.length);
+    check('it never says it is further than the end',
+      steps.every(([done, total]) => done >= 0 && done <= total && total === long.length),
+      JSON.stringify(steps.slice(0, 3)));
+    check('and it only ever moves forwards',
+      steps.every(([done], i) => i === 0 || done >= steps[i - 1][0]),
+      JSON.stringify(steps.map((s) => s[0])));
+  }
+
   check('YouTube is a video site', Subs.siteFor('www.youtube.com') === 'youtube');
   check('so is Netflix', Subs.siteFor('www.netflix.com') === 'netflix');
   check('and so is Netflix in another country', Subs.siteFor('netflix.com') === 'netflix');

@@ -45,10 +45,11 @@
   <p>でもそれって、すごいですね。</p>
   <p>僕もちえこさんも猫です。</p>
 
-  <p class="hint">The line below stands in for a caption. It is the middle of
-  three, and the word 皆さん is cut in half by the join, so pointing at the
-  皆 has to answer 皆さん rather than 皆.</p>
-  <p data-lll-subtitle>ないのかもっていうことなんですよね。皆</p>
+  <p class="hint">The line below stands in for a caption, the middle of three.
+  It ends in the middle of 嬉しかった, so both the popup and the yellow
+  marking have to see 嬉しかっ as part of 嬉しかった rather than as かっ on
+  its own.</p>
+  <p data-lll-subtitle>なってるのでとっても嬉しかっ</p>
 </main>
 
 <script src="../extension/japanese.js"></script>
@@ -68,7 +69,7 @@ window.LLLSubtitles = {
   // looked up with the lines either side of it.
   around(text) {
     if (window.__around) return window.__around;
-    return { before: '私の場合は繋がるわけじゃ', after: 'さんがこう日常とか' };
+    return { before: '私の場合は', after: 'たです。ありがとう' };
   },
   cueFor(sentence) { return sentence ? { start: 1, end: 3, text: sentence } : null; },
   allText() { return ""; },
@@ -83,6 +84,7 @@ window.LLLVideo = {
 };
 
 const watchers = [];
+const messageListeners = [];
 window.browser = {
   storage: {
     local: {
@@ -100,6 +102,7 @@ window.browser = {
   },
   runtime: {
     id: 'preview',
+    onMessage: { addListener(fn) { messageListeners.push(fn); } },
     getURL: (p) => '../extension/' + p,
     async sendMessage(msg) {
       if (msg.type === 'tags') return TAGS;
@@ -120,7 +123,24 @@ window.browser = {
         return { ok: true, result: LLLLookup.coverage(tokens, known, ignored) };
       }
       if (msg.type === 'wordPlaces') {
-        const tokens = await LLLLookup.locateTokens(msg.text, db);
+        // The real background script says how far through it is as it goes.
+        if (msg.text.length > 20) {
+          for (const done of [0.25, 0.5, 0.75]) {
+            for (const fn of messageListeners) {
+              fn({ type: 'reading', done: Math.round(msg.text.length * done), total: msg.text.length });
+            }
+            await new Promise((r) => setTimeout(r, 120));
+          }
+        }
+        // Read with whatever came before and after, exactly as the real one
+        // does, then keep only the words that reach into this line. Without
+        // this a caption ending 嬉しかっ is marked as かっ.
+        const CONTEXT = 24;
+        const lead = String(msg.before || '').slice(-CONTEXT);
+        const trail = String(msg.after || '').slice(0, CONTEXT);
+        const whole = lead + msg.text + trail;
+        const tokens = LLLLookup.within(
+          await LLLLookup.locateTokens(whole, db), lead.length, msg.text.length);
         const places = {};
         const unmarked = [];
         tokens.forEach((t, i) => {
