@@ -1,53 +1,26 @@
 /*
- * Netflix's own seek, because its player will not be moved by hand.
+ * The Netflix end of things, on LLL's side of the page.
  *
- * Setting `currentTime` on the video element, which is how A and D move on
- * every other site, does not work here: Netflix streams in pieces it chose in
- * advance, and moving the element under it ends the session with error F7375
- * and a Netflix error page. Its player has a seek of its own, reached through
- * `wrappedJSObject`, which is how a content script gets at the page's own
- * objects in Firefox, the same way subtitles.js reads YouTube's player.
+ * Two jobs, both about the player rather than about the words.
  *
- * This only reads what the page already has. Nothing here changes anything the
- * page does, which is a line worth drawing after what happened when LLL tried
- * to go further, and is written up below.
+ * It holds the subtitle file. netflix-page.js catches that, running as page
+ * code because it has to; all it can do with what it caught is post it
+ * through the window the two of them share, and this is what listens.
  *
- * ---------------------------------------------------------------------------
+ * And it seeks. Setting `currentTime` on the video element, which is how A
+ * and D move on every other site, does not work here: Netflix streams in
+ * pieces it chose in advance, and moving the element under it ends the
+ * session with error F7375 and a Netflix error page. Its player has a seek of
+ * its own, reached through `wrappedJSObject`, which is how a content script
+ * gets at the page's own objects in Firefox, the same way subtitles.js reads
+ * YouTube's player.
  *
- * Getting Netflix's subtitle file up front, the way the transcript is got on
- * YouTube, is not solved, and three attempts are worth recording so the fourth
- * does not repeat them.
- *
- * The idea is sound and is what other tools do. Netflix will hand over its
- * subtitles as plain WebVTT, but only if asked: when the player starts a title
- * it posts a "manifest" request listing the formats it will accept, and the
- * answer only ever offers what was asked for. Add `webvtt-lssdh-ios8` to that
- * request on its way out, read the addresses out of the answer, and there is
- * the whole episode before a second of it has played.
- *
- * The request becomes text in `JSON.stringify` and the answer stops being text
- * in `JSON.parse`, so those are the two places to stand. Reaching them is the
- * problem:
- *
- *   1. A content script declared `"world": "MAIN"` never ran at all, on
- *      Firefox 155, where it should have.
- *   2. A <script> tag pointing at the same file never ran either, near
- *      certainly stopped by Netflix's content security policy.
- *   3. Reaching the page's own JSON from here, through wrappedJSObject and
- *      exportFunction, did run, and broke Netflix: the home page came up with
- *      its header and nothing else. `JSON.parse` is used by every part of that
- *      site for everything, and handing its answers back through a function of
- *      ours was evidently not free, whatever the wrapping did to them.
- *
- * The third is the one to learn from. A hook on `JSON.parse` is a hook on the
- * whole site, and the cost of getting it slightly wrong is the site. Whatever
- * comes next should touch something narrower: the one request that matters,
- * rather than the one method everything goes through.
- *
- * Until then Netflix reads its lines off the screen, which works, and means
- * the percentage describes what has been watched so far rather than the whole
- * episode, and D has nowhere to go because the next line has not been said.
+ * Reaching across like that is fine for reading something the page already
+ * has. It is not fine for changing what the page does: an attempt to hook
+ * Netflix's `JSON` this way broke the site outright, which is the whole
+ * reason netflix-page.js is a separate file living in a different world.
  */
+
 var LLLNetflix = (function () {
   'use strict';
 
@@ -85,12 +58,19 @@ var LLLNetflix = (function () {
     return api.videoPlayer.getVideoPlayerBySessionId(id) || null;
   }
 
+  var caught = null;
+  window.addEventListener('message', function (e) {
+    // Only this page, and only this message. Anything can post to a window.
+    if (e.source !== window) return;
+    var data = e.data;
+    if (!data || data.lll !== 'lll-netflix-subtitles') return;
+    if (typeof data.vtt !== 'string' || !data.vtt) return;
+    caught = { movie: String(data.movie || ''), vtt: data.vtt };
+  });
+
   return {
-    /**
-     * Nothing yet. Kept so subtitles.js has one shape to talk to whether or
-     * not a way of catching the file is ever found; see the note above.
-     */
-    track: function () { return null; },
+    /** The subtitle file netflix-page.js caught, if one has arrived. */
+    track: function () { return caught; },
 
     /** Ask Netflix's own player to move. Its video element must not be. */
     seek: function (seconds) {

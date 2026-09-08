@@ -479,8 +479,67 @@ function ignoredSet() { return wordSet(IGNORED); }
 if (api.storage.onChanged) {
   api.storage.onChanged.addListener((changes) => {
     for (const key of Object.keys(changes)) delete caches[key];
+    if (changes.off) netflixHelper(!changes.off.newValue);
   });
 }
+
+// ---------------------------------------------------------------------------
+// Netflix
+// ---------------------------------------------------------------------------
+
+/**
+ * Put netflix-page.js into Netflix's own page.
+ *
+ * It has to run there, as page code, rather than beside the page as every
+ * other content script does; the file itself says why. Getting it there took
+ * three failed goes. Declaring it in the manifest with `"world": "MAIN"` did
+ * nothing at all, on a Firefox new enough to support that, most likely
+ * because Firefox rejects the whole content_scripts entry over the property
+ * rather than ignoring it. Adding a <script> tag from a content script did
+ * nothing either, near certainly stopped by Netflix's content security
+ * policy. Reaching into the page from a content script instead did run, and
+ * broke the site.
+ *
+ * Registering it from here, through the scripting API, is the fourth way and
+ * the one that other tools use. The same property the manifest would not
+ * take is accepted here.
+ *
+ * It follows the switch on the toolbar button. Turning LLL off takes the
+ * script off Netflix altogether, so if it ever misbehaves on Netflix's own
+ * pages there is a way out that does not involve uninstalling anything.
+ */
+const NETFLIX_HELPER = {
+  id: 'lll-netflix-page',
+  js: ['netflix-page.js'],
+  matches: ['*://*.netflix.com/*'],
+  runAt: 'document_start',
+  world: 'MAIN',
+  allFrames: false,
+  persistAcrossSessions: true
+};
+
+async function netflixHelper(on) {
+  if (!api.scripting || !api.scripting.registerContentScripts) {
+    console.warn('LLL: this browser has no way to run LLL’s Netflix helper, ' +
+      'so Netflix will read its subtitles off the screen.');
+    return;
+  }
+  try {
+    const already = await api.scripting.getRegisteredContentScripts({ ids: [NETFLIX_HELPER.id] });
+    if (!on) {
+      if (already.length) await api.scripting.unregisterContentScripts({ ids: [NETFLIX_HELPER.id] });
+      return;
+    }
+    if (already.length) await api.scripting.updateContentScripts([NETFLIX_HELPER]);
+    else await api.scripting.registerContentScripts([NETFLIX_HELPER]);
+  } catch (err) {
+    console.warn('LLL: could not put LLL’s Netflix helper on the page:', err && err.message);
+  }
+}
+
+api.storage.local.get('off')
+  .then((stored) => netflixHelper(!stored.off))
+  .catch(() => netflixHelper(true));
 
 /**
  * One list, as it is on disk.

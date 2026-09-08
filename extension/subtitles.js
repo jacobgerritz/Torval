@@ -114,9 +114,7 @@ var LLLSubtitles = (function () {
       },
       captions: '.player-timedtext',
       player: '.watch-video--player-view, .watch-video, .VideoContainer',
-      // Nothing hands LLL a subtitle file here yet, see the note at the top
-      // of netflix.js for the three ways that has been tried.
-      catches: false,
+      catches: true,
       // Netflix streams in pieces it chose in advance, and moving the
       // video element under it ends the session with error F7375 and an
       // error page. Its player has a seek of its own; that is the one.
