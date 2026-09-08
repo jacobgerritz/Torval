@@ -120,9 +120,101 @@ var LLLVideo = (function () {
 
     if (cue && cue.end > cue.start) {
       var clip = await record(video, cue.start, cue.end, lead);
-      if (clip) out.sentenceAudio = { filename: name(sentence, 'webm'), data: await toBase64(clip) };
+      var sound = clip ? await asWav(clip) : null;
+      if (sound) {
+        out.sentenceAudio = { filename: name(sentence, 'wav'), data: await toBase64(sound) };
+      } else if (clip) {
+        // The conversion did not work, which should not happen, but a card
+        // with sound Anki may refuse is better than a card with none.
+        out.sentenceAudio = { filename: name(sentence, 'webm'), data: await toBase64(clip) };
+      }
     }
     return out;
+  }
+
+  // -------------------------------------------------------------------------
+  // Turning the recording into something every Anki can play
+  // -------------------------------------------------------------------------
+
+  /**
+   * What comes off a browser recorder is Opus in a WebM container, which is
+   * an excellent format and the wrong one for a card. Anki on a computer
+   * plays it, because that Anki hands the file to mpv, which plays anything.
+   * Anki on a phone does not: AnkiMobile cannot read WebM at all, and
+   * AnkiDroid depends on what the phone underneath it happens to support.
+   * A card that plays at the desk and is silent on the train is worse than
+   * useless, because it is only ever found out on the train.
+   *
+   * So the clip is decoded and written out again as a plain WAV: mono,
+   * sixteen bits, and the sample rate below. Nothing invented, nothing
+   * clever, just the samples one after another, which is the one audio
+   * format that has never needed asking about.
+   *
+   * The cost is the file. A WAV of a spoken line runs to a few hundred
+   * kilobytes where the Opus was twenty or thirty, and there is no honest
+   * way around that without an encoder, which is a large piece of somebody
+   * else's code. Speech does not need much though, so the rate is set low
+   * enough to keep it in proportion and high enough that nothing is lost:
+   * 24 kHz carries everything a voice does.
+   */
+  var WAV_RATE = 24000;
+
+  async function asWav(clip) {
+    try {
+      var bytes = await clip.arrayBuffer();
+      // Decoding through a context set to the rate we want is also what
+      // resamples it: an AudioContext hands back everything at its own rate.
+      var context = new OfflineAudioContext(1, 1, WAV_RATE);
+      var audio = await context.decodeAudioData(bytes);
+      return wavFile(toMono(audio), WAV_RATE);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /** Both channels averaged into one. A subtitle line is speech, not music. */
+  function toMono(audio) {
+    var channels = audio.numberOfChannels;
+    var out = new Float32Array(audio.length);
+    for (var c = 0; c < channels; c++) {
+      var data = audio.getChannelData(c);
+      for (var i = 0; i < out.length; i++) out[i] += data[i];
+    }
+    if (channels > 1) for (var j = 0; j < out.length; j++) out[j] /= channels;
+    return out;
+  }
+
+  /**
+   * A WAV file: a 44-byte header saying what the samples are, then the
+   * samples. Every field is written little-endian, which is what the `true`
+   * on each line means.
+   */
+  function wavFile(samples, rate) {
+    var body = samples.length * 2;
+    var bytes = new ArrayBuffer(44 + body);
+    var view = new DataView(bytes);
+    var write = function (at, text) {
+      for (var i = 0; i < text.length; i++) view.setUint8(at + i, text.charCodeAt(i));
+    };
+    write(0, 'RIFF');
+    view.setUint32(4, 36 + body, true);   // everything after this field
+    write(8, 'WAVEfmt ');
+    view.setUint32(16, 16, true);         // how long the description below is
+    view.setUint16(20, 1, true);          // plain samples, nothing compressed
+    view.setUint16(22, 1, true);          // one channel
+    view.setUint32(24, rate, true);       // samples a second
+    view.setUint32(28, rate * 2, true);   // bytes a second
+    view.setUint16(32, 2, true);          // bytes per sample
+    view.setUint16(34, 16, true);         // bits per sample
+    write(36, 'data');
+    view.setUint32(40, body, true);
+    for (var s = 0; s < samples.length; s++) {
+      // Anything past the ends of the scale is held at the ends of it,
+      // rather than wrapping round into a crack of noise.
+      var value = Math.max(-1, Math.min(1, samples[s]));
+      view.setInt16(44 + s * 2, Math.round(value * 32767), true);
+    }
+    return new Blob([bytes], { type: 'audio/wav' });
   }
 
   function grabFrame(video) {
@@ -258,7 +350,11 @@ var LLLVideo = (function () {
     return 'lll-' + (hash >>> 0).toString(36) + '.' + extension;
   }
 
-  return { capture: capture, record: record, currentVideo: currentVideo, name: name };
+  return {
+    capture: capture, record: record, currentVideo: currentVideo, name: name,
+    // Exposed for the tests: the file the card actually carries.
+    _toMono: toMono, _wavFile: wavFile
+  };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = LLLVideo;

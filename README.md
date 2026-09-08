@@ -209,6 +209,27 @@ from two different words onto one card.
 
 ---
 
+### How much of a page is read
+
+Reading a page means segmenting every stretch of Japanese on it, which is
+real work: roughly a second for a long article. An article is worth it, since
+the number at the top is about the whole article.
+
+A video page is not an article. Its number comes from the transcript, which
+LLL fetches separately, and the page around the player is comments and menus
+running to tens of thousands of characters, all of it read, almost none of it
+visible. So where the number comes from somewhere else, only what is on
+screen gets read, and a screen either side of it. Scrolling reads what you
+scrolled to, once you stop. Nothing is lost: the only reason to read a page
+whose score is already known is to mark the words on it, and a mark you
+cannot see is not doing anything.
+
+More of a transcript arriving is likewise a reason to work out the number
+again and not a reason to read the page again, which used to happen every
+twenty seconds for the whole length of a video.
+
+---
+
 ## Subtitles, and mining from video
 
 LLL times YouTube's Japanese subtitles so it knows exactly when each line
@@ -337,6 +358,20 @@ couple of seconds, and what comes out is exactly the line.
 
 Playback speed is forced to normal while it records, since a line captured at
 1.5× is a line spoken at 1.5×.
+
+The clip goes on the card as a plain WAV, mono and 24 kHz, not as what the
+browser recorded. A browser records Opus in a WebM container, and Anki on a
+computer plays that happily because it hands the file to mpv, which plays
+anything. Anki on a phone does not: AnkiMobile cannot read WebM at all, and
+AnkiDroid depends on what the phone underneath it supports. A card that plays
+at the desk and is silent on the train is worse than useless, because the
+train is where you find out.
+
+The cost is the file: a couple of hundred kilobytes for a line where the Opus
+was twenty or thirty. There is no honest way around that without shipping an
+MP3 encoder, which is a large piece of somebody else’s code for a problem
+that only exists on a phone. 24 kHz carries everything a voice does and keeps
+it in proportion.
 
 **Content-protected video cannot be captured.** Netflix, Prime Video and Disney+
 hand their video to the browser's DRM layer, and both the frame and the audio

@@ -1443,6 +1443,47 @@ const run = async () => {
   check('filenames survive any filesystem', /^lll-[a-z0-9]+\.jpg$/.test(name1), name1);
   check('the extension is kept', Video.name('x', 'webm').endsWith('.webm'));
 
+  // --- the sound a card carries --------------------------------------------
+  // A browser records Opus in a WebM container, which Anki on a computer
+  // plays and Anki on a phone very often does not. So the clip is written
+  // out again as a plain WAV, which everything plays. This is that file.
+  {
+    const rate = 24000;
+    const samples = Float32Array.from([0, 1, -1, 0.5, 2, -2]);
+    const file = Video._wavFile(samples, rate);
+    const bytes = new DataView(await file.arrayBuffer());
+    const text = (at, n) => Array.from({ length: n },
+      (_, i) => String.fromCharCode(bytes.getUint8(at + i))).join("");
+
+    check('it is a WAV file', text(0, 4) === 'RIFF' && text(8, 4) === 'WAVE', text(0, 12));
+    check('of plain samples, not compressed anything', bytes.getUint16(20, true) === 1);
+    check('one channel, sixteen bits, at the rate asked for',
+      bytes.getUint16(22, true) === 1 && bytes.getUint16(34, true) === 16 &&
+      bytes.getUint32(24, true) === rate);
+    check('the length in the header matches the samples in it',
+      bytes.getUint32(40, true) === samples.length * 2 &&
+      file.size === 44 + samples.length * 2, file.size);
+    check('a sample is written where it belongs on the scale',
+      bytes.getInt16(44, true) === 0 && bytes.getInt16(46, true) === 32767 &&
+      bytes.getInt16(48, true) === -32767, bytes.getInt16(46, true));
+    check('and one past the end of the scale is held at the end of it,',
+      bytes.getInt16(52, true) === 32767 && bytes.getInt16(54, true) === -32767,
+      bytes.getInt16(52, true));
+
+    // Two channels averaged, not added: adding them would push a loud line
+    // past the top of the scale and hold it there, which is a card that
+    // crackles.
+    const stereo = {
+      numberOfChannels: 2, length: 3,
+      getChannelData: (c) => c === 0 ? Float32Array.from([1, 0, -1])
+                                     : Float32Array.from([0, 0, -1])
+    };
+    const mixed = Array.from(Video._toMono(stereo));
+    check('two channels come down to one, averaged',
+      mixed.length === 3 && mixed[0] === 0.5 && mixed[1] === 0 && mixed[2] === -1,
+      JSON.stringify(mixed));
+  }
+
   // --- putting a mark back on the page -----------------------------------
   // A page's text is gathered from many text nodes into one string; a word
   // found at some position in that string has to be traced back to the node it

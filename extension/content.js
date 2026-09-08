@@ -297,7 +297,9 @@
     return api.runtime.sendMessage(message).then((reply) => {
       if (!reply || !reply.ok) return false;
       if (typeof LLLBar !== 'undefined') LLLBar.restate(word, before, after);
-      if (typeof LLLHighlight !== 'undefined') {
+      // More of a video's transcript arriving changes the number and
+      // nothing else. The page around the player is the same page it was.
+      if (typeof LLLHighlight !== 'undefined' && !(options && options.scoreOnly)) {
         LLLHighlight.setMarked(word, after === 'unknown');
         // The subtitle showing now is drawn from ranges of its own, made
         // when the line arrived. Asking for them again is one short message
@@ -888,7 +890,7 @@
         if (Date.now() - last < 20000) return;
         seen = now;
         last = Date.now();
-        readPage();
+        readPage({ scoreOnly: true });
       }, 2000);
     }
   }
@@ -940,7 +942,7 @@
    * both numbers were being computed correctly, but only one of the two ever
    * got the chance.
    */
-  async function readPage() {
+  async function readPage(options) {
     if (readingPage || !isCurrent()) return;
     readingPage = true;
     let scored = false;
@@ -965,7 +967,7 @@
 
       if (typeof LLLHighlight !== 'undefined') {
         try {
-          const score = await LLLHighlight.read();
+          const score = await LLLHighlight.read({ nearby: !!transcript });
           if (!transcript && score && !scored) { LLLBar.show(score); scored = true; }
         } catch (err) {
           console.warn('LLL: could not colour this page:', err && err.message);

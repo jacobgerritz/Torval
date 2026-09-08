@@ -46,6 +46,7 @@ var LLLHighlight = (function () {
 
   var MAX_TEXT = 100000;    // characters read from one page
   var MAX_RANGES = 20000;   // marks painted at once, so a pathological page cannot hang
+  var SETTLE = 350;         // how long after scrolling stops before reading again
 
   // Ruby readings are furigana, not words; form controls and script tags are
   // not prose. The same places a hover refuses to look are the places not to
@@ -62,6 +63,9 @@ var LLLHighlight = (function () {
   var unknown = new Set();      // every word seen so far that is not known
   var lastLine = null;
   var lineOverlay = null;   // the subtitle box, once it exists
+  var nearby = false;       // was the last read only of what was on screen
+  var lastRead = '';        // and what it said, so as not to read it again
+  var rereading = null;
 
   function supported() {
     return typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight === 'function';
@@ -84,7 +88,28 @@ var LLLHighlight = (function () {
     }
     ensureStyle();
     watchLine();
+    watchScrolling();
     return true;
+  }
+
+  /**
+   * Colour what you scrolled to, on a page being read a screen at a time.
+   *
+   * Only ever after scrolling has stopped, and only when what is on screen
+   * has actually changed: a page of comments moves a long way under a
+   * flick of the wheel, and reading at every step of it would be the very
+   * thing this was written to avoid.
+   */
+  function watchScrolling() {
+    window.addEventListener('scroll', function () {
+      if (!nearby) return;
+      clearTimeout(rereading);
+      rereading = setTimeout(function () {
+        if (!nearby) return;
+        if (gather(document.body, true, true).text === lastRead) return;
+        read({ nearby: true });
+      }, SETTLE);
+    }, { passive: true, capture: true });
   }
 
   /**
@@ -92,10 +117,27 @@ var LLLHighlight = (function () {
    * because this is the same passage the bar is asking about and there is no
    * sense reading a page twice to answer two questions about it.
    */
-  async function read() {
+  /**
+   * Read the page and colour it.
+   *
+   * `options.nearby` reads only what is on screen, and a screen either
+   * side of it. That is for a page whose score comes from somewhere else,
+   * a video measured against its transcript, where the text around the
+   * player is comments and menus rather than the thing being watched. On
+   * a video the difference is not small: a YouTube page with its comments
+   * open runs to tens of thousands of characters of Japanese, all of it
+   * read, none of it visible, and reading it took long enough to notice.
+   * Nothing is lost by leaving it, because the only reason to read a page
+   * whose score is already known is to mark the words on it, and a mark
+   * you cannot see is not doing anything. Scrolling reads what you
+   * scrolled to.
+   */
+  async function read(options) {
     if (!supported()) return null;
-    var found = gather(document.body, true);
+    nearby = !!(options && options.nearby);
+    var found = gather(document.body, true, nearby);
     if (!found.text) return null;
+    lastRead = found.text;
 
     var reply;
     try {
@@ -152,7 +194,8 @@ var LLLHighlight = (function () {
    * in instead, so the end of one paragraph cannot form a word with the start
    * of the next.
    */
-  function gather(root, skipSubtitle) {
+  function gather(root, skipSubtitle, nearOnly) {
+    var reach = nearOnly ? (window.innerHeight || 800) : 0;
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         var parent = node.parentElement;
@@ -164,6 +207,7 @@ var LLLHighlight = (function () {
         // changes; leaving it in here as well would mark it twice.
         if (skipSubtitle && parent.closest('[data-lll-subtitle]')) return NodeFilter.FILTER_REJECT;
         if (parent.checkVisibility && !parent.checkVisibility()) return NodeFilter.FILTER_REJECT;
+        if (nearOnly && !nearScreen(parent, reach)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
       }
     });
@@ -181,6 +225,13 @@ var LLLHighlight = (function () {
       if (text.length >= MAX_TEXT) break;
     }
     return { text: text, pieces: pieces };
+  }
+
+  /** Is this near enough to the screen to be worth colouring? */
+  function nearScreen(el, reach) {
+    var box = el.getBoundingClientRect();
+    if (!box.width && !box.height) return false;
+    return box.bottom > -reach && box.top < (window.innerHeight || 0) + reach;
   }
 
   function blockOf(node) {
