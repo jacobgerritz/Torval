@@ -514,7 +514,7 @@ const NETFLIX_HELPER = {
   matches: ['*://*.netflix.com/*'],
   runAt: 'document_start',
   world: 'MAIN',
-  allFrames: false,
+  allFrames: true,
   persistAcrossSessions: true
 };
 

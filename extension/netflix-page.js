@@ -115,11 +115,14 @@
   JSON.parse = function (text) {
     var value = parse.apply(this, arguments);
     try {
-      // The text is searched before the object is walked, because this runs
-      // for every piece of JSON the site parses and that is a great many.
-      // One string search that almost always fails is the cheapest way to
-      // leave all of them alone.
-      if (typeof text === 'string' && text.indexOf('timedtexttracks') !== -1) {
+      // Two looks, cheap one first, because this runs for every piece of
+      // JSON the site parses and that is a great many. The cheap one is where
+      // the track list has always been. The deep one costs a string search
+      // that nearly always fails, and only then a walk.
+      if (value && typeof value === 'object' &&
+        (value.timedtexttracks || (value.result && value.result.timedtexttracks))) {
+        collect(value);
+      } else if (typeof text === 'string' && text.indexOf('timedtexttracks') !== -1) {
         collect(value);
       }
     } catch (err) {

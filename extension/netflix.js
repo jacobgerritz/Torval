@@ -68,9 +68,62 @@ var LLLNetflix = (function () {
     caught = { movie: String(data.movie || ''), vtt: data.vtt };
   });
 
+  /**
+   * What the player itself is holding, said out loud, when nothing else
+   * worked.
+   *
+   * The subtitle file is asked for and its reply is never seen: the format
+   * goes into the request, the request goes out, and nothing carrying a track
+   * list is ever read on this page by any of the three ways a reply becomes
+   * an object. Which leaves two possibilities, that the reply is read
+   * somewhere out of reach, or that what LLL wants is sitting on the player
+   * object all along and there was never any need to catch a reply at all.
+   * Netflix is rendering those subtitles from something.
+   *
+   * This only reads and reports. It changes nothing, and it runs once.
+   */
+  function describePlayer() {
+    var playing = null;
+    try {
+      playing = player();
+    } catch (err) { /* said below */ }
+    if (!playing) { say('there is no player object to look at.'); return; }
+
+    var names = [];
+    var level = playing;
+    try {
+      while (level) {
+        var own = Object.getOwnPropertyNames(level);
+        for (var i = 0; i < own.length; i++) {
+          if (names.indexOf(own[i]) === -1) names.push(own[i]);
+        }
+        level = Object.getPrototypeOf(level);
+      }
+    } catch (err) { /* whatever was reached is enough */ }
+
+    var about = names.filter(function (name) {
+      return /text|track|cue|subtitle|caption|download/i.test(name);
+    });
+    say('the player offers:', about.join(', ') || '(nothing about text or tracks)');
+
+    try {
+      var list = playing.getTimedTextTrackList && playing.getTimedTextTrackList();
+      if (!list || !list.length) { say('and no timed text track list.'); return; }
+      var keys = [];
+      for (var key in list[0]) keys.push(key);
+      say('a track in it looks like:', keys.join(', '));
+      say('and there are', list.length, 'of them.');
+    } catch (err) {
+      say('could not read the track list:', err && err.message);
+    }
+  }
+
   return {
     /** The subtitle file netflix-page.js caught, if one has arrived. */
     track: function () { return caught; },
+
+    /** See describePlayer. Called by subtitles.js when nothing was caught. */
+    describe: describePlayer,
 
     /** Ask Netflix's own player to move. Its video element must not be. */
     seek: function (seconds) {
