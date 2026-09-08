@@ -1246,74 +1246,11 @@ const run = async () => {
       Subs.parseVtt('WEBVTT').length === 0);
   }
 
-  // --- asking Netflix for a format that can be read -------------------------
-  // netflix.js reaches into the page's own JSON and wraps both halves of it.
-  // Here the "page" is a sandbox with a JSON of its own, which is exactly the
-  // shape of the real thing: a separate JSON that has to be reached rather
-  // than the one this file is holding. Firefox's two helpers for crossing
-  // that wall, wrappedJSObject and exportFunction, stand in as themselves.
-  {
-    let asked = null;
-    const sandbox = {
-      console: { log() {}, warn() {}, error() {} },
-      fetch: async (url) => {
-        asked = url;
-        return { ok: true, text: async () => 'WEBVTT' };
-      },
-      exportFunction: (fn) => fn
-    };
-    sandbox.globalThis = sandbox;
-    sandbox.window = sandbox;
-    sandbox.window.wrappedJSObject = sandbox;
-    vm.createContext(sandbox);
-    const Netflix = vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix.js'), 'utf8') +
-      ';LLLNetflix', sandbox, { filename: 'netflix.js' });
-
-    const stringify = (value) => vm.runInContext('JSON.stringify(value)',
-      Object.assign(sandbox, { value }));
-
-    const request = { url: '/nq/msl_v1/cadmium/pbo_manifests',
-      manifest: { profiles: ['playready-h264'] } };
-    check('the request for a title asks for a subtitle format LLL can read',
-      JSON.parse(stringify(request)).manifest.profiles[0] === 'webvtt-lssdh-ios8',
-      stringify(request));
-    check('and asking twice does not ask for it twice',
-      (stringify(request), JSON.parse(stringify(request)).manifest.profiles.length) === 2,
-      stringify(request));
-    check('every other request is left exactly as it was',
-      stringify({ url: '/nq/msl_v1/cadmium/pbo_licenses',
-        profiles: ['playready-h264'] }).indexOf('webvtt') === -1);
-
-    // The answer to that request, cut down to the parts this reads. Two
-    // Japanese tracks, because a title very often has both, and the one that
-    // writes out sounds and speaker names is not the one to read.
-    const answer = JSON.stringify({ result: {
-      movieId: 81234567,
-      timedtexttracks: [
-        { language: 'en',
-          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/en.vtt' }] } } },
-        { language: 'ja', rawTrackType: 'closedcaptions',
-          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja-cc.vtt' }] } } },
-        { language: 'ja', rawTrackType: 'subtitles',
-          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja.vtt' }] } } },
-        { language: 'ja', isForcedNarrative: true,
-          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja-forced.vtt' }] } } }
-      ]
-    } });
-    const parsedAnswer = vm.runInContext('JSON.parse(answer)',
-      Object.assign(sandbox, { answer }));
-    check('the answer is handed back untouched, whatever was read out of it',
-      parsedAnswer.result.movieId === 81234567 &&
-      parsedAnswer.result.timedtexttracks.length === 4);
-    await new Promise((r) => setTimeout(r, 10));
-    check('the Japanese subtitles are fetched, not the English',
-      asked === 'https://x/ja.vtt', asked);
-    check('and the plain track is preferred to the closed captions',
-      asked !== 'https://x/ja-cc.vtt', asked);
-    check('the file is then there for the rest of LLL, with the episode it is of',
-      Netflix.track() && Netflix.track().movie === '81234567' &&
-      Netflix.track().vtt === 'WEBVTT', JSON.stringify(Netflix.track()));
-  }
+  // Netflix hands LLL no subtitle file: three ways of getting at the request
+  // that would ask for one have failed, one of them by breaking the site. The
+  // note at the top of netflix.js has the details. The reader below stays,
+  // because reading a WebVTT file is the same job whatever finally hands one
+  // over, and because it is the half that was never in doubt.
   check('and nor is anywhere else', Subs.siteFor('example.com') === null);
 
   Subs._setCues(parsed);

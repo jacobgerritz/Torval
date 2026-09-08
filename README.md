@@ -253,49 +253,43 @@ needs them running.
 
 ### Netflix
 
-Netflix hands over its whole subtitle file before the episode has played a
-second, which sounds unlikely and turns out to be a matter of asking.
+Netflix works, by reading the lines off the screen as they are shown, so
+Japanese has to be the subtitle language chosen in the player. The words are
+hoverable, the popup works, and a card can be mined from a line.
 
-When the player starts a title it posts a request listing the formats it is
-prepared to accept, and the answer only ever offers what was asked for. The
-player never asks for WebVTT, so the answer never offers it, and there is
-nothing to find afterwards however hard you look. Add that one format to the
-request on its way out and the very same answer comes back with a plain,
-unencrypted address for every subtitle track in it, Japanese included.
+Two things are worse than on YouTube, both for the same reason. The
+comprehension percentage can only describe the lines already watched, and it
+grows as you watch. And **D** has nowhere to go, because the next line has not
+been said yet. **A** works, and asks Netflix’s own player to move rather than
+setting `currentTime` on the video element, which ends the session with error
+F7375 and an error page.
 
-So LLL adds it. `JSON.stringify` is where the request becomes text, which is
-the last moment before it is sent, and `JSON.parse` is where the answer stops
-being text, which is the first moment it can be read. Netflix’s player is not
-affected either way: the extra format is one more line in a list it ignores,
-and the answer is handed back exactly as it arrived.
+A third thing is unrelated to any of that: the audio on a mined card may not
+record, because Netflix video is encrypted and the browser will not hand its
+sound to an extension. The card is still made, with the sentence and the word.
 
-Both hooks have to go on the page’s own `JSON`, which is not the same object
-as an extension’s `JSON`, and `wrappedJSObject` is how a content script
-reaches across that line in Firefox. Two earlier attempts went the other way,
-putting a file into the page to run there: a content script declared
-`"world": "MAIN"`, which never ran, and then a `<script>` tag, which never ran
-either, most likely stopped by Netflix’s content security policy. Neither
-could say why, because neither got far enough to say anything. Reaching the
-page’s objects from here has nothing to inject and no policy to satisfy, and
-it is what subtitles.js already does to read YouTube’s player.
+**Getting the whole subtitle file up front is not solved.** Netflix will hand
+it over as plain WebVTT, but only if asked: when the player starts a title it
+posts a request listing the formats it will accept, and the answer only ever
+offers what was asked for. Add one format to that request and the answer comes
+back with a plain address for every track in it. The request becomes text in
+`JSON.stringify` and the answer stops being text in `JSON.parse`, so those are
+the two places to stand. Reaching them is the problem, and three ways have
+failed:
 
-If that comes up empty, for a title with no Japanese subtitles or because the
-extension was loaded halfway through an episode, LLL reads the lines off the
-screen as it does on YouTube, and Japanese has to be the subtitle language
-turned on in the player for it to have anything to read. Reading the screen
-is a poor second: the percentage can only describe the lines already watched,
-and **D** has nowhere to go, because the next line has not been said yet.
-The console says which of the two is in use.
+1. A content script declared `"world": "MAIN"` never ran at all, on Firefox
+   155, where it should have.
+2. A `<script>` tag pointing at the same file never ran either, near certainly
+   stopped by Netflix’s content security policy.
+3. Reaching the page’s own `JSON` from the content script, through
+   `wrappedJSObject` and `exportFunction`, did run, and broke Netflix: the
+   home page came up with its header and nothing else.
 
-**A** and **D** ask Netflix’s own player to move rather than setting
-`currentTime` on the video element, which is what works everywhere else.
-Netflix streams in pieces chosen in advance, and moving the element under it
-ends the session with error F7375 and an error page.
-
-One thing is different from YouTube either way: the audio on a mined card may
-not record, because Netflix video is encrypted and the browser will not hand
-its sound to an extension. The card is still made, with the sentence and the
-word on it.
+The third is the one to learn from. A hook on `JSON.parse` is a hook on the
+whole site, since every part of it parses JSON for everything, and the cost of
+getting it slightly wrong is the site. Whatever comes next should touch
+something narrower: the one request that matters, rather than the one method
+everything goes through.
 
 There are four ways it gets the timing, tried in the order below, each a
 fallback for the one before it, not a choice between them. The first three all
