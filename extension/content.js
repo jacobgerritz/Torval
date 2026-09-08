@@ -297,9 +297,7 @@
     return api.runtime.sendMessage(message).then((reply) => {
       if (!reply || !reply.ok) return false;
       if (typeof LLLBar !== 'undefined') LLLBar.restate(word, before, after);
-      // More of a video's transcript arriving changes the number and
-      // nothing else. The page around the player is the same page it was.
-      if (typeof LLLHighlight !== 'undefined' && !(options && options.scoreOnly)) {
+      if (typeof LLLHighlight !== 'undefined') {
         LLLHighlight.setMarked(word, after === 'unknown');
         // The subtitle showing now is drawn from ranges of its own, made
         // when the line arrived. Asking for them again is one short message
@@ -965,7 +963,9 @@
         }
       }
 
-      if (typeof LLLHighlight !== 'undefined') {
+      // More of a video's transcript arriving changes the number and
+      // nothing else. The page around the player is the page it already was.
+      if (typeof LLLHighlight !== 'undefined' && !(options && options.scoreOnly)) {
         try {
           const score = await LLLHighlight.read({ nearby: !!transcript });
           if (!transcript && score && !scored) { LLLBar.show(score); scored = true; }

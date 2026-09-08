@@ -113,11 +113,6 @@ var LLLHighlight = (function () {
   }
 
   /**
-   * Read the page and work out what to mark. Answers with the score as well,
-   * because this is the same passage the bar is asking about and there is no
-   * sense reading a page twice to answer two questions about it.
-   */
-  /**
    * Read the page and colour it.
    *
    * `options.nearby` reads only what is on screen, and a screen either
