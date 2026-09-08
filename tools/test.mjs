@@ -1260,6 +1260,10 @@ const run = async () => {
         return { ok: true, text: async () => 'WEBVTT' };
       },
       window: { postMessage(message) { posted = message; } },
+      // A reply becomes an object by one of three routes, and only one of
+      // them is JSON.parse. These are the other two.
+      Response: function Response() {},
+      XMLHttpRequest: function XMLHttpRequest() {},
       // The page script sets a timer to say so if nothing ever comes back.
       // Let go of it, or the tests would sit and wait out its twenty-five
       // seconds before the process could end.
@@ -1267,6 +1271,12 @@ const run = async () => {
       clearTimeout
     };
     sandbox.globalThis = sandbox;
+    let jsonCalls = 0;
+    sandbox.Response.prototype.json = function () {
+      jsonCalls++;
+      return Promise.resolve(JSON.parse(this.body));
+    };
+    for (const name of ['open', 'send']) sandbox.XMLHttpRequest.prototype[name] = function () {};
     vm.createContext(sandbox);
     vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix-page.js'), 'utf8'),
       sandbox, { filename: 'netflix-page.js' });
@@ -1319,6 +1329,37 @@ const run = async () => {
     check('the file reaches the rest of LLL, with the episode it belongs to',
       posted && posted.lll === 'lll-netflix-subtitles' && posted.movie === '81234567' &&
       posted.vtt === 'WEBVTT', JSON.stringify(posted));
+
+    // The same answer, arriving the way fetch delivers one. response.json()
+    // never calls JSON.parse, the browser parses the body itself, so a site
+    // that reads its replies this way goes straight past the hook above.
+    // Netflix is such a site, which is why nothing was ever caught.
+    posted = null;
+    asked = null;
+    const reply = new sandbox.Response();
+    reply.url = 'https://www.netflix.com/nq/msl_v1/cadmium/pbo_manifests';
+    // A different episode, or the same track would be recognised as one
+    // already fetched and quite rightly left alone.
+    reply.body = answer.split('/ja.vtt').join('/ja2.vtt');
+    const handed = reply.json();
+    check('a reply read with response.json() is still the caller’s own promise',
+      handed instanceof Promise && jsonCalls === 1, jsonCalls);
+    const value = await handed;
+    check('and it hands back the answer itself, unchanged',
+      value.result.movieId === 81234567 && value.result.timedtexttracks.length === 4);
+    await new Promise((r) => setTimeout(r, 10));
+    check('the subtitles are found in it all the same',
+      asked === 'https://x/ja2.vtt', asked);
+
+    // Every other reply on the site is left alone, whatever is in it.
+    posted = null;
+    asked = null;
+    const other = new sandbox.Response();
+    other.url = 'https://www.netflix.com/api/shakti/whatever';
+    other.body = answer;
+    await other.json();
+    await new Promise((r) => setTimeout(r, 10));
+    check('a reply to anything else is not read at all', asked === null, asked);
   }
   check('and nor is anywhere else', Subs.siteFor('example.com') === null);
 

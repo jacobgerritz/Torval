@@ -264,11 +264,19 @@ request on its way out and the very same answer comes back with a plain,
 unencrypted address for every subtitle track in it, Japanese included.
 
 So LLL adds it. `JSON.stringify` is where the request becomes text, which is
-the last moment before it is sent, and `JSON.parse` is where the answer stops
-being text, which is the first moment it can be read. Netflix’s player is not
-affected either way: the extra format is one more line in a list it ignores,
-and the answer is handed straight back, the very same object the real
-`JSON.parse` produced.
+the last moment before it is sent, so that is where the format goes in.
+
+Reading the answer took longer to place. `JSON.parse` is the obvious spot and
+it is the wrong one: nothing carrying a track list ever went through it,
+because `response.json()` does not call `JSON.parse` at all, the browser parses
+the body itself. So the answer is watched at all three places a reply can
+become an object, `JSON.parse`, `Response.prototype.json` and an
+`XMLHttpRequest`’s `responseText`, and at the last two only for a reply to the
+manifest request, so nothing else on the site is touched.
+
+Netflix’s player is not affected by any of it: the extra format is one more
+line in a list it ignores, and every answer is handed straight back, the same
+object and the same promise the real one produced.
 
 #### Getting the hooks onto the page took four goes
 

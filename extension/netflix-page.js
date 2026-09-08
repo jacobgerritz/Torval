@@ -147,6 +147,78 @@
       offered.join(', ') || '(nothing)');
   }
 
+  /**
+   * The other two ways a reply becomes an object without JSON.parse ever
+   * being called.
+   *
+   * `JSON.parse` was the only place watched, and nothing carrying a track
+   * list ever went through it. It does not follow that the answer is out of
+   * reach: `response.json()` does not call `JSON.parse`, the browser parses
+   * the body itself, and neither does reading `responseText` and handing it
+   * to something else. Both are watched here, and both only for a reply to
+   * the manifest request, so nothing else on the site is touched.
+   *
+   * Neither changes the reply. The promise handed back is the very one the
+   * real `json()` returned; this only listens to it.
+   */
+  var seenReply = false;
+
+  if (typeof Response !== 'undefined' && Response.prototype.json) {
+    var realJson = Response.prototype.json;
+    Response.prototype.json = function () {
+      var answer = realJson.apply(this, arguments);
+      try {
+        if (MANIFEST.test(this.url || '')) {
+          // A derived promise, so a failure here can never become an
+          // unhandled rejection on the one the player is waiting for.
+          answer.then(function (value) { fromReply(value); }, function () {});
+        }
+      } catch (err) { /* leave the reply alone */ }
+      return answer;
+    };
+  }
+
+  if (typeof XMLHttpRequest !== 'undefined') {
+    var realOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      try { this.__lllUrl = String(url || ''); } catch (err) { /* no matter */ }
+      return realOpen.apply(this, arguments);
+    };
+
+    var realSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function () {
+      try {
+        if (MANIFEST.test(this.__lllUrl || '')) {
+          this.addEventListener('load', function () {
+            try {
+              if (this.responseType && this.responseType !== 'text') {
+                if (this.responseType === 'json') fromReply(this.response);
+                return;
+              }
+              var text = this.responseText;
+              if (text && text.indexOf('timedtexttracks') !== -1) {
+                fromReply(parse(text));
+              }
+            } catch (err) { /* not ours to read */ }
+          });
+        }
+      } catch (err) { /* leave the request alone */ }
+      return realSend.apply(this, arguments);
+    };
+  }
+
+  /** A reply to the manifest request, however it was read. */
+  function fromReply(value) {
+    try {
+      if (!seenReply) {
+        seenReply = true;
+        say('the reply to that request came back. It holds:',
+          (value && typeof value === 'object' ? Object.keys(value) : [typeof value]).join(', '));
+      }
+      collect(value);
+    } catch (err) { /* said what there was to say */ }
+  }
+
   /** The first value under `wanted`, anywhere in here. */
   function findKey(node, wanted, depth) {
     if (!node || typeof node !== 'object' || depth > 8) return null;
@@ -218,7 +290,10 @@
    */
   setTimeout(function () {
     if (got || !asked) return;
-    say('the request went out but no answer carrying a track list was parsed ' +
-      'on this page. Whatever reads it is somewhere this cannot see.');
+    say(seenReply
+      ? 'the reply came back but had no track list in it, so the format was ' +
+        'added in the wrong place or under the wrong name.'
+      : 'the request went out and its reply was never read on this page. ' +
+        'Whatever reads it is somewhere this cannot see, a worker most likely.');
   }, 25000);
 })();
