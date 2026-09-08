@@ -1259,7 +1259,12 @@ const run = async () => {
         asked = url;
         return { ok: true, text: async () => 'WEBVTT' };
       },
-      window: { postMessage(message) { posted = message; } }
+      window: { postMessage(message) { posted = message; } },
+      // The page script sets a timer to say so if nothing ever comes back.
+      // Let go of it, or the tests would sit and wait out its twenty-five
+      // seconds before the process could end.
+      setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
+      clearTimeout
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);

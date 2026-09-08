@@ -56,13 +56,26 @@
   // On the way out: ask for a format that can be read
   // ---------------------------------------------------------------------
 
-  var told = false;
+  var asked = 0;
   var stringify = JSON.stringify;
   JSON.stringify = function (value) {
     try {
       if (value && typeof value.url === 'string' && MANIFEST.test(value.url)) {
-        ask(value);
-        if (!told) { told = true; say('asking this title for its subtitles as a plain file'); }
+        var added = ask(value, 0);
+        // Said once, with the count, because "asked" and "found somewhere to
+        // ask" are different things and only the second one is any use. A
+        // request that goes out with nothing added is the whole explanation
+        // for an answer that comes back with nothing in it.
+        // Three times rather than once: the first manifest of a session is
+        // usually a trailer previewing itself on the home page, and the one
+        // that matters is the episode you then chose.
+        if (asked++ < 3) {
+          say(added
+            ? 'asking this title for its subtitles as a plain file (' + added +
+              ' format lists)'
+            : 'this title’s request has no format list to add to. Its parts are: ' +
+              Object.keys(value).join(', '));
+        }
       }
     } catch (err) {
       // Never let this break the request itself. A missing subtitle file is
@@ -71,16 +84,27 @@
     return stringify.apply(this, arguments);
   };
 
-  /** Add WebVTT to every list of acceptable formats in this request. */
-  function ask(payload) {
-    offer(payload);
-    for (var key in payload) offer(payload[key]);
-  }
-
-  function offer(part) {
-    if (!part || !Array.isArray(part.profiles)) return;
-    if (part.profiles.indexOf(WEBVTT) !== -1) return;
-    part.profiles.unshift(WEBVTT);
+  /**
+   * Add WebVTT to every list of acceptable formats in this request.
+   *
+   * Wherever it is. The list used to be looked for in the payload itself and
+   * one level under it, which is where it was when this was written against
+   * one recording of one request, and there is no reason for Netflix to keep
+   * it there. Answers with how many lists it actually found.
+   */
+  function ask(node, depth) {
+    if (!node || typeof node !== 'object' || depth > 6) return 0;
+    var added = 0;
+    if (Array.isArray(node.profiles) && node.profiles.indexOf(WEBVTT) === -1) {
+      node.profiles.unshift(WEBVTT);
+      added++;
+    }
+    for (var key in node) {
+      if (key === 'profiles') continue;
+      var value = node[key];
+      if (value && typeof value === 'object') added += ask(value, depth + 1);
+    }
+    return added;
   }
 
   // ---------------------------------------------------------------------
@@ -88,10 +112,16 @@
   // ---------------------------------------------------------------------
 
   var parse = JSON.parse;
-  JSON.parse = function () {
+  JSON.parse = function (text) {
     var value = parse.apply(this, arguments);
     try {
-      collect(value);
+      // The text is searched before the object is walked, because this runs
+      // for every piece of JSON the site parses and that is a great many.
+      // One string search that almost always fails is the cheapest way to
+      // leave all of them alone.
+      if (typeof text === 'string' && text.indexOf('timedtexttracks') !== -1) {
+        collect(value);
+      }
     } catch (err) {
       // Same reasoning as above, and more so: JSON.parse is used by every
       // part of this site for everything.
@@ -99,13 +129,35 @@
     return value;
   };
 
+  /**
+   * The track list out of an answer that has one, wherever it sits in it.
+   *
+   * Looked for by name rather than by route, for the same reason the YouTube
+   * side does it: the route is undocumented and has moved before now.
+   */
   function collect(value) {
-    var result = value && value.result;
-    if (!result || !result.movieId || !result.timedtexttracks) return;
-    var track = pick(result.timedtexttracks);
-    if (track) return load(String(result.movieId), track);
+    var tracks = findKey(value, 'timedtexttracks', 0);
+    if (!tracks || !tracks.length) return;
+    var movie = findKey(value, 'movieId', 0);
+    var track = pick(tracks);
+    if (track) return load(String(movie || ''), track);
+    var offered = [];
+    for (var i = 0; i < tracks.length; i++) offered.push(String(tracks[i].language));
     say('this title offers no Japanese subtitles as a file. It offers:',
-      result.timedtexttracks.map(function (t) { return t.language; }).join(', '));
+      offered.join(', ') || '(nothing)');
+  }
+
+  /** The first value under `wanted`, anywhere in here. */
+  function findKey(node, wanted, depth) {
+    if (!node || typeof node !== 'object' || depth > 8) return null;
+    if (node[wanted]) return node[wanted];
+    for (var key in node) {
+      var value = node[key];
+      if (!value || typeof value !== 'object') continue;
+      var found = findKey(value, wanted, depth + 1);
+      if (found) return found;
+    }
+    return null;
   }
 
   /**
@@ -131,8 +183,10 @@
     return best;
   }
 
+  var got = false;
   var fetched = '';
   function load(movie, track) {
+    got = true;
     if (track.url === fetched) return;    // the same track, asked for twice
     fetched = track.url;
     // Fetched from here rather than from the extension's side, because here
@@ -152,4 +206,19 @@
   }
 
   say('watching for this title’s subtitle file');
+
+  /**
+   * Say so if the request went out and nothing ever came back through here.
+   *
+   * Silence is the hardest thing to act on. If the format was added to a
+   * real request and no answer carrying a track list was ever parsed on this
+   * page, then the answer is being read somewhere this cannot see, a worker
+   * most likely, and the next thing to try is a different place to stand
+   * rather than a different thing to look for.
+   */
+  setTimeout(function () {
+    if (got || !asked) return;
+    say('the request went out but no answer carrying a track list was parsed ' +
+      'on this page. Whatever reads it is somewhere this cannot see.');
+  }, 25000);
 })();
