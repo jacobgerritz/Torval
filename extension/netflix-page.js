@@ -210,6 +210,75 @@
     };
   }
 
+  /**
+   * Listen to what the workers say.
+   *
+   * The reply is not read on this page by any of the three ways a reply
+   * becomes an object, and the player holds no file and no cues. What is left
+   * is that Netflix hands the request to a worker, which does the encryption,
+   * sends it, decrypts what comes back, reads it there and posts the result
+   * home as an object. Nothing of that passes through anything on this page,
+   * except the last step: the object arriving.
+   *
+   * So that is where to stand. Every worker the page makes gets a listener
+   * added to it, which is all this does; it reads what the worker sent and
+   * changes nothing. A Proxy rather than a replacement class, so that Worker
+   * is still Worker in every other respect.
+   *
+   * Most of what a worker sends here is media, arriving as raw bytes, and
+   * those are dropped in one test before anything is looked at.
+   */
+  var workers = 0;
+
+  if (typeof Worker !== 'undefined' && typeof Proxy !== 'undefined') {
+    try {
+      Worker = new Proxy(Worker, {
+        construct: function (Real, args) {
+          var worker = Reflect.construct(Real, args);
+          try {
+            if (!workers++) say('the player is using workers, starting with', String(args[0]));
+            worker.addEventListener('message', function (e) { fromWorker(e.data); });
+          } catch (err) { /* a worker that cannot be listened to still works */ }
+          return worker;
+        }
+      });
+    } catch (err) {
+      say('could not listen to the workers:', err && err.message);
+    }
+  }
+
+  function fromWorker(data) {
+    try {
+      if (typeof data === 'string') {
+        if (data.indexOf('timedtexttracks') !== -1) fromReply(parse(data));
+        return;
+      }
+      if (!data || typeof data !== 'object') return;
+      // Media, and there is a great deal of it.
+      if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) return;
+      if (holdsTracks(data, 0)) fromReply(data);
+    } catch (err) { /* not ours to read */ }
+  }
+
+  /**
+   * Is the track list somewhere in here? Bounded hard, in depth and in how
+   * much it will look at, because this runs on every message every worker
+   * sends and some of them are busy.
+   */
+  function holdsTracks(node, depth) {
+    if (!node || typeof node !== 'object' || depth > 4) return false;
+    if (node.timedtexttracks) return true;
+    var looked = 0;
+    for (var key in node) {
+      if (++looked > 40) return false;
+      var value = node[key];
+      if (!value || typeof value !== 'object') continue;
+      if (value instanceof ArrayBuffer || ArrayBuffer.isView(value)) continue;
+      if (holdsTracks(value, depth + 1)) return true;
+    }
+    return false;
+  }
+
   /** A reply to the manifest request, however it was read. */
   function fromReply(value) {
     try {
@@ -296,7 +365,8 @@
     say(seenReply
       ? 'the reply came back but had no track list in it, so the format was ' +
         'added in the wrong place or under the wrong name.'
-      : 'the request went out and its reply was never read on this page. ' +
-        'Whatever reads it is somewhere this cannot see, a worker most likely.');
+      : 'the request went out and its reply was never seen, in this page or ' +
+        'in anything ' + (workers ? 'the ' + workers + ' workers said.' :
+          'said by a worker, of which there were none.'));
   }, 25000);
 })();
