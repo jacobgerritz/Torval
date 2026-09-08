@@ -208,6 +208,49 @@
   color: #949aa3;
 }
 
+/*
+ * The lines either side, offered for one card. Dim until clicked, so the
+ * ordinary case, which is not wanting them, reads as nothing having been
+ * chosen rather than as something switched off.
+ */
+.context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #212227;
+}
+
+.context-label {
+  font: 11px/1.6 -apple-system, "Segoe UI", sans-serif;
+  letter-spacing: .04em;
+  color: #6b7078;
+}
+
+.context-line {
+  font: 13px/1.5 inherit;
+  color: #7d828b;
+  background: #17181b;
+  border: 1px solid #26282d;
+  border-radius: 4px;
+  padding: 1px 7px;
+  cursor: pointer;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-line:hover { border-color: #33363c; color: #a4a9b2; }
+
+.context-line.chosen {
+  background: #1e2731;
+  border-color: #2f4152;
+  color: #d9dade;
+}
+
 /* A card was made. Green because nothing else in here is. */
 .note.added {
   margin-top: 5px;

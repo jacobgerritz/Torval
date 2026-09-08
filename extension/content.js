@@ -878,6 +878,23 @@
   }
 
   /** The sentence with the looked-up word wrapped in bold, ready for a card. */
+  /**
+   * The sentence with whichever neighbours were asked for folded into it.
+   *
+   * Joined with nothing between them, which is how Japanese is written and
+   * also what a caption cut in half actually needs: the line before ends
+   * mid-word about as often as not.
+   */
+  function widen(sentence, wanted) {
+    const lead = wanted.before ? (sentence.before || '') : '';
+    const trail = wanted.after ? (sentence.after || '') : '';
+    if (!lead && !trail) return sentence;
+    return {
+      text: lead + sentence.text + trail,
+      index: sentence.index + lead.length
+    };
+  }
+
   function markSentence(sentence, length) {
     const { text, index } = sentence;
     if (index < 0 || index >= text.length) return escapeHtml(text);
@@ -1235,7 +1252,70 @@
       });
       card.append(toggle, rest);
     }
+
+    const beside = contextRow();
+    if (beside) card.appendChild(beside);
     place(at);
+  }
+
+  /**
+   * What was said either side, offered for this card and no other.
+   *
+   * Usually a line on its own is the right amount to put on a card, and
+   * more is noise you have to read every time it comes up. Sometimes it is
+   * not: これはちょっと… means nothing without the question it answers, and
+   * a card you cannot read is a card you fail for the wrong reason. Which
+   * of the two it is can only be told by looking at the line, so the two
+   * neighbours are shown, and clicking one folds it into the sentence for
+   * this card only. Nothing is remembered; the next word starts clean.
+   *
+   * The same idea as picking a single sense, and the same behaviour: what
+   * you clicked is what you get, and clicking nothing is the ordinary case.
+   */
+  function contextRow() {
+    if (!context) return null;
+    const before = context.before || '';
+    const after = context.after || '';
+    if (!before && !after) return null;
+
+    const row = document.createElement('div');
+    row.className = 'context';
+
+    const label = document.createElement('span');
+    label.className = 'context-label';
+    label.textContent = 'also on the card:';
+    row.appendChild(label);
+
+    if (before) row.appendChild(chip('before', '…' + tail(before)));
+    if (after) row.appendChild(chip('after', head(after) + '…'));
+    return row;
+  }
+
+  function chip(which, shown) {
+    const el = document.createElement('button');
+    el.className = 'context-line';
+    el.dataset.side = which;
+    el.textContent = shown;
+    el.title = which === 'before' ? context.before : context.after;
+    el.addEventListener('click', () => {
+      el.classList.toggle('chosen');
+      reflow();
+    });
+    return el;
+  }
+
+  const CHIP_CHARACTERS = 18;
+  function tail(text) { return text.slice(-CHIP_CHARACTERS); }
+  function head(text) { return text.slice(0, CHIP_CHARACTERS); }
+
+  /** Which neighbours are wanted, for the card about to be made. */
+  function chosenContext() {
+    const wanted = { before: false, after: false };
+    if (!ui) return wanted;
+    for (const el of ui.card.querySelectorAll('.context-line.chosen')) {
+        wanted[el.dataset.side] = true;
+    }
+    return wanted;
   }
 
   function renderGroup(group, isTop) {
@@ -1575,15 +1655,20 @@
       }
     }
 
+    // Whatever was clicked in the popup is folded in before the word is
+    // marked, so the bold still lands on the word rather than a count of
+    // characters into a longer line.
+    const written = context ? markSentence(widen(context, chosenContext()), surface.length) : '';
+
     const note = {
       media,
       word,
       reading,
       // The bold marks the word exactly as the page wrote it, inflection and
       // all, while the Target Word field carries the dictionary form.
-      sentence: context ? markSentence(context, surface.length) : '',
+      sentence: written,
       // Kept so a mapping saved before the two were merged still fills in.
-      sentenceMarked: context ? markSentence(context, surface.length) : '',
+      sentenceMarked: written,
       // Only ever used if a field on your note type asks for them.
       sentenceBefore: context ? escapeHtml(context.before || '') : '',
       sentenceAfter: context ? escapeHtml(context.after || '') : '',

@@ -170,7 +170,7 @@ Four things can be put on a card:
 | **Word audio** | a recording of the word, if one can be found |
 | **Pitch accent** | the accent diagram, drawn as an SVG |
 | **Video frame** | the frame on screen when you pressed + |
-| **Sentence before** | what was said just before, off unless a field asks for it. One line of a conversation can be genuinely ambiguous on its own, これはちょっと… means nothing without the question it answers |
+| **Sentence before** | what was said just before, for a note type that has somewhere to put it. Off unless a field asks for it |
 | **Sentence after** | and what was said just after |
 | **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says roughly how much sound to keep from before the line, a tenth of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said. Roughly, because a recorder swallows an unpredictable moment when it starts, measured at anything from 0.05 to 0.4 seconds, so LLL starts it early and lets it |
 
@@ -208,6 +208,30 @@ them, so the ordinary case needs no clicks. Picking several senses of the same
 word is fine, but a card is one word: choosing a sense in a different entry
 lets go of whatever was chosen before, rather than quietly mixing meanings
 from two different words onto one card.
+
+---
+
+### Putting the line before or after on one card
+
+The two fields above are all or nothing: map them and every card gets them.
+Usually that is not what you want, because usually a line on its own is the
+right amount to put on a card and more is noise you have to read every time it
+comes up.
+
+So the popup offers them one card at a time. Where there is a line either side,
+a row appears under the entry reading **also on the card:** followed by the
+neighbouring text itself, dimmed. Click one and it is folded into the sentence
+for that card. Click nothing and nothing changes, which is the ordinary case.
+Nothing is remembered: the next word starts clean.
+
+You can see what you are adding before you add it, which is the point. Whether
+a line needs its neighbour is not a rule, これはちょっと… means nothing without
+the question it answers and 猫です。 means everything on its own, and the only
+way to tell is to look.
+
+The word stays bold in the right place, and on a caption cut in half the bold
+grows to the whole word once the next line completes it: 嬉しかっ becomes
+嬉しかった.
 
 ---
 
