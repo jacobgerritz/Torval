@@ -1166,6 +1166,102 @@ const run = async () => {
   check('so is Netflix', Subs.siteFor('www.netflix.com') === 'netflix');
   check('and so is Netflix in another country', Subs.siteFor('netflix.com') === 'netflix');
   check('a site that merely mentions one is not', Subs.siteFor('notnetflix.com') === null);
+
+  // --- Netflix's own subtitle file -----------------------------------------
+  // WebVTT as Netflix writes it: a stamp, the words, a blank line. The
+  // furigana it puts in as ruby has to come out, or every kanji would be
+  // followed by its own reading spelled out as more words to read.
+  {
+    const vtt = [
+      'WEBVTT',
+      '',
+      '00:00:01.000 --> 00:00:03.500 line:10%',
+      '\u79c1\u306e\u5834\u5408\u306f\u7e4b\u304c\u308b\u308f\u3051\u3058\u3083',
+      '',
+      '00:00:03.500 --> 00:00:06.000',
+      '<i>\u306a\u3044\u306e\u304b\u3082\u3063\u3066</i>\u3044\u3046\u3053\u3068',
+      '',
+      '01:00:00.250 --> 01:00:02.000',
+      '<ruby>\u7686<rt>\u307f\u306a</rt></ruby>\u3055\u3093'
+    ].join(String.fromCharCode(10));
+    const cues = Subs.parseVtt(vtt);
+    check('every line of the file is read', cues.length === 3, cues.length);
+    check('with the words, and no markup',
+      cues[1].text === '\u306a\u3044\u306e\u304b\u3082\u3063\u3066\u3044\u3046\u3053\u3068', cues[1].text);
+    check('the furigana comes out and the kanji stays',
+      cues[2].text === '\u7686\u3055\u3093', cues[2].text);
+    check('a stamp is read as a time', cues[0].start === 1 && cues[0].end === 3.5,
+      cues[0].start + JSON.stringify(cues[0]));
+    check('and an hour counts as an hour', cues[2].start === 3600.25, cues[2].start);
+    check('a file with nothing in it is no lines rather than a crash',
+      Subs.parseVtt('WEBVTT').length === 0);
+  }
+
+  // --- asking Netflix for a format that can be read -------------------------
+  // The half of this that runs in the page's own world, where it can reach
+  // the player's JSON. Everything it does happens inside those two methods,
+  // so a sandbox with its own JSON is the whole test rig it needs.
+  {
+    let posted = null;
+    let asked = null;
+    const sandbox = {
+      console: { log() {}, warn() {}, error() {} },
+      fetch: async (url) => {
+        asked = url;
+        return { ok: true, text: async () => 'WEBVTT' };
+      },
+      window: {
+        addEventListener() {},
+        postMessage(message) { posted = message; }
+      }
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix-page.js'), 'utf8'),
+      sandbox, { filename: 'netflix-page.js' });
+
+    const stringify = (value) => vm.runInContext(
+      'JSON.stringify(value)', Object.assign(sandbox, { value }));
+
+    const request = { url: '/nq/msl_v1/cadmium/pbo_manifests', manifest: { profiles: ['playready-h264'] } };
+    check('the request for a title asks for a subtitle format LLL can read',
+      JSON.parse(stringify(request)).manifest.profiles[0] === 'webvtt-lssdh-ios8',
+      stringify(request));
+    check('and asking twice does not ask for it twice',
+      (stringify(request), JSON.parse(stringify(request)).manifest.profiles.length) === 2,
+      stringify(request));
+    check('every other request is left exactly as it was',
+      stringify({ url: '/nq/msl_v1/cadmium/pbo_licenses', manifest: { profiles: ['playready-h264'] } })
+        .indexOf('webvtt') === -1);
+
+    // The answer to that request, cut down to the parts this reads. Two
+    // Japanese tracks, because a title very often has both, and the one that
+    // writes out sounds and speaker names is not the one to read.
+    const answer = JSON.stringify({ result: {
+      movieId: 81234567,
+      timedtexttracks: [
+        { language: 'en', ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/en.vtt' }] } } },
+        { language: 'ja', rawTrackType: 'closedcaptions',
+          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja-cc.vtt' }] } } },
+        { language: 'ja', rawTrackType: 'subtitles',
+          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja.vtt' }] } } },
+        { language: 'ja', isForcedNarrative: true,
+          ttDownloadables: { 'webvtt-lssdh-ios8': { urls: [{ url: 'https://x/ja-forced.vtt' }] } } }
+      ]
+    } });
+    const parsed = vm.runInContext(
+      'JSON.parse(answer)', Object.assign(sandbox, { answer }));
+    check('the answer is handed back untouched, whatever was read out of it',
+      parsed.result.movieId === 81234567 && parsed.result.timedtexttracks.length === 4);
+    await new Promise((r) => setTimeout(r, 10));
+    check('the Japanese subtitles are fetched, not the English',
+      asked === 'https://x/ja.vtt', asked);
+    check('and the plain track is preferred to the closed captions',
+      asked !== 'https://x/ja-cc.vtt', asked);
+    check('the file reaches the rest of LLL, with the episode it belongs to',
+      posted && posted.lll === 'lll-netflix-subtitles' && posted.movie === '81234567' &&
+      posted.vtt === 'WEBVTT', JSON.stringify(posted));
+  }
   check('and nor is anywhere else', Subs.siteFor('example.com') === null);
 
   Subs._setCues(parsed);

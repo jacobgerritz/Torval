@@ -64,6 +64,10 @@ var LLLSubtitles = (function () {
   // How far a rolling caption is allowed to grow before it counts as a new
   // line: about as long as a subtitle gets, and about as long as one stays
   // on screen.
+  // How many passes of watch(), which is one a second, to wait for a site to
+  // hand over its own subtitle file before reading the screen instead.
+  var WAIT_TO_BE_HANDED = 5;
+
   var ROLL_CHARACTERS = 60;
   var ROLL_SECONDS = 10;
 
@@ -85,16 +89,17 @@ var LLLSubtitles = (function () {
    * where the player draws its own caption text, and where LLL should hang
    * its own line.
    *
-   * Netflix has no transcript worth asking for: its subtitle files are
-   * signed for the player alone and expire. So it reads the lines off the
-   * screen, the same fallback YouTube uses when a fetch fails. The only
-   * thing lost by that is that the percentage describes what has been
-   * watched so far rather than the whole episode.
+   * There are two ways of getting a transcript, and a site uses one or the
+   * other. YouTube is asked for one. Netflix is not asked at all: its
+   * player is handed a subtitle file of its own, and LLL takes a copy as
+   * it goes past, which is what `catches` means. Either way, a site that
+   * comes up empty reads the lines off the screen instead.
    */
   var SITES = {
     youtube: {
       host: /(^|[.])youtube[.]com$/,
       fetches: true,
+      catches: false,
       id: function () { return new URLSearchParams(location.search).get('v'); },
       captions: '.ytp-caption-window-container, .captions-text',
       player: '.html5-video-player'
@@ -102,6 +107,7 @@ var LLLSubtitles = (function () {
     netflix: {
       host: /(^|[.])netflix[.]com$/,
       fetches: false,
+      catches: true,
       id: function () {
         var match = /[/]watch[/]([0-9]+)/.exec(location.pathname);
         return match ? match[1] : null;
@@ -335,23 +341,113 @@ var LLLSubtitles = (function () {
       openCue = null;
       state = 'idle';
       attempts = 0;
+      caughtFile = '';
+      caughtWrong = '';
       console.log('LLL: video is now', id || '(none, not a watch page)');
     }
 
-    // Keep trying for a while. This script starts before YouTube's player
+    // A site that hands its subtitles over does so whenever it pleases, so
+    // this looks on every pass rather than only while nothing has arrived: a
+    // real transcript replaces lines read off the screen at whatever moment
+    // it turns up, including after a whole episode of reading the screen.
+    if (id && site.catches) takeCaughtFile(id);
+
+    // Keep trying for a while. This script starts before the site's player
     // exists, so the first look almost always finds nothing; giving up on that
     // would mean never loading subtitles at all. Once a definite answer comes
     // back, ready, watching, or genuinely unavailable, this stops retrying.
     if (id && state === 'idle') {
-      if (!site.fetches) fallBackToWatching();
-      else if (attempts < MAX_LOOKUP_ATTEMPTS) { attempts++; load(id); }
+      attempts++;
+      // A site that is asked for its transcript is asked again. A site that
+      // waits to be handed one waits a few seconds before settling for the
+      // screen, since the file usually arrives about as fast as the video.
+      if (site.fetches) { if (attempts <= MAX_LOOKUP_ATTEMPTS) load(id); }
+      else if (attempts > WAIT_TO_BE_HANDED) fallBackToWatching();
     }
 
     video = document.querySelector('video');
   }
 
   // -------------------------------------------------------------------------
-  // Plan 1: ask YouTube for the file
+  // Plan 1, on Netflix: take a copy of the player's own subtitle file
+  // -------------------------------------------------------------------------
+
+  var caughtFile = "";
+  var caughtWrong = "";
+
+  /**
+   * The subtitle file Netflix's own player was handed, if one has come in.
+   *
+   * The catching happens in netflix-page.js, which is a different world
+   * entirely and explains itself there. All that is left here is to read it,
+   * and to be sure it belongs to the episode actually playing: Netflix is one
+   * page from beginning to end, so the file for the last episode is still
+   * sitting there when the next one starts.
+   */
+  function takeCaughtFile(id) {
+    var reader = typeof LLLNetflix !== 'undefined' ? LLLNetflix
+      : (typeof window !== 'undefined' ? window.LLLNetflix : null);
+    var caught = reader ? reader.track() : null;
+    if (!caught || caught.vtt === caughtFile) return;
+    if (caught.movie && String(caught.movie) !== String(id)) {
+      // Said once about a given file, not once a second for the rest of the
+      // episode.
+      if (caughtWrong !== caught.vtt) {
+        caughtWrong = caught.vtt;
+        console.log('LLL: Netflix handed over subtitles for', caught.movie,
+          'but', id, 'is playing, so they are being left alone.');
+      }
+      return;
+    }
+    var loaded = parseVtt(caught.vtt);
+    if (!loaded.length) return;
+    caughtFile = caught.vtt;
+    cues = loaded;
+    index = 0;
+    openCue = null;
+    state = 'ready';
+    console.log('LLL:', cues.length, 'subtitle lines ready, from the file Netflix',
+      'gave its own player');
+  }
+
+  /**
+   * WebVTT: a stamp line, then the words, then a blank line.
+   *
+   * Netflix writes furigana into its Japanese subtitles as ruby, a reading
+   * in <rt> tags after the word it belongs to. Left in, that reading would
+   * be read as more words, so it goes; the kanji it was helping with stays.
+   */
+  function parseVtt(text) {
+    var lines = String(text).replace(/\r/g, '').split('\n');
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+      var stamp = /^\s*([0-9:.,]+)\s+-->\s+([0-9:.,]+)/.exec(lines[i]);
+      if (!stamp) continue;
+      var start = clock(stamp[1]);
+      var end = clock(stamp[2]);
+      var said = [];
+      for (i++; i < lines.length && lines[i].trim() !== ''; i++) said.push(lines[i]);
+      var line = squash(said.join(' ')
+        .replace(/<rt[^>]*>[\s\S]*?<\/rt>/g, '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&(amp|lt|gt|quot|#39|nbsp|lrm|rlm);/g, ' '));
+      if (!line) continue;
+      if (out.length && out[out.length - 1].end > start) out[out.length - 1].end = start;
+      out.push({ start: start, end: end, text: line });
+    }
+    return out;
+  }
+
+  /** 00:01:02.500, or 01:02.500, in seconds. */
+  function clock(stamp) {
+    var parts = String(stamp).replace(',', '.').split(':');
+    var total = 0;
+    for (var i = 0; i < parts.length; i++) total = total * 60 + (parseFloat(parts[i]) || 0);
+    return total;
+  }
+
+  // -------------------------------------------------------------------------
+  // Plan 1, on YouTube: ask for the file
   // -------------------------------------------------------------------------
 
   async function load(id) {
@@ -1145,6 +1241,7 @@ var LLLSubtitles = (function () {
     insertObserved: insertObserved,
     isContinuation: isContinuation,
     siteFor: siteFor,
+    parseVtt: parseVtt,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; },
     // The line in progress, which is where a line lives while it is on

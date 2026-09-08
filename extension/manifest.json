@@ -6,7 +6,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "lll@jacobgerritz",
-      "strict_min_version": "127.0"
+      "strict_min_version": "128.0"
     }
   },
   "permissions": [
@@ -27,6 +27,25 @@
     ]
   },
   "content_scripts": [
+    {
+      "matches": [
+        "*://*.netflix.com/*"
+      ],
+      "js": [
+        "netflix.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "*://*.netflix.com/*"
+      ],
+      "js": [
+        "netflix-page.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": [
         "<all_urls>"

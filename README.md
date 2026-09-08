@@ -225,17 +225,33 @@ needs them running.
 
 ### Netflix
 
-Netflix works too, by that last route only: LLL reads the Japanese subtitle
-off the screen as it plays, so Japanese has to be the subtitle language
-chosen in the player. Everything else is the same, the words are hoverable,
-**A** and **D** step between lines, and a card can be mined from one.
+Netflix hands over its whole subtitle file before the episode has played a
+second, which sounds unlikely and turns out to be a matter of asking.
 
-Two things are different, both because there is no file to fetch. The
-comprehension percentage describes what has been watched so far rather than
-the whole episode, and it grows as you watch. And the audio on a mined card
-may not record, since Netflix video is encrypted and the browser will not
-hand its sound to an extension; the card is still made, with the sentence
-and the word on it.
+When the player starts a title it posts a request listing the formats it is
+prepared to accept, and the answer only ever offers what was asked for. The
+player never asks for WebVTT, so the answer never offers it, and there is
+nothing to find afterwards however hard you look. Add that one format to the
+request on its way out and the very same answer comes back with a plain,
+unencrypted address for every subtitle track in it, Japanese included.
+
+So LLL adds it. `JSON.stringify` is where the request becomes text, which is
+the last moment before it is sent, and `JSON.parse` is where the answer stops
+being text, which is the first moment it can be read. Both live in
+`netflix-page.js`, which runs in the page’s own world because the player’s
+`JSON` is not an extension’s `JSON`. Netflix’s player is not affected either
+way: the extra format is one more line in a list it ignores, and the answer
+is handed back exactly as it arrived.
+
+If that comes up empty, for a title with no Japanese subtitles or because the
+extension was loaded halfway through an episode, LLL reads the lines off the
+screen as it does on YouTube, and Japanese has to be the subtitle language
+turned on in the player for it to have anything to read.
+
+One thing is different from YouTube either way: the audio on a mined card may
+not record, because Netflix video is encrypted and the browser will not hand
+its sound to an extension. The card is still made, with the sentence and the
+word on it.
 
 There are four ways it gets the timing, tried in the order below, each a
 fallback for the one before it, not a choice between them. The first three all
