@@ -782,6 +782,82 @@ function loadTags() {
  * the second half can be started from the first half's results. Two
  * transactions would mean paying the setup twice for one question.
  */
+/**
+ * A fingerprint of every word the dictionary knows.
+ *
+ * Reading a page asks about far more than it finds. Every stretch of text
+ * from every position is deinflected every way it could have been inflected,
+ * which is some thirty questions per character and, on a page of thirty
+ * thousand characters, the better part of a million. Almost none of them are
+ * words: they are the shapes a word might have taken, and the dictionary has
+ * never heard of nineteen in twenty of them.
+ *
+ * Each of those was a separate read of the database. This answers them
+ * instead, in memory, before the database is troubled at all: a sorted list
+ * of one number per word LLL knows, and a number not in the list is a word
+ * that certainly is not there. Two million bytes, and it turns the great
+ * majority of a page read into no database work whatsoever.
+ *
+ * It can only ever be wrong in the harmless direction. Two different words
+ * can share a number, roughly one pair in this dictionary, and the cost of
+ * that is one wasted read that finds nothing, which is what used to happen
+ * every time anyway. It can never say no about a word that is there, because
+ * the number comes from the word itself.
+ */
+let fingerprints = null;
+
+/** FNV-1a, which is small, fast and spreads short strings about well. */
+function fingerprint(text) {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/** Could the dictionary have this word? No means no; yes means look. */
+function mightKnow(term) {
+  if (!fingerprints) return true;
+  const wanted = fingerprint(term);
+  let low = 0;
+  let high = fingerprints.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >>> 1;
+    const here = fingerprints[middle];
+    if (here === wanted) return true;
+    if (here < wanted) low = middle + 1; else high = middle - 1;
+  }
+  return false;
+}
+
+/**
+ * Read every word the dictionary knows and remember its number.
+ *
+ * Once, after the database is open. It costs a moment and a couple of
+ * megabytes; until it has finished, everything works as it did before,
+ * because mightKnow says yes to everything while there is no list.
+ */
+async function learnWhatIsKnown() {
+  try {
+    const db = await ready;
+    const keys = await new Promise((resolve, reject) => {
+      const request = db.transaction(INDEX, 'readonly').objectStore(INDEX).getAllKeys();
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+    const marks = new Uint32Array(keys.length);
+    for (let i = 0; i < keys.length; i++) marks[i] = fingerprint(String(keys[i]));
+    marks.sort();
+    fingerprints = marks;
+    console.log('LLL:', keys.length, 'words fingerprinted, so most of reading a page ' +
+      'now needs no database at all.');
+  } catch (err) {
+    // Not being able to do this costs speed and nothing else.
+    console.warn('LLL: could not fingerprint the dictionary:', err && err.message);
+  }
+}
+
 async function getEntries(terms) {
   const db = await ready;
 
@@ -795,6 +871,9 @@ async function getEntries(terms) {
     const asked = new Set();
 
     for (const term of terms) {
+      // Almost all of them stop here, having cost one number and a search of
+      // a sorted list rather than a read of the database. See fingerprints.
+      if (!mightKnow(term)) continue;
       const req = index.get(term);
       req.onsuccess = () => {
         if (!req.result) return;
@@ -826,6 +905,9 @@ async function getEntries(terms) {
 // ---------------------------------------------------------------------------
 
 ready = start();
+// Once the words are there, take their fingerprints. Nothing waits for this:
+// until it has finished, every question goes to the database as it always did.
+ready.then(learnWhatIsKnown, () => {});
 ready.catch((err) => {
   console.error('LLL failed to start', err);
   status = { state: 'error', message: String(err) };

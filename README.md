@@ -235,6 +235,33 @@ grows to the whole word once the next line completes it: 嬉しかっ becomes
 
 ---
 
+### Asking about a word without asking the database
+
+Reading a page asks about far more words than it finds. Every stretch of text
+from every position is deinflected every way it could have been inflected,
+which is around thirty questions per character: on a page of thirty thousand
+characters, nearly nine hundred thousand of them. Nineteen in twenty are not
+words at all. They are the shapes a word might have taken, and the dictionary
+has never heard of them.
+
+Each of those used to be a separate read of the database. Now the background
+script keeps a sorted list of one number per word it knows, a plain FNV hash,
+about two megabytes, taken once at startup. A number not in the list belongs to
+a word that certainly is not there, and the question is answered in memory.
+
+Measured on that same thirty thousand characters: **883,534 reads become
+14,468**, one and a half percent of what it was. Ninety-four of those find
+nothing, because two words shared a number; there are 32 such pairs in the
+whole dictionary of 465,350 forms.
+
+It can only ever be wrong in the harmless direction. A shared number costs one
+wasted read that finds nothing, which is exactly what used to happen every time
+anyway. It can never say no about a word that is really there, because the
+number is taken from the word itself, and the tests check that against every
+single word in the dictionary rather than a sample.
+
+---
+
 ### How much of a page is read
 
 Reading a page means segmenting every stretch of Japanese on it, which is

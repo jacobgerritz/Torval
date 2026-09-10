@@ -1684,6 +1684,62 @@ const run = async () => {
     vm.createContext(sandbox);
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
 
+    // --- the fingerprints -------------------------------------------------
+    // Reading a page asks about far more words than it finds: some thirty
+    // questions per character, nineteen in twenty of which are not words at
+    // all. Each was a separate read of the database. A sorted list of one
+    // number per word answers almost all of them in memory instead.
+    //
+    // The one thing that must be true of it is that it never says no about a
+    // word that is really there, so that is checked against every single word
+    // in the dictionary rather than a sample. The checking runs inside the
+    // sandbox, in one go: crossing back and forth half a million times took
+    // twenty seconds and proved exactly the same thing.
+    {
+      sandbox.allTerms = [...index.keys()];
+      const report = vm.runInContext(`(function () {
+        var marks = new Uint32Array(allTerms.length);
+        for (var i = 0; i < allTerms.length; i++) marks[i] = fingerprint(allTerms[i]);
+        marks.sort();
+
+        var everything = !fingerprints;   // before the list exists, ask about all
+        fingerprints = marks;
+
+        var missed = null;
+        for (var j = 0; j < allTerms.length; j++) {
+          if (!mightKnow(allTerms[j])) { missed = allTerms[j]; break; }
+        }
+
+        // Things that are not words. Random kana, which is what most of the
+        // questions a page asks actually look like.
+        var kana = '\u3042\u3044\u3046\u3048\u304a\u304b\u304d\u304f\u3051\u3053' +
+          '\u3055\u3057\u3059\u305b\u305d\u305f\u3061\u3064\u3066\u3068';
+        var seed = 7, asked = 0, through = 0;
+        var real = new Set(allTerms);
+        for (var n = 0; n < 20000; n++) {
+          var junk = '';
+          var length = 3 + (n % 4);
+          for (var c = 0; c < length; c++) {
+            seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+            junk += kana[seed % kana.length];
+          }
+          if (real.has(junk)) continue;
+          asked++;
+          if (mightKnow(junk)) through++;
+        }
+
+        return { missed: missed, asked: asked, through: through, everything: everything };
+      })()`, sandbox);
+
+      check('every word the dictionary has gets past the fingerprints',
+        report.missed === null, report.missed);
+      check('and next to nothing that is not a word does',
+        report.through / report.asked < 0.01,
+        report.through + ' of ' + report.asked);
+      check('until the list has been made, every word is asked about',
+        report.everything === true);
+    }
+
     const send = (message) => listener(message);
     const OLD = 1000, NEW = 9000;
     stored.knownWords = { '本': NEW };
