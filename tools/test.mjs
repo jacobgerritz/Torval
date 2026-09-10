@@ -1592,6 +1592,17 @@ const run = async () => {
     check('a line on a clean track is still just itself',
       one && one.start === clean[1].start && one.end === clean[1].end,
       JSON.stringify(one));
+
+    // Two lines that merely begin the same way are two lines. Joining them
+    // would put the next sentence on the end of every card.
+    const alike = Subs.parse({ events: [
+      { tStartMs: 0, dDurationMs: 1500, segs: [{ utf8: '\u305d\u3046\u3067\u3059\u306d\u3001\u79c1\u306f\u5143\u6c17\u3067\u3059' }] },
+      { tStartMs: 1500, dDurationMs: 1500, segs: [{ utf8: '\u305d\u3046\u3067\u3059\u306d\u3001\u3067\u3082\u9055\u3044\u307e\u3059' }] }
+    ] });
+    Subs._setCues(alike);
+    const apart = Subs.cueFor(alike[0].text);
+    check('two lines that start alike are not recorded as one',
+      apart && apart.end === alike[0].end, JSON.stringify(apart));
   }
 
   // --- the sound a card carries --------------------------------------------

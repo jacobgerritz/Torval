@@ -1177,11 +1177,26 @@ var LLLSubtitles = (function () {
     return { start: cues[first].start, end: cues[last].end, text: cues[last].text };
   }
 
-  /** Is the second cue the first one being said again, further along? */
+  /**
+   * Is the second cue the first one being said again, further along?
+   *
+   * Not the same question as isContinuation just above, which asks whether
+   * one caption plausibly follows another and is deliberately generous. This
+   * one decides how much video to record, so being generous costs you a clip
+   * with the next sentence on the end of it. Two lines that merely begin the
+   * same way, そうですね、私は… and そうですね、でも…, are two lines.
+   *
+   * A revision is the same words with more added, give or take the last sound
+   * or two, which is the part the recogniser goes back and changes.
+   */
   function stillSaying(a, b) {
     if (!a || !b) return false;
     if (b.start - a.end > 0.4) return false;    // a gap: a different line
-    return isContinuation(strip(a.text), strip(b.text));
+    var was = strip(a.text);
+    var now = strip(b.text);
+    if (!was || !now || now.length < was.length) return false;
+    var shared = commonPrefixLength(was, now);
+    return shared >= 2 && shared >= was.length - 2;
   }
 
   // A space between two Japanese characters is not a word boundary; Japanese
