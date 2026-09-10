@@ -143,6 +143,20 @@
     fill();
   }
 
+  /**
+   * What a book on the shelf says under its title.
+   *
+   * "2 chapters, you are in 2" was what this said, which is not a sentence.
+   * It also said nothing at all when you were in the first chapter, because
+   * chapter one is chapter zero underneath and zero is not a number the old
+   * test believed in.
+   */
+  function shelfNote(many, where) {
+    if (many < 2) return 'one chapter';
+    if (!where) return many + ' chapters';
+    return 'chapter ' + (Math.min(where.at, many - 1) + 1) + ' of ' + many;
+  }
+
   function row(shelved) {
     const line = document.createElement('div');
     line.className = 'book';
@@ -159,9 +173,7 @@
     const many = shelved.chapters.length;
     const note = document.createElement('span');
     note.className = 'book-note';
-    note.textContent = many > 1
-      ? many + ' chapters' + (where && where.at ? ', you are in ' + (where.at + 1) : '')
-      : 'one chapter';
+    note.textContent = shelfNote(many, where);
 
     open.append(title, note);
 

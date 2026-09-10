@@ -782,6 +782,21 @@ followed it, which produced 科である read as 科, さです as 差 and と�
 two of which are not things anyone would say. The copula does still conjugate as
 itself, so でした is read as the past of です.
 
+### たり and たら
+
+A deinflection rule says what kind of word it applies to, which is what stops
+少ない becoming the verb 少る. たり and たら complicate that: they take a word
+and hand it on as a *past* form, so by the time the past rule is reached the
+word is no longer typed as an adjective or a copula, and a past rule that only
+accepted its own kind never fired.
+
+Verbs never had the gap, because their past rules take a た-form to begin with.
+The copula and the adjectives did, so the chain stopped one step short and the
+り or the ら was left stranded as a word of its own: 元気だったり was read as
+元気, だった, り. Every past rule now accepts a た-form as well as its own kind.
+
+---
+
 ### Lines cut in half
 
 Automatic captions break wherever the speaker draws breath, which is regularly

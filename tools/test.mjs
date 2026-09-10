@@ -680,6 +680,41 @@ const run = async () => {
   await reads('でもそれって', ['でも', 'それ', 'って']);
   await reads('すごいですね。', ['すごい', 'です', 'ね']);
 
+  // --- たり and たら, which hand a word on as a た-form ----------------------
+  // Every past rule has to accept a た-form as well as the kind of word it
+  // belongs to, because たり and たら have already turned one into the other
+  // by the time it is reached. The copula and the adjectives did not, so the
+  // chain stopped one step short and the り or the ら was left over as a word
+  // of its own: 元気だったり came out as 元気, だった, り.
+  {
+    const reads = async (line) => {
+      const tokens = await Lookup.locateTokens(line, db);
+      return tokens.map((t) => line.slice(t.start, t.start + t.length)).join('/');
+    };
+    check('the copula listed with たり is one word',
+      await reads('\u5143\u6c17\u3060\u3063\u305f\u308a') === '\u5143\u6c17/\u3060\u3063\u305f\u308a',
+      await reads('\u5143\u6c17\u3060\u3063\u305f\u308a'));
+    check('and so is an adjective',
+      await reads('\u5fd9\u3057\u304b\u3063\u305f\u308a') === '\u5fd9\u3057\u304b\u3063\u305f\u308a',
+      await reads('\u5fd9\u3057\u304b\u3063\u305f\u308a'));
+    check('たら reaches the copula too',
+      await reads('\u5b66\u751f\u3060\u3063\u305f\u3089') === '\u5b66\u751f/\u3060\u3063\u305f\u3089',
+      await reads('\u5b66\u751f\u3060\u3063\u305f\u3089'));
+    check('and an adjective',
+      await reads('\u9ad8\u304b\u3063\u305f\u3089') === '\u9ad8\u304b\u3063\u305f\u3089',
+      await reads('\u9ad8\u304b\u3063\u305f\u3089'));
+
+    // Verbs never had the gap. They are here so that fixing the others
+    // cannot quietly break them.
+    check('verbs listed with たり still read as they did',
+      await reads('\u98df\u3079\u305f\u308a\u98f2\u3093\u3060\u308a') ===
+        '\u98df\u3079\u305f\u308a/\u98f2\u3093\u3060\u308a',
+      await reads('\u98df\u3079\u305f\u308a\u98f2\u3093\u3060\u308a'));
+    check('and an ordinary past is still an ordinary past',
+      await reads('\u5148\u751f\u3060\u3063\u305f') === '\u5148\u751f/\u3060\u3063\u305f',
+      await reads('\u5148\u751f\u3060\u3063\u305f'));
+  }
+
   // The copula is a word, not an ending a noun grows.
   await reads('単子葉植物の一つの科である。',
     ['単子葉植物', 'の', '一つ', 'の', '科', 'である']);

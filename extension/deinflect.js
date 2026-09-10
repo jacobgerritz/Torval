@@ -203,8 +203,16 @@ var LLLDeinflect = (function () {
   rule('ましょう',     'ます', ['masu'], ['masu'], 'volitional');
   rule('まして',       'ます', ['masu'], ['masu'], '-te');
 
+  // What a past rule will accept: the kind of word it belongs to, or a
+  // た-form, which is what たり and たら leave behind on their way through.
+  // See the copula further down for the whole story.
+  var PAST_IN = ['adj-i', 'ta'];
+
   // ない conjugates exactly like an i-adjective.
-  rule('なかった', 'ない', ['adj-i'], ['adj-i'], 'past');
+  // PAST_IN rather than adj-i alone, for the reason given beside the copula
+  // below: たり and たら hand on a word typed as a た-form, and a past rule
+  // that will not accept one leaves the り or the ら stranded.
+  rule('なかった', 'ない', PAST_IN, ['adj-i'], 'past');
   rule('なくて',   'ない', ['adj-i'], ['adj-i'], '-te');
   rule('なく',     'ない', ['adj-i'], ['adj-i'], 'adverbial');
   rule('なければ', 'ない', ['adj-i'], ['adj-i'], 'conditional');
@@ -220,7 +228,7 @@ var LLLDeinflect = (function () {
   // ---------------------------------------------------------------------
   // I-adjectives
   // ---------------------------------------------------------------------
-  rule('かった', 'い', ['adj-i'], ['adj-i'], 'past');
+  rule('かった', 'い', PAST_IN, ['adj-i'], 'past');
   rule('くない', 'い', ['adj-i'], ['adj-i'], 'negative');
   rule('くて',   'い', ['adj-i'], ['adj-i'], '-te');
   rule('く',     'い', [],        ['adj-i'], 'adverbial');
@@ -230,10 +238,10 @@ var LLLDeinflect = (function () {
   rule('すぎる', 'い', ['v1'],    ['adj-i'], 'too much');
   rule('げ',     'い', ['adj-na'], ['adj-i'], 'seeming');
   // いい / 良い is irregular: it conjugates as よい.
-  rule('よかった', 'いい', ['adj-i'], ['adj-i'], 'past');
+  rule('よかった', 'いい', PAST_IN, ['adj-i'], 'past');
   rule('よくない', 'いい', ['adj-i'], ['adj-i'], 'negative');
   rule('よくて',   'いい', ['adj-i'], ['adj-i'], '-te');
-  rule('良かった', '良い', ['adj-i'], ['adj-i'], 'past');
+  rule('良かった', '良い', PAST_IN, ['adj-i'], 'past');
   rule('良くない', '良い', ['adj-i'], ['adj-i'], 'negative');
 
   // ---------------------------------------------------------------------
@@ -243,8 +251,14 @@ var LLLDeinflect = (function () {
   // the past of だ. That is a copula becoming another copula, which is a very
   // different claim from a noun becoming one.
   var COP = ['cop'];
-  rule('でした', 'です', COP, COP, 'past');
-  rule('だった', 'だ',   COP, COP, 'past');
+  // Reached from a た-form as well as from a copula, because たり and たら
+  // turn one into the other: だったり is だった is だ, and without this the
+  // chain stopped at だった and 元気だったり was read as 元気, だった, り, with
+  // the り left over as a word of its own. Verbs never had the gap, since
+  // their past rules take a た-form to begin with.
+  var COP_OR_PAST = ['cop', 'ta'];
+  rule('でした', 'です', COP_OR_PAST, COP, 'past');
+  rule('だった', 'だ',   COP_OR_PAST, COP, 'past');
 
   // Nouns, though, are not here on purpose. です, だ, である and their negatives
   // are words in their own right, not endings a noun grows, and treating them
