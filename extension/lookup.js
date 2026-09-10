@@ -83,19 +83,38 @@ var LLLLookup = (function () {
    * from. Deinflection only, no dictionary: this is the half of the work
    * that can be done for a whole sentence before anything is looked up.
    */
-  function termsAt(text) {
+  function termsAt(text, knows) {
     var byTerm = new Map();
     var scan = Math.min(text.length, MAX_SCAN);
     for (var len = scan; len >= 1; len--) {
       var candidates = LLLDeinflect.deinflect(text.slice(0, len));
       for (var i = 0; i < candidates.length; i++) {
         var c = candidates[i];
+        // Thirty-odd shapes are proposed per character and one or two of
+        // them are words. Where the dictionary can say up front that it has
+        // never heard of one, it is dropped here rather than carried through
+        // the whole reading: it would otherwise be held in a map, asked
+        // about, and looked for again in the answer, three times over
+        // nothing.
+        if (knows && !knows(c.term)) continue;
         var list = byTerm.get(c.term);
         if (!list) { list = []; byTerm.set(c.term, list); }
         list.push({ length: len, types: c.types, reasons: c.reasons });
       }
     }
     return byTerm;
+  }
+
+  /**
+   * What this database will say it has never heard of, if it can say.
+   *
+   * Optional, and everything works without it, which is what the tests and
+   * the previews run on.
+   */
+  function knowerOf(db) {
+    return db && typeof db.mightKnow === 'function'
+      ? function (term) { return db.mightKnow(term); }
+      : null;
   }
 
   /** What the dictionary answered, filed by how many characters it took. */
@@ -131,7 +150,7 @@ var LLLLookup = (function () {
 
   /** Both halves, for one place in the text. */
   async function groupsAt(text, db) {
-    var byTerm = termsAt(text);
+    var byTerm = termsAt(text, knowerOf(db));
     return groupsFrom(byTerm, await db.getEntries(Array.from(byTerm.keys())));
   }
 
@@ -316,12 +335,12 @@ var LLLLookup = (function () {
    * without asking it anything. Deinflection only, so several runs can be
    * prepared and then asked about together.
    */
-  function prepareRun(text, from, to, asking) {
+  function prepareRun(text, from, to, asking, knows) {
     var n = to - from;
     var termsFor = new Array(n).fill(null);
     for (var t = 0; t < n; t++) {
       if (splitsCluster(text, from + t)) continue;
-      var terms = termsAt(text.slice(from + t, from + t + MAX_SCAN + 1));
+      var terms = termsAt(text.slice(from + t, from + t + MAX_SCAN + 1), knows);
       termsFor[t] = terms;
       terms.forEach(function (infos, term) { asking.add(term); });
     }
@@ -411,7 +430,7 @@ var LLLLookup = (function () {
   async function segmentRun(text, from, to, db) {
     if (to - from <= 0) return { words: [], groupsFor: [], from: from };
     var asking = new Set();
-    var run = prepareRun(text, from, to, asking);
+    var run = prepareRun(text, from, to, asking, knowerOf(db));
     return solveRun(text, run, await db.getEntries(Array.from(asking)));
   }
 
@@ -428,6 +447,7 @@ var LLLLookup = (function () {
     var batch = [];
     var asking = new Set();
     var reached = 0;
+    var knows = knowerOf(db);
 
     // A page is a great many sentences, and asking about each one on its own
     // meant a trip to the database per sentence: on a page of 1,400
@@ -453,7 +473,7 @@ var LLLLookup = (function () {
     while (i < text.length) {
       if (!LLLJapanese.test(text.charAt(i))) { i++; continue; }
       var run = runAround(text, i);
-      batch.push(prepareRun(text, run.from, run.to, asking));
+      batch.push(prepareRun(text, run.from, run.to, asking, knows));
       i = run.to;
       reached = i;
       if (asking.size >= BATCH_TERMS) await flush();

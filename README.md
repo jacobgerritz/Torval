@@ -254,6 +254,14 @@ Measured on that same thirty thousand characters: **883,534 reads become
 nothing, because two words shared a number; there are 32 such pairs in the
 whole dictionary of 465,350 forms.
 
+The same list then saves the reading a second time, and more of it. A shape the
+dictionary cannot have used to be held in a map, asked about, and looked for
+again in the answer, three pieces of work over nothing. Dropped at the moment
+it is proposed, a thirty thousand character page carries **22,788 terms instead
+of 957,322** and reads in **3.6 seconds instead of 5.9**, for exactly the same
+12,953 words. The tests read the same passage both ways and require the two to
+agree word for word.
+
 It can only ever be wrong in the harmless direction. A shared number costs one
 wasted read that finds nothing, which is exactly what used to happen every time
 anyway. It can never say no about a word that is really there, because the

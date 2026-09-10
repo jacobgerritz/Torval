@@ -272,6 +272,9 @@ const CACHE_LIMIT = 20000;
 function cachingReader() {
   const cache = new Map();
   return {
+    // Handed on to the reading, which uses it to drop a shape it was about to
+    // ask about before it goes anywhere near a map or a message. See termsAt.
+    mightKnow: mightKnow,
     async getEntries(terms) {
       const missing = terms.filter((term) => !cache.has(term));
       if (missing.length) {

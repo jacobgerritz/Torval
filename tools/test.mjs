@@ -1256,6 +1256,43 @@ const run = async () => {
       JSON.stringify(steps.map((s) => s[0])));
   }
 
+  // --- dropping shapes the dictionary cannot have ---------------------------
+  // Thirty-odd shapes are proposed per character and one or two are words.
+  // A database that can say up front what it has never heard of lets the rest
+  // be dropped before they are held in a map, asked about, and looked for
+  // again in the answer. It has to change nothing at all about the reading,
+  // so the same passage is read both ways and the two must agree exactly.
+  {
+    const knowing = {
+      mightKnow: (term) => index.has(term),
+      getEntries: db.getEntries
+    };
+    const glue = ['\u306f', '\u3092', '\u306b', '\u304c', '\u3067', '\u3057\u305f', '\u3067\u3059\u3002'];
+    const headwords = [...index.keys()].filter((t) => t.length >= 2 && t.length <= 4);
+    let passage = '';
+    for (let i = 0; i < 400; i++) {
+      passage += headwords[(i * 7919) % headwords.length] + glue[i % glue.length];
+    }
+
+    const plain = await Lookup.locateTokens(passage, db);
+    const filtered = await Lookup.locateTokens(passage, knowing);
+    const shape = (list) => list.map((t) => t.word + t.start + t.length).join('|');
+    check('a reading that drops impossible shapes reads exactly the same',
+      shape(plain) === shape(filtered),
+      plain.length + ' words against ' + filtered.length);
+
+    // And a hover, which goes through the same generation by a different door.
+    const line = '\u4eca\u65e5\u306f\u6691\u3044\u3067\u3059\u306d\u3002';
+    for (const spot of [0, 2, 3, 6]) {
+      const one = await Lookup.hover(line, spot, db);
+      const two = await Lookup.hover(line, spot, knowing);
+      check('and so does a hover at character ' + spot,
+        JSON.stringify(one.groups.map((g) => g.surface + g.hits[0].word)) ===
+        JSON.stringify(two.groups.map((g) => g.surface + g.hits[0].word)),
+        JSON.stringify(two.groups.map((g) => g.surface)));
+    }
+  }
+
   check('YouTube is a video site', Subs.siteFor('www.youtube.com') === 'youtube');
   check('so is Netflix', Subs.siteFor('www.netflix.com') === 'netflix');
   check('and so is Netflix in another country', Subs.siteFor('netflix.com') === 'netflix');
