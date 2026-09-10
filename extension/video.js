@@ -30,6 +30,11 @@ var LLLVideo = (function () {
   var MAX_WIDTH = 1280;         // frames are scaled down to this before saving
   var JPEG_QUALITY = 0.82;
   var MAX_CLIP_SECONDS = 20;    // no subtitle line is longer than this
+  // And none worth mining is shorter than this. A caption that revises
+  // itself is filed as several cues in a row, and although subtitles.js now
+  // hands over the whole line rather than one revision of it, a clip of half
+  // a second is useless enough to be worth refusing to make twice.
+  var MIN_CLIP_SECONDS = 1.2;
   // Seeking then playing does not start the sound instantly, and a recorder
   // started before it does captures the silence. So playback is resumed a
   // moment early and recording begins once the video has actually reached the
@@ -60,6 +65,23 @@ var LLLVideo = (function () {
 
   var stream = null;
   var streamFor = null;
+
+  /**
+   * One recording at a time, and the second waits rather than being turned
+   * away.
+   *
+   * Two of them share one video element and one captured stream, and the
+   * first to finish puts the video back where it was, in the middle of the
+   * second. Refusing the second is easy and gives you a card with no sound
+   * on it; waiting costs a few seconds and gives you the card you asked for.
+   */
+  var turn = Promise.resolve();
+
+  function inTurn(work) {
+    var mine = turn.then(work, work);
+    turn = mine.then(function () {}, function () {});
+    return mine;
+  }
 
   function mimeType() {
     var types = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
@@ -238,7 +260,11 @@ var LLLVideo = (function () {
    * Speed is forced to normal for the duration: a line captured at 1.5x is a
    * line spoken at 1.5x, which is not what you want on a card.
    */
-  async function record(video, start, end, lead) {
+  function record(video, start, end, lead) {
+    return inTurn(function () { return recordNow(video, start, end, lead); });
+  }
+
+  async function recordNow(video, start, end, lead) {
     var type = mimeType();
     var source = audioStream(video);
     if (!type || !source) return null;
@@ -252,7 +278,7 @@ var LLLVideo = (function () {
     var wasPaused = video.paused;
     var wasTime = video.currentTime;
     var wasRate = video.playbackRate;
-    var length = Math.min(end - from, MAX_CLIP_SECONDS);
+    var length = Math.min(Math.max(end - from, MIN_CLIP_SECONDS), MAX_CLIP_SECONDS);
 
     var recorder;
     try {
@@ -287,7 +313,12 @@ var LLLVideo = (function () {
       try { recorder.stop(); } catch (ignored) { /* already stopped */ }
       return null;
     } finally {
-      await restore(video, wasTime, wasRate, wasPaused);
+      // Left where the recording ended, rather than dragged back to where
+      // the + was pressed. You have just heard the line played out; the
+      // place to carry on from is the end of it. Never earlier than where
+      // you were, though: pressing + after a line has finished should not
+      // rewind you into it.
+      await restore(video, Math.max(wasTime, from + length), wasRate, wasPaused);
     }
 
     return chunks.length ? new Blob(chunks, { type: type }) : null;

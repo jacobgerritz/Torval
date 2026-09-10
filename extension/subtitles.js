@@ -1145,9 +1145,43 @@ var LLLSubtitles = (function () {
     if (!wanted) return null;
     for (var i = 0; i < cues.length; i++) {
       var text = strip(cues[i].text);
-      if (text && (text.indexOf(wanted) !== -1 || wanted.indexOf(text) !== -1)) return cues[i];
+      if (text && (text.indexOf(wanted) !== -1 || wanted.indexOf(text) !== -1)) {
+        return wholeLine(i);
+      }
     }
-    return video ? cueAt(video.currentTime) : null;
+    if (!video) return null;
+    var here = cueAt(video.currentTime);
+    return here ? wholeLine(cues.indexOf(here)) : null;
+  }
+
+  /**
+   * The whole of the line that this cue is part of, in time.
+   *
+   * An automatic caption revises itself as the recogniser hears more, and
+   * every revision is filed as a cue of its own. What you read as one line
+   * is several cues in a row, each a rewrite of the one before, and any
+   * single one of them can be under a second long. Mining picked one of
+   * those and recorded it, which is where "it only records the first half
+   * second" came from: the clip was the whole of a cue, and the cue was a
+   * fraction of the sentence.
+   *
+   * A line runs from the first of those cues to the last. On a clean
+   * subtitle track, where each line is filed once, this changes nothing.
+   */
+  function wholeLine(i) {
+    if (i < 0 || i >= cues.length) return null;
+    var first = i;
+    var last = i;
+    while (first > 0 && stillSaying(cues[first - 1], cues[first])) first--;
+    while (last + 1 < cues.length && stillSaying(cues[last], cues[last + 1])) last++;
+    return { start: cues[first].start, end: cues[last].end, text: cues[last].text };
+  }
+
+  /** Is the second cue the first one being said again, further along? */
+  function stillSaying(a, b) {
+    if (!a || !b) return false;
+    if (b.start - a.end > 0.4) return false;    // a gap: a different line
+    return isContinuation(strip(a.text), strip(b.text));
   }
 
   // A space between two Japanese characters is not a word boundary; Japanese
@@ -1251,6 +1285,7 @@ var LLLSubtitles = (function () {
     pickTrack: pickTrack,
     insertObserved: insertObserved,
     isContinuation: isContinuation,
+    wholeLine: wholeLine,
     siteFor: siteFor,
     parseVtt: parseVtt,
     status: function () { return state; },

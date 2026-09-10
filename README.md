@@ -453,6 +453,30 @@ The line plays out loud while this happens, so you hear what is being put on
 the card rather than mining blind. It takes as long as the line does, a
 couple of seconds, and what comes out is exactly the line.
 
+When it finishes, the video is left where the recording ended rather than
+dragged back to where **+** was pressed: you have just heard the line played
+out, and the place to carry on from is the end of it. Never earlier than
+where you were, though, so pressing **+** on a line that has already finished
+does not rewind you into it.
+
+A second **+** pressed while one recording is running waits for it rather
+than being turned away. Both cards get their sound; the second takes a few
+seconds longer.
+
+#### A line is not always one cue
+
+An automatic caption revises itself as the recogniser hears more, and every
+revision is filed as a cue of its own. What you read as one line is several
+cues in a row, each a rewrite of the one before, and any single one of them
+can be well under a second long.
+
+Mining used to pick one of those and record exactly it, which produced a clip
+of the lead-in and nothing else: half a second of the previous line, stopping
+at the moment the line you wanted began. A line now runs from the first of
+those cues to the last, and a clip is never shorter than 1.2 seconds whatever
+the timings say. On a clean subtitle track, where each line is filed once,
+neither rule changes anything.
+
 Playback speed is forced to normal while it records, since a line captured at
 1.5× is a line spoken at 1.5×.
 

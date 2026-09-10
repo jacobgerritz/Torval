@@ -1550,6 +1550,50 @@ const run = async () => {
   check('filenames survive any filesystem', /^lll-[a-z0-9]+\.jpg$/.test(name1), name1);
   check('the extension is kept', Video.name('x', 'webm').endsWith('.webm'));
 
+  // --- how long a line actually lasts ---------------------------------------
+  // An automatic caption revises itself as the recogniser hears more, and
+  // every revision is filed as a cue of its own. What you read as one line is
+  // several cues in a row, and any one of them can be under a second. Mining
+  // recorded one of those and produced half a second of the line before it,
+  // which is what "it only records the first half second" was.
+  {
+    const said = [];
+    const words = ['\u304d\u3087\u3046', '\u306f', '\u3044\u3044', '\u3066\u3093\u304d',
+      '\u3067\u3059\u306d', '\u307b\u3093\u3068\u3046\u306b', '\u305d\u3046', '\u304a\u3082\u3044\u307e\u3059'];
+    let saying = '';
+    for (let i = 0; i < words.length; i++) {
+      saying += words[i];
+      // Every third one, the recogniser changes its mind about the last
+      // sound, which is what breaks the roll into separate cues.
+      const shown = i % 3 === 2 ? saying.slice(0, -1) + '\u30fc' : saying;
+      said.push({ tStartMs: i * 400, dDurationMs: 400, segs: [{ utf8: shown }] });
+    }
+    const revised = Subs.parse({ events: said });
+    Subs._setCues(revised);
+
+    check('a caption that revises itself is filed as several short cues',
+      revised.length > 1 && revised.some((c) => c.end - c.start < 1.5),
+      JSON.stringify(revised.map((c) => +(c.end - c.start).toFixed(2))));
+
+    const spoken = revised[revised.length - 1].end - revised[0].start;
+    const line = Subs.cueFor(revised[revised.length - 1].text);
+    check('but mining one of them records the whole line, not the revision',
+      line && Math.abs((line.end - line.start) - spoken) < 0.01,
+      line && (line.end - line.start) + ' of ' + spoken);
+    check('which starts where the line started, not where the revision did',
+      line && line.start === revised[0].start, line && line.start);
+
+    // A clean track, where every line is filed once, is left exactly alone.
+    const clean = Subs.parse({ events: [0, 1, 2].map((i) => ({
+      tStartMs: i * 3000, dDurationMs: 2800, segs: [{ utf8: '\u3053\u308c\u306f' + i + '\u884c\u76ee\u3002' }]
+    })) });
+    Subs._setCues(clean);
+    const one = Subs.cueFor(clean[1].text);
+    check('a line on a clean track is still just itself',
+      one && one.start === clean[1].start && one.end === clean[1].end,
+      JSON.stringify(one));
+  }
+
   // --- the sound a card carries --------------------------------------------
   // A browser records Opus in a WebM container, which Anki on a computer
   // plays and Anki on a phone very often does not. So the clip is written
