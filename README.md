@@ -463,6 +463,19 @@ A second **+** pressed while one recording is running waits for it rather
 than being turned away. Both cards get their sound; the second takes a few
 seconds longer.
 
+#### Only a subtitle brings the video with it
+
+A frame and a line of audio belong to a word read off a subtitle. Mining one
+out of a comment under the video used to put whatever happened to be playing on
+the card, for two reasons at once: the frame was grabbed whenever there was a
+video anywhere on the page, and the line to record is found by matching the
+sentence against the subtitles, which falls back to the line playing now when
+nothing matches. That is a fair guess about a subtitle and nonsense about a
+comment.
+
+The sentence now remembers whether it came off a subtitle, and nothing reaches
+for the video unless it did.
+
 #### A line is not always one cue
 
 An automatic caption revises itself as the recogniser hears more, and every

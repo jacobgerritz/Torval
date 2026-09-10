@@ -826,7 +826,10 @@
     return {
       text: slice.trim().slice(0, 300), index: index - start - lead,
       before: sentenceBefore(block, text, start),
-      after: sentenceAfter(block, text, end)
+      after: sentenceAfter(block, text, end),
+      // Whether this came off a subtitle, which decides whether there is a
+      // frame and a line of audio to put on the card. See mine().
+      subtitle: isSubtitle(block)
     };
   }
 
@@ -1643,10 +1646,19 @@
     // plainly afterwards, rather than looking like a card that failed before
     // it was ever recorded.
     const sentence = context ? context.text : '';
-    const cue = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.cueFor(sentence) : null;
+    // Only a word read off a subtitle has a frame and a line of audio behind
+    // it. Mining one out of a comment under a video was putting whatever
+    // happened to be playing on the card: cueFor falls back to the line
+    // playing now when the text matches no cue, which is a fair guess about
+    // a subtitle and nonsense about anything else, and the frame was grabbed
+    // whenever there was a video on the page at all.
+    const fromVideo = !!(context && context.subtitle);
+    const cue = fromVideo && typeof LLLSubtitles !== 'undefined'
+      ? LLLSubtitles.cueFor(sentence)
+      : null;
     const settings = await api.storage.local.get('ankiConfig').catch(() => ({}));
     let media = {};
-    if (typeof LLLVideo !== 'undefined') {
+    if (fromVideo && typeof LLLVideo !== 'undefined') {
       const doing = cue ? saying(entryEl, 'Recording the line…') : null;
       try {
         media = await LLLVideo.capture(sentence, cue, { lead: (settings.ankiConfig || {}).lead });
