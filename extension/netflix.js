@@ -69,18 +69,16 @@ var LLLNetflix = (function () {
   });
 
   /**
-   * What the player itself is holding, said out loud, when nothing else
-   * worked.
+   * What the player itself is holding, said out loud.
    *
-   * The subtitle file is asked for and its reply is never seen: the format
-   * goes into the request, the request goes out, and nothing carrying a track
-   * list is ever read on this page by any of the three ways a reply becomes
-   * an object. Which leaves two possibilities, that the reply is read
-   * somewhere out of reach, or that what LLL wants is sitting on the player
-   * object all along and there was never any need to catch a reply at all.
-   * Netflix is rendering those subtitles from something.
+   * Written while working out where the subtitle file could be. It answered
+   * its question, which was no: twenty tracks, each with a name, a language
+   * and a type, and nothing to fetch and no cues. Kept because it is the
+   * first thing to run again if Netflix changes, and because it costs
+   * nothing sitting here. Nothing calls it; type LLLNetflix.describe() in
+   * the console on a playing episode.
    *
-   * This only reads and reports. It changes nothing, and it runs once.
+   * This only reads and reports. It changes nothing.
    */
   function describePlayer() {
     var playing = null;

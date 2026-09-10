@@ -373,14 +373,7 @@ var LLLSubtitles = (function () {
       // waits to be handed one waits a few seconds before settling for the
       // screen, since the file usually arrives about as fast as the video.
       if (site.fetches) { if (attempts <= MAX_LOOKUP_ATTEMPTS) load(id); }
-      else if (attempts > WAIT_TO_BE_HANDED) {
-        fallBackToWatching();
-        // Nothing was handed over, so ask the player what it has instead.
-        // Once, and only to say what it found; see describePlayer.
-        var reader = typeof LLLNetflix !== 'undefined' ? LLLNetflix
-          : (typeof window !== 'undefined' ? window.LLLNetflix : null);
-        if (reader && reader.describe) setTimeout(reader.describe, 4000);
-      }
+      else if (attempts > WAIT_TO_BE_HANDED) fallBackToWatching();
     }
 
     video = document.querySelector('video');

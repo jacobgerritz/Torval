@@ -66,10 +66,7 @@
         // ask" are different things and only the second one is any use. A
         // request that goes out with nothing added is the whole explanation
         // for an answer that comes back with nothing in it.
-        // Three times rather than once: the first manifest of a session is
-        // usually a trailer previewing itself on the home page, and the one
-        // that matters is the episode you then chose.
-        if (asked++ < 3) {
+        if (!asked++) {
           say(added
             ? 'asking this title for its subtitles as a plain file (' + added +
               ' format lists)'
@@ -381,19 +378,9 @@
     };
   }
 
-  /**
-   * The first few addresses asked for once a title has been asked about.
-   *
-   * No request matching "manifest" was ever sent from this frame, and yet
-   * the payload that says "manifest" is built here. Both are true because
-   * that word is Netflix's own name for the request, inside the payload, and
-   * has nothing to do with the address it is sent to. So the addresses
-   * themselves are worth seeing once, rather than guessed at again.
-   */
+  /** How many requests went out after a title was asked about. */
   function noteRequest(where) {
-    if (!asked || sent >= 6 || !where) return;
-    sent++;
-    say('request', sent + ':', String(where).slice(0, 110));
+    if (asked && where) sent++;
   }
 
   /**
@@ -443,7 +430,7 @@
     }
   }
 
-  say('watching for this title’s subtitle file, in', location.href.slice(0, 90));
+  say('watching for this title’s subtitle file');
 
   /**
    * Say so if the request went out and nothing ever came back through here.
@@ -457,13 +444,14 @@
   setTimeout(function () {
     if (got || !asked) return;
     if (seenReply) {
-      say('the reply came back but had no track list in it, so the format was ' +
-        'added in the wrong place or under the wrong name.');
+      say('the reply came back with no track list in it.');
       return;
     }
-    say('nothing found. Requests noted:', sent, '| workers:', workers,
-      '| channel messages:', ports,
-      '| a service worker is', (navigator.serviceWorker &&
-        navigator.serviceWorker.controller) ? 'running this page' : 'not running this page');
+    // Where this got to, in one line, for whoever picks it up next. The
+    // request goes out and its reply is read somewhere none of this can
+    // see: not on the page, not in a worker, not down a channel. See the
+    // README for the four ways of getting in here that were tried.
+    say('no subtitle file. The request was built here and sent elsewhere (' +
+      sent + ' requests, ' + workers + ' workers, ' + ports + ' channel messages).');
   }, 25000);
 })();
