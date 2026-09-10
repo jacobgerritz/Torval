@@ -32,7 +32,9 @@
         placeholder="日本語のテキストをここに貼り付けてください…"></textarea>
 
       <p class="row">
+        <label class="pick" for="file">Choose a file</label>
         <input type="file" id="file" accept=".txt,text/plain">
+        <span class="picked" id="file-name">or paste the text above</span>
         <span class="spacer"></span>
         <button id="add" class="primary">Add these words</button>
       </p>
@@ -78,6 +80,7 @@
         <span id="save-note" class="note"></span>
       </p>
       <p class="row">
+        <label class="pick" for="load-words">Load from a file</label>
         <input type="file" id="load-words" accept=".json,application/json">
         <span id="load-note" class="note"></span>
       </p>

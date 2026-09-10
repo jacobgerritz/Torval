@@ -1391,6 +1391,7 @@
       }).catch((err) => {
         // Whatever went wrong in there, the one thing that must not happen
         // is the button sitting on a dot with nothing said.
+        add.classList.remove('working');
         add.textContent = '+';
         add.disabled = false;
         const failed = saying(el, (err && err.message) || 'Something went wrong making the card.');
@@ -1636,6 +1637,7 @@
   async function mine(button, entryEl, { word, reading, entry, surface, senses }) {
     button.disabled = true;
     button.textContent = '·';
+    button.classList.add('working');
     const old = entryEl.querySelector('.error');
     if (old) old.remove();
 
@@ -1695,6 +1697,7 @@
     }
 
     if (reply && reply.ok) {
+      button.classList.remove('working');
       button.textContent = '✓';
       button.classList.add('done');
       // The tick alone is easy to miss, and a card quietly not being made
@@ -1705,6 +1708,7 @@
       setTimeout(function () { said.remove(); }, 2500);
       return;
     }
+    button.classList.remove('working');
     button.textContent = '+';
     button.disabled = false;
     const message = document.createElement('div');

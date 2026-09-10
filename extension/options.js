@@ -59,6 +59,20 @@ const SOURCE_LABELS = [
   ['sentenceAfter', 'Sentence after']
 ];
 
+// The chosen file’s name, said in the page’s own type. The browser will not
+// show it once its own control is out of the way, and a file picker that says
+// nothing after you have picked something is a file picker you press twice.
+for (const input of document.querySelectorAll('input[type="file"]')) {
+  const beside = input.parentElement.querySelector('.picked');
+  if (!beside) continue;
+  const idle = beside.textContent;
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    beside.textContent = file ? file.name : idle;
+    beside.classList.toggle('chosen', !!file);
+  });
+}
+
 const deckSelect = document.getElementById('deck');
 const modelSelect = document.getElementById('model');
 const tagsInput = document.getElementById('tags');

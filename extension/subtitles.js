@@ -1087,6 +1087,7 @@ var LLLSubtitles = (function () {
       'padding:9px 22px',
       'font:500 34px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
         '"Noto Sans JP","Yu Gothic",Meiryo,sans-serif',
+      'transition:font-size .15s ease',
       'text-align:center', 'white-space:pre-wrap',
       // A hint that the box itself can be moved, without taking the text
       // cursor away from the words inside it.
@@ -1096,6 +1097,28 @@ var LLLSubtitles = (function () {
     player.appendChild(overlay);
     dragging(overlayLine);
     overlay.style.bottom = bottom + '%';
+    fitLine();
+  }
+
+  // How large the line is, as a fraction of the player it sits in, and the
+  // sizes it will not go past. A subtitle that stays 34 pixels tall whatever
+  // it is sitting in is small in fullscreen and large in a corner window,
+  // which is backwards: every player in the world grows its subtitles with
+  // itself, because how big the picture is, is how far away you are sitting.
+  var LINE_OF_PLAYER = 0.045;
+  var LINE_SMALLEST = 20;
+  var LINE_LARGEST = 48;
+
+  function fitLine() {
+    if (!overlay || !overlayLine) return;
+    var box = overlay.parentElement;
+    var height = box ? box.clientHeight : 0;
+    if (!height) return;
+    var size = Math.round(Math.max(LINE_SMALLEST,
+      Math.min(LINE_LARGEST, height * LINE_OF_PLAYER)));
+    if (overlayLine.style.fontSize !== size + 'px') {
+      overlayLine.style.fontSize = size + 'px';
+    }
   }
 
   /**
@@ -1120,6 +1143,7 @@ var LLLSubtitles = (function () {
     }
     ensureOverlay();
     overlay.style.display = 'flex';
+    fitLine();
     if (overlayLine.textContent !== text) overlayLine.textContent = text;
   }
 

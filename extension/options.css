@@ -268,13 +268,54 @@ textarea {
   resize: vertical;
 }
 
+/*
+ * Choosing a file. The browser's own control is a grey slab with type of its
+ * own that belongs to no page, and it sat in the middle of a carefully dark
+ * one saying "No file chosen" in a font nothing else here uses. So the input
+ * is taken out of the layout and a label put in its place, which is an
+ * ordinary button as far as this page is concerned and opens the same dialog
+ * as far as the browser is concerned.
+ *
+ * Not display:none, which would take it out of the tab order with it. Kept
+ * where a screen reader and the keyboard can still find it, and the label
+ * shows the focus ring for it.
+ */
 input[type="file"] {
-  flex: 0 1 auto;
+  position: absolute;
+  width: 1px;
+  height: 1px;
   padding: 0;
-  background: none;
   border: 0;
-  font-size: 12px;
-  color: var(--ink-quiet);
+  opacity: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.pick {
+  flex: 0 0 auto;
+  padding: 9px 18px;
+  background: #23252a;
+  color: var(--ink);
+  border: 1px solid #34373d;
+  border-radius: 7px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pick:hover { background: #2c2f35; }
+.pick:active { background: #212328; }
+input[type="file"]:focus-visible + .picked,
+input[type="file"]:focus-visible ~ .pick,
+.pick:focus-visible { outline: 2px solid #4a6f80; outline-offset: 2px; }
+
+/* The name of whatever was chosen, in the page’s own voice. */
+.picked {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--ink-faint);
 }
 
 .search { margin-bottom: 14px; }
@@ -335,3 +376,5 @@ input[type="file"] {
 .check { align-items: flex-start; gap: 10px; margin-bottom: 0; }
 .check input { flex: 0 0 auto; width: 16px; height: 16px; margin: 3px 0 0; padding: 0; }
 .check > span { flex: 1 1 auto; white-space: normal; color: var(--ink); }
+
+.picked.chosen { color: var(--ink); }
