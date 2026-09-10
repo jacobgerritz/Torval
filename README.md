@@ -96,7 +96,7 @@ on *every* sense is describing the word, and 事 carrying "usually kana" ten tim
 over says nothing ten times. Where a tag really is on only some senses it stays
 with them: 綺麗 is usually kana when it means "clean", not when it means "pretty",
 and that is worth knowing. Part of speech works the same way: 勉強 is a
-transitive suru-verb for one sense and intransitive for another and just a plain
+transitive する verb for one sense and intransitive for another and just a plain
 noun for a third, so only "noun", what every sense actually agrees on, sits
 beside the word; each sense's own line carries whatever it adds beyond that.
 
@@ -781,6 +781,22 @@ noun grows, and LLL now reads them that way: 猫です is 猫 and です, 静か
 followed it, which produced 科である read as 科, さです as 差 and とです as と,
 two of which are not things anyone would say. The copula does still conjugate as
 itself, so でした is read as the past of です.
+
+### Looking up the second half of a word
+
+A hover is read from where the *word* starts, which is the right answer to
+"what is this word": every character of だからこそ answers with だからこそ,
+だから, だか and だ. It also means the second half of a long word can never be
+looked up at all. こそ was offered from nowhere, including from itself.
+
+Offering every word beginning at every character would be a wall of matches
+nobody asked for. But the cursor is already the input, so the words beginning
+at the character you are actually pointing at are added to the list. Point at
+こ and こそ is there; point at だ and nothing is added, because だ is where the
+word begins anyway. Bounded by the word rather than the sentence, since these
+are other ways of reading this word and 頑張る is not one of them.
+
+---
 
 ### たり and たら
 

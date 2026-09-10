@@ -131,20 +131,20 @@ const run = async () => {
   await contains('食べられる', '食べる');
   await topMatch('食べさせられた', '食べさせられた', '食べる', 'causative passive < past');
   await topMatch('食べたくなかった', '食べたくなかった', '食べる', 'want to < negative < past');
-  await topMatch('食べている', '食べている', '食べる', '-te < progressive');
-  await topMatch('食べてしまった', '食べてしまった', '食べる', '-te < completely < past');
-  await topMatch('食べちゃった', '食べちゃった', '食べる', '-te < completely < past');
+  await topMatch('食べている', '食べている', '食べる', 'て form < progressive');
+  await topMatch('食べてしまった', '食べてしまった', '食べる', 'て form < completely < past');
+  await topMatch('食べちゃった', '食べちゃった', '食べる', 'て form < completely < past');
 
   // Godan across all nine rows, in their trickiest (て/た) forms.
-  await topMatch('買って', '買って', '買う', '-te');
+  await topMatch('買って', '買って', '買う', 'て form');
   await topMatch('書いた', '書いた', '書く', 'past');
-  await topMatch('泳いで', '泳いで', '泳ぐ', '-te');
-  await topMatch('話して', '話して', '話す', '-te');
+  await topMatch('泳いで', '泳いで', '泳ぐ', 'て form');
+  await topMatch('話して', '話して', '話す', 'て form');
   await contains('待った', '待つ');   // 待った is also a noun in its own right
-  await topMatch('死んで', '死んで', '死ぬ', '-te');
+  await topMatch('死んで', '死んで', '死ぬ', 'て form');
   await topMatch('遊んだ', '遊んだ', '遊ぶ', 'past');
-  await topMatch('読んで', '読んで', '読む', '-te');
-  await topMatch('取って', '取って', '取る', '-te');
+  await topMatch('読んで', '読んで', '読む', 'て form');
+  await topMatch('取って', '取って', '取る', 'て form');
   // 行く is the classic irregular て-form, 行いて would be wrong.
   await contains('行って', '行く');
 
@@ -160,7 +160,7 @@ const run = async () => {
   await topMatch('高くない', '高くない', '高い', 'negative');
   await topMatch('高かった', '高かった', '高い', 'past');
   await topMatch('高くなかった', '高くなかった', '高い', 'negative < past');
-  await topMatch('美しくて', '美しくて', '美しい', '-te');
+  await topMatch('美しくて', '美しくて', '美しい', 'て form');
   await contains('よかった', '良い');
   await contains('静かじゃない', '静か');
   await contains('元気でした', '元気');
@@ -766,11 +766,21 @@ const run = async () => {
       const found = await Lookup.tokenAt(line, at, db);
       const asked = await Lookup.search(line.slice(found.start), db, found.length);
       const hovered = await Lookup.hover(line, at, db);
-      check('hovering character ' + at + ' says the same as asking twice would',
+      const front = hovered.groups.slice(0, asked.length).map((g) => g.surface);
+      check('hovering character ' + at + ' says what asking twice would',
         hovered.start === found.start && hovered.length === found.length &&
-        JSON.stringify(hovered.groups.map((g) => g.surface)) ===
-          JSON.stringify(asked.map((g) => g.surface)),
+        JSON.stringify(front) ===
+          JSON.stringify(asked.slice(0, front.length).map((g) => g.surface)),
         JSON.stringify(hovered.groups.map((g) => g.surface)));
+
+      // Anything past that begins at the character pointed at, and stays
+      // inside the word: they are other ways of reading this word, and the
+      // next word along is not one of them.
+      const extra = hovered.groups.slice(asked.length);
+      check('and anything more begins where the cursor is',
+        extra.every((g) => line.slice(at, at + g.length) === g.surface &&
+          at + g.length <= found.start + found.length),
+        JSON.stringify(extra.map((g) => g.surface)));
     }
 
     // A different sentence, straight after, must not be answered from the

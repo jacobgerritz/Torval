@@ -520,10 +520,56 @@ var LLLLookup = (function () {
    */
   async function hover(text, at, db) {
     var found = await tokenAt(text, at, db);
+    var whole = text.slice(found.start);
     var groups = found.groups
-      ? present(found.groups, text.slice(found.start), found.length)
-      : await search(text.slice(found.start), db, found.length);
-    return { start: found.start, length: found.length, groups: groups };
+      ? present(found.groups, whole, found.length)
+      : await search(whole, db, found.length);
+    var later = await startingAt(text, at, found, db, groups);
+    return {
+      start: found.start,
+      length: found.length,
+      groups: groups.concat(later).slice(0, MAX_GROUPS)
+    };
+  }
+
+  /**
+   * The words that begin at the character actually pointed at.
+   *
+   * Everything else about a hover is read from where the *word* starts, so
+   * every character of だからこそ answered with だからこそ, だから, だか and
+   * だ. That is the right answer to "what is this word", and it also means
+   * the second half of a long word can never be looked up: こそ is offered
+   * from nowhere at all, including from itself.
+   *
+   * The obvious repair, every word beginning at every character, is a wall
+   * of matches nobody asked for. But the cursor is already the input, and
+   * using it costs nothing: point at こ and こそ is there, point at だ and
+   * nothing is added, because だ is where the word starts anyway.
+   *
+   * Bounded by the word rather than by the rest of the sentence, since these
+   * are other ways of reading this word and 頑張る is not one of them.
+   */
+  async function startingAt(text, at, found, db, already) {
+    if (!found.length || at <= found.start) return [];
+    var rest = text.slice(at, found.start + found.length);
+    if (!rest) return [];
+    return notAlready(await search(rest, db), already);
+  }
+
+  /** The same entry twice is noise, not choice. */
+  function notAlready(groups, already) {
+    var seen = new Set();
+    already.forEach(function (group) {
+      group.hits.forEach(function (hit) { seen.add(hit.entry.id); });
+    });
+    var out = [];
+    groups.forEach(function (group) {
+      var hits = group.hits.filter(function (hit) { return !seen.has(hit.entry.id); });
+      if (!hits.length) return;
+      hits.forEach(function (hit) { seen.add(hit.entry.id); });
+      out.push({ length: group.length, surface: group.surface, hits: hits });
+    });
+    return out;
   }
 
   /** Where the word covering `at` begins. */

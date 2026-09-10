@@ -68,7 +68,7 @@ var LLLDeinflect = (function () {
     rule(g.a + 'ない',   g.u, ['adj-i'], T, 'negative');
     rule(g.a + 'ず',     g.u, [],        T, 'negative');
     rule(g.a + 'ずに',   g.u, [],        T, 'without doing');
-    rule(g.te,           g.u, ['te'],    T, '-te');
+    rule(g.te,           g.u, ['te'],    T, 'て form');
     rule(g.ta,           g.u, ['ta'],    T, 'past');
     rule(g.e + 'る',     g.u, ['v1'],    T, 'potential');
     rule(g.a + 'れる',   g.u, ['v1'],    T, 'passive');
@@ -87,7 +87,7 @@ var LLLDeinflect = (function () {
     rule(g.i + 'にくい', g.u, ['adj-i'], T, 'hard to');
     rule(g.i + 'かた',   g.u, ['n'],     T, 'way of doing');
     rule(g.i + 'なさい', g.u, [],        T, 'polite imperative');
-    rule(g.i,            g.u, [],        T, 'masu stem');
+    rule(g.i,            g.u, [],        T, 'ます stem');
   });
 
   // ---------------------------------------------------------------------
@@ -99,7 +99,7 @@ var LLLDeinflect = (function () {
     rule('ない',       'る', ['adj-i'], T, 'negative');
     rule('ず',         'る', [],        T, 'negative');
     rule('ずに',       'る', [],        T, 'without doing');
-    rule('て',         'る', ['te'],    T, '-te');
+    rule('て',         'る', ['te'],    T, 'て form');
     rule('た',         'る', ['ta'],    T, 'past');
     rule('られる',     'る', ['v1'],    T, 'passive / potential');
     rule('れる',       'る', ['v1'],    T, 'potential');
@@ -118,7 +118,7 @@ var LLLDeinflect = (function () {
     rule('にくい',     'る', ['adj-i'], T, 'hard to');
     rule('かた',       'る', ['n'],     T, 'way of doing');
     rule('なさい',     'る', [],        T, 'polite imperative');
-    rule('',           'る', [],        T, 'masu stem');
+    rule('',           'る', [],        T, 'ます stem');
   });
 
   // ---------------------------------------------------------------------
@@ -132,7 +132,7 @@ var LLLDeinflect = (function () {
   rule('します',     'する', ['masu'],  SURU, 'polite');
   rule('しない',     'する', ['adj-i'], SURU, 'negative');
   rule('せず',       'する', [],        SURU, 'negative');
-  rule('して',       'する', ['te'],    SURU, '-te');
+  rule('して',       'する', ['te'],    SURU, 'て form');
   rule('した',       'する', ['ta'],    SURU, 'past');
   rule('される',     'する', ['v1'],    SURU, 'passive');
   rule('させる',     'する', ['v1'],    SURU, 'causative');
@@ -146,8 +146,8 @@ var LLLDeinflect = (function () {
   rule('しながら',   'する', [],        SURU, 'while');
   rule('しすぎる',   'する', ['v1'],    SURU, 'too much');
   rule('しなさい',   'する', [],        SURU, 'polite imperative');
-  rule('し',         'する', [],        SURU, 'masu stem');
-  rule('する',       '',     SURU,      ['vs', 'vs-s', 'vs-i', 'n'], 'suru verb');
+  rule('し',         'する', [],        SURU, 'ます stem');
+  rule('する',       '',     SURU,      ['vs', 'vs-s', 'vs-i'], 'する verb');
 
   // 来る is written either 来る or くる, and the stem vowel changes: き / こ / く.
   [['来', true], ['く', false]].forEach(function (pair) {
@@ -158,7 +158,7 @@ var LLLDeinflect = (function () {
     var T = ['vk'];
     rule(i + 'ます',       stem + 'る', ['masu'],  T, 'polite');
     rule(o + 'ない',       stem + 'る', ['adj-i'], T, 'negative');
-    rule(i + 'て',         stem + 'る', ['te'],    T, '-te');
+    rule(i + 'て',         stem + 'る', ['te'],    T, 'て form');
     rule(i + 'た',         stem + 'る', ['ta'],    T, 'past');
     rule(o + 'られる',     stem + 'る', ['v1'],    T, 'passive / potential');
     rule(o + 'させる',     stem + 'る', ['v1'],    T, 'causative');
@@ -168,7 +168,7 @@ var LLLDeinflect = (function () {
     rule(o + 'い',         stem + 'る', [],        T, 'imperative');
     rule(i + 'たい',       stem + 'る', ['adj-i'], T, 'want to');
     rule(i + 'ながら',     stem + 'る', [],        T, 'while');
-    rule(i,                stem + 'る', [],        T, 'masu stem');
+    rule(i,                stem + 'る', [],        T, 'ます stem');
   });
 
   // ---------------------------------------------------------------------
@@ -201,7 +201,7 @@ var LLLDeinflect = (function () {
   rule('ました',       'ます', ['masu'], ['masu'], 'past');
   rule('ませんでした', 'ます', ['masu'], ['masu'], 'negative past');
   rule('ましょう',     'ます', ['masu'], ['masu'], 'volitional');
-  rule('まして',       'ます', ['masu'], ['masu'], '-te');
+  rule('まして',       'ます', ['masu'], ['masu'], 'て form');
 
   // What a past rule will accept: the kind of word it belongs to, or a
   // た-form, which is what たり and たら leave behind on their way through.
@@ -213,7 +213,7 @@ var LLLDeinflect = (function () {
   // below: たり and たら hand on a word typed as a た-form, and a past rule
   // that will not accept one leaves the り or the ら stranded.
   rule('なかった', 'ない', PAST_IN, ['adj-i'], 'past');
-  rule('なくて',   'ない', ['adj-i'], ['adj-i'], '-te');
+  rule('なくて',   'ない', ['adj-i'], ['adj-i'], 'て form');
   rule('なく',     'ない', ['adj-i'], ['adj-i'], 'adverbial');
   rule('なければ', 'ない', ['adj-i'], ['adj-i'], 'conditional');
   rule('なきゃ',   'ない', ['adj-i'], ['adj-i'], 'conditional');
@@ -230,7 +230,7 @@ var LLLDeinflect = (function () {
   // ---------------------------------------------------------------------
   rule('かった', 'い', PAST_IN, ['adj-i'], 'past');
   rule('くない', 'い', ['adj-i'], ['adj-i'], 'negative');
-  rule('くて',   'い', ['adj-i'], ['adj-i'], '-te');
+  rule('くて',   'い', ['adj-i'], ['adj-i'], 'て form');
   rule('く',     'い', [],        ['adj-i'], 'adverbial');
   rule('ければ', 'い', [],        ['adj-i'], 'conditional');
   rule('さ',     'い', ['n'],     ['adj-i'], 'noun form');
@@ -240,7 +240,7 @@ var LLLDeinflect = (function () {
   // いい / 良い is irregular: it conjugates as よい.
   rule('よかった', 'いい', PAST_IN, ['adj-i'], 'past');
   rule('よくない', 'いい', ['adj-i'], ['adj-i'], 'negative');
-  rule('よくて',   'いい', ['adj-i'], ['adj-i'], '-te');
+  rule('よくて',   'いい', ['adj-i'], ['adj-i'], 'て form');
   rule('良かった', '良い', PAST_IN, ['adj-i'], 'past');
   rule('良くない', '良い', ['adj-i'], ['adj-i'], 'negative');
 
