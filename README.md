@@ -372,10 +372,18 @@ are not part of what the DRM protects. The player downloads them from
 inside it, in the clear, like any other file on any other site. So LLL watches
 what the page fetches, and anything whose body turns out to be WebVTT or TTML
 is the subtitle file, caught whole, with every timing in it. No manifest, no
-injected format, nothing to guess. The one thing it needs is for the subtitles
-to be turned on in Netflix's own player, since the file is only downloaded
-when something is going to be shown, and the track you turn on is the track
-LLL reads.
+injected format, nothing to guess.
+
+The file is only downloaded when the player is going to show something, which
+would mean going into Netflix's own menu, turning on the language you are
+reading, and then watching two sets of subtitles at once. The player will do
+it when asked, though: it keeps a list of its tracks and a method to choose
+one, the same pair its own menu is built on. So LLL turns the track on itself,
+waits for the file that fetches, and puts your own choice straight back. What
+is left behind is the player exactly as it was and the whole subtitle file in
+hand. A moment of Netflix's own subtitles may flash up in between, once per
+episode. If you had already turned that language on yourself, nothing is
+touched at all.
 
 This is what asbplayer does now as well. It used to carry Netflix-specific
 code and today has not one file with Netflix in its name: it watches replies

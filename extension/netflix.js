@@ -82,6 +82,30 @@ var LLLNetflix = (function () {
   });
 
   /**
+   * Tell the page which language is being read.
+   *
+   * Page code has no way of knowing: it cannot see the extension's settings,
+   * and this side cannot reach the player's own track list without the
+   * trouble that reaching across for anything but a read always causes. So
+   * each half says what it knows. This is also said again whenever the
+   * language changes, since the track to turn on changes with it.
+   *
+   * Said more than once at the start because the two scripts begin at
+   * different moments: this one runs before the page has finished loading,
+   * and the language it reads is only settled once storage has answered.
+   */
+  function announce() {
+    var wanted = (typeof LLLLang !== 'undefined' && LLLLang.profile().subtitles) || null;
+    if (!wanted) return;
+    window.postMessage({ lll: 'lll-netflix-want', languages: wanted }, '*');
+  }
+
+  announce();
+  setTimeout(announce, 2000);
+  setTimeout(announce, 6000);
+  if (typeof LLLLang !== 'undefined' && LLLLang.onChange) LLLLang.onChange(announce);
+
+  /**
    * Which of the tracks Netflix offered to ask for.
    *
    * netflix-page.js is page code and knows nothing about which language LLL

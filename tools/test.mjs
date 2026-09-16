@@ -1475,11 +1475,13 @@ const run = async () => {
       URL,
       TextDecoder,
       XMLHttpRequest: function XMLHttpRequest() {},
-      // The page script sets a timer to say so if nothing ever comes back.
-      // Let go of it, or the tests would sit and wait out its twenty-five
-      // seconds before the process could end.
+      // The page script sets a timer to say so if nothing ever comes back,
+      // and another to watch for the next episode starting. Let go of both,
+      // or the tests would sit and wait them out before the process could end.
       setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
-      clearTimeout
+      clearTimeout,
+      setInterval: (fn, ms) => { const t = setInterval(fn, ms); if (t.unref) t.unref(); return t; },
+      clearInterval
     };
     sandbox.globalThis = sandbox;
     let jsonCalls = 0;
@@ -1631,6 +1633,95 @@ const run = async () => {
     await new Promise((r) => setTimeout(r, 10));
     check('what is not a subtitle file is not taken for one', posted === null, posted);
   }
+  // --- turning the track on, so there is a file to catch ---------------------
+  // The file is only fetched when the player is about to show something. The
+  // player will do that when asked, so LLL asks, takes the file that causes,
+  // and puts the viewer's own choice back.
+  {
+    let posted = null;
+    const listeners = [];
+    const bodies = {};
+    const timers = [];
+    const none = { isNoneTrack: true, bcp47: '' };
+    const chosen = [];
+    const tracks = [
+      { bcp47: 'ja', trackType: 'PRIMARY' },
+      { bcp47: 'it', trackType: 'ASSISTIVE', rawTrackType: 'closedcaptions' },
+      { bcp47: 'it', trackType: 'PRIMARY' },
+      { bcp47: 'it', isForcedNarrative: true },
+      none
+    ];
+    const player = {
+      getTimedTextTrackList: () => tracks,
+      getTimedTextTrack: () => none,
+      setTimedTextTrack: (track) => chosen.push(track)
+    };
+    const sandbox = {
+      console: { log() {}, warn() {}, error() {} },
+      fetch: async (url) => {
+        const body = Object.prototype.hasOwnProperty.call(bodies, url) ? bodies[url] : '';
+        return { ok: true, url, text: async () => body, clone() { return this; } };
+      },
+      window: {
+        postMessage(message) { posted = message; },
+        addEventListener(kind, fn) { if (kind === 'message') listeners.push(fn); },
+        netflix: { appContext: { state: { playerApp: { getAPI: () => ({ videoPlayer: {
+          getAllPlayerSessionIds: () => ['preview-1', 'watch-9'],
+          getVideoPlayerBySessionId: (id) => (id === 'watch-9' ? player : null)
+        } }) } } } },
+        location: { href: 'https://www.netflix.com/watch/70123456',
+          pathname: '/watch/70123456' }
+      },
+      location: { href: 'https://www.netflix.com/watch/70123456',
+        pathname: '/watch/70123456' },
+      navigator: {},
+      URL,
+      TextDecoder,
+      Response: function Response() {},
+      XMLHttpRequest: function XMLHttpRequest() {},
+      setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
+      clearTimeout,
+      setInterval: (fn, ms) => {
+        const t = setInterval(fn, ms);
+        if (t.unref) t.unref();
+        timers.push(t);
+        return t;
+      },
+      clearInterval
+    };
+    sandbox.netflix = sandbox.window.netflix;
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix-page.js'), 'utf8'),
+      sandbox, { filename: 'netflix-page.js' });
+    const arrives = (message) =>
+      listeners.forEach((fn) => fn({ source: sandbox.window, data: message }));
+
+    check('nothing is touched before the extension says what it reads',
+      chosen.length === 0, chosen.length);
+
+    arrives({ lll: 'lll-netflix-want', languages: ['it', 'it-IT'] });
+    check('the track for the language being read is turned on',
+      chosen.length === 1 && chosen[0] === tracks[2], chosen.length);
+    check('and speech is preferred to the track that writes out sounds',
+      chosen[0].rawTrackType === undefined, JSON.stringify(chosen[0]));
+
+    // The file the player fetches because of that, caught on its way past.
+    const ttml = '<?xml version="1.0"?><tt xmlns="http://www.w3.org/ns/ttml" ' +
+      'ttp:tickRate="10000000"><body><div><p begin="10000000t" end="20000000t">' +
+      'Mi chiamo Giuseppe</p></div></body></tt>';
+    bodies['https://oca.nflxvideo.net/?o=9'] = ttml;
+    await vm.runInContext('fetch("https://oca.nflxvideo.net/?o=9")', sandbox);
+    await new Promise((r) => setTimeout(r, 900));
+    check('the file is caught, and the player put back as the viewer had it',
+      chosen.length === 2 && chosen[1] === none, JSON.stringify(chosen.length));
+    check('and it is the file that reaches the rest of LLL',
+      posted && posted.lll === 'lll-netflix-subtitles' && posted.format === 'ttml',
+      JSON.stringify(posted && posted.lll));
+
+    timers.forEach(clearInterval);
+  }
+
   // --- choosing which of Netflix's tracks to read ---------------------------
   // The page script offers every track the title has, because page code knows
   // nothing about LLL's settings. netflix.js is the half that does know, and
@@ -1644,7 +1735,11 @@ const run = async () => {
         postMessage(message) { posted = message; },
         addEventListener(kind, fn) { if (kind === 'message') listeners.push(fn); }
       },
-      LLLLang: { profile: () => ({ subtitles: ['it', 'it-IT'], name: 'Italian' }) }
+      LLLLang: { profile: () => ({ subtitles: ['it', 'it-IT'], name: 'Italian' }) },
+      // It says which language it reads more than once at the start, since
+      // the two scripts begin at different moments.
+      setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
+      clearTimeout
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);

@@ -472,6 +472,7 @@
     if (!format) return false;
     if (text === caughtText) return true;      // the same file, fetched twice
     caughtText = text;
+    caughtFor = movieId();
     got = true;
     say('caught the subtitle file the player is using,', text.length,
       'characters of ' + format.toUpperCase() + ', from',
@@ -524,6 +525,149 @@
         function () { /* not text, so not subtitles */ });
     } catch (err) { /* leave the response alone */ }
   }
+
+  // ---------------------------------------------------------------------
+  // Turning the track on, so there is a file to catch
+  // ---------------------------------------------------------------------
+
+  /*
+   * The file is only downloaded when the player is going to show something,
+   * which meant the viewer had to go into Netflix's own menu and turn on the
+   * language LLL reads, and then watch two sets of subtitles at once.
+   *
+   * The player will do it when asked. It keeps a list of its timed text
+   * tracks and a method to choose one, the same pair its own menu is built
+   * on, so LLL selects the track it wants, waits for the file that selecting
+   * it causes to be fetched, and puts the viewer's own choice straight back.
+   * What is left behind is the player exactly as it was and the whole
+   * subtitle file in hand.
+   *
+   * A moment of Netflix's own subtitles may flash up in between. That is the
+   * whole cost, and it happens once per episode.
+   *
+   * If the viewer has already turned that language on themselves, nothing is
+   * touched: there is a file coming anyway, and putting a choice "back"
+   * that they made on purpose would be taking it away.
+   */
+  var WAIT_PASSES = 40;      // half-seconds to wait for the file before giving up
+  var want = null;           // language codes the extension asked for
+  var arrangedFor = '';      // the episode already seen to
+  var caughtFor = '';        // the episode whose file is in hand
+
+  window.addEventListener('message', function (e) {
+    if (e.source !== window) return;
+    var data = e.data;
+    if (!data || data.lll !== 'lll-netflix-want' || !Array.isArray(data.languages)) return;
+    want = data.languages.map(String);
+    arrangedFor = '';        // a language change is a reason to look again
+    arrange();
+  });
+
+  /** The player for whatever is playing, which is page code's to reach. */
+  function playing() {
+    try {
+      var app = window.netflix && window.netflix.appContext;
+      var api = app && app.state && app.state.playerApp && app.state.playerApp.getAPI();
+      if (!api || !api.videoPlayer) return null;
+      var ids = api.videoPlayer.getAllPlayerSessionIds();
+      if (!ids || !ids.length) return null;
+      var id = ids[0];
+      for (var i = 0; i < ids.length; i++) {
+        if (String(ids[i]).indexOf('watch-') === 0) { id = ids[i]; break; }
+      }
+      return api.videoPlayer.getVideoPlayerBySessionId(id) || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /** What language a track is in, under whichever name this player uses. */
+  function trackLanguage(track) {
+    if (!track) return '';
+    return String(track.bcp47 || track.language || track.locale || '');
+  }
+
+  function wantsLanguage(track) {
+    var code = trackLanguage(track);
+    if (!code) return false;
+    for (var i = 0; i < want.length; i++) {
+      if (code === want[i] || code.slice(0, 2) === String(want[i]).slice(0, 2)) return true;
+    }
+    return false;
+  }
+
+  /** The track to turn on: the language asked for, speech rather than sounds. */
+  function choose(list) {
+    var best = null;
+    for (var i = 0; i < list.length; i++) {
+      var track = list[i];
+      if (!track || track.isForcedNarrative || track.isNoneTrack) continue;
+      if (!wantsLanguage(track)) continue;
+      var captions = /closedcaptions|assistive/i.test(
+        String(track.rawTrackType || track.trackType || ''));
+      if (best && !(best.captions && !captions)) continue;
+      best = { track: track, captions: captions };
+    }
+    return best && best.track;
+  }
+
+  function arrange() {
+    if (!want || !want.length) return;
+    var id = movieId();
+    if (!id || id === arrangedFor || id === caughtFor) return;
+
+    var player = playing();
+    if (!player || !player.getTimedTextTrackList || !player.setTimedTextTrack) return;
+
+    var list;
+    try { list = player.getTimedTextTrackList(); } catch (err) { return; }
+    if (!list || !list.length) return;      // too early; the next pass will do
+
+    arrangedFor = id;
+    var track = choose(list);
+    if (!track) {
+      var offered = [];
+      for (var i = 0; i < list.length; i++) offered.push(trackLanguage(list[i]) || '?');
+      say('this title has no', want[0], 'subtitle track. It offers:', offered.join(', '));
+      return;
+    }
+
+    var before = null;
+    try { before = player.getTimedTextTrack && player.getTimedTextTrack(); } catch (err) { /* none */ }
+    if (before && !before.isNoneTrack && trackLanguage(before) === trackLanguage(track)) {
+      say('the', trackLanguage(track), 'subtitles are already on, so its file is on its way');
+      return;
+    }
+
+    say('turning the', trackLanguage(track),
+      'track on for a moment, to make the player fetch its file');
+    try {
+      player.setTimedTextTrack(track);
+    } catch (err) {
+      say('the player would not change track:', err && err.message);
+      return;
+    }
+
+    // Back to whatever the viewer had, the moment the file is in hand, or
+    // after twenty seconds if it never comes: leaving somebody else's
+    // subtitles turned on is worse than not having tried.
+    var passes = 0;
+    var putBack = setInterval(function () {
+      if (!caughtText && ++passes < WAIT_PASSES) return;
+      clearInterval(putBack);
+      if (caughtText) caughtFor = id;
+      try {
+        if (before) player.setTimedTextTrack(before);
+      } catch (err) { /* the viewer can set it back themselves */ }
+      say(caughtText
+        ? 'got the file; the player is back as it was'
+        : 'no file came, and the player is back as it was');
+    }, 500);
+  }
+
+  // A page that never reloads: the next episode starts, and its own file has
+  // to be arranged for all over again.
+  setInterval(arrange, 2000);
 
   /**
    * Is the request even sent from here?
