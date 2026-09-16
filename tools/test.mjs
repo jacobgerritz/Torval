@@ -1819,6 +1819,13 @@ const run = async () => {
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
+    // background.js now asks LLLLang which language is active before it does
+    // almost anything (which dictionary to open, which storage keys to use),
+    // so the sandbox needs the same language-registry files the manifest
+    // loads before background.js in the real extension.
+    for (const f of ['japanese.js', 'scan.js', 'italian.js', 'italian-scan.js', 'lang.js']) {
+      vm.runInContext(readFileSync(join(ROOT, 'extension', f), 'utf8'), sandbox, { filename: f });
+    }
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
 
     // --- the fingerprints -------------------------------------------------

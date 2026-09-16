@@ -50,7 +50,15 @@ var LLLSubtitles = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
-  var LANGUAGES = ['ja', 'ja-JP'];
+  // Which tracks to fetch, from the language being read rather than fixed
+  // here: this used to be a Japanese-only list, so an Italian video was
+  // reported as having no subtitle track no matter how many Italian tracks
+  // it offered, and fell all the way back to reading the captions off the
+  // screen.
+  function languages() {
+    var profile = typeof LLLLang !== 'undefined' ? LLLLang.profile() : null;
+    return (profile && profile.subtitles) || ['ja', 'ja-JP'];
+  }
   var MAX_LOOKUP_ATTEMPTS = 12;    // ~12s of retrying before giving up on the player existing
   var MIN_OBSERVED_SECONDS = 0.15; // shorter than this is a DOM flicker, not a line
 
@@ -497,7 +505,8 @@ var LLLSubtitles = (function () {
 
     var track = pickTrack(tracks);
     if (!track) {
-      console.warn('LLL: this video has no Japanese subtitle track. Tracks offered:',
+      console.warn('LLL: this video has no ' + LLLLang.profile().name +
+        ' subtitle track. Tracks offered:',
         tracks.map(function (t) { return t.languageCode; }).join(', '));
       return fallBackToWatching();
     }
@@ -859,7 +868,8 @@ var LLLSubtitles = (function () {
    * human-made track is the better choice whenever there is one to choose.
    */
   function pickTrack(tracks) {
-    var candidates = tracks.filter(function (t) { return LANGUAGES.indexOf(t.languageCode) !== -1; });
+    var wanted = languages();
+    var candidates = tracks.filter(function (t) { return wanted.indexOf(t.languageCode) !== -1; });
     if (!candidates.length) return null;
     var manual = candidates.find(function (t) { return !t.auto; });
     return manual || candidates[0];
@@ -1230,13 +1240,29 @@ var LLLSubtitles = (function () {
   // and ない, two words that are one, and 皆 さん as two more.
   var WRAPPED = new RegExp('(' + LLLJapanese.source + ')\\s+(?=' + LLLJapanese.source + ')', 'g');
 
+  // Characters that take up no room and mean nothing, which subtitle tracks
+  // are full of: zero-width spaces and joiners, the word joiner, the byte
+  // order mark, the soft hyphen. YouTube sends runs of them around a line and
+  // between its halves, and they survive every ordinary tidying-up because
+  // JavaScript's \s does not count them as whitespace: a line arrives as
+  // "nessuno<ZWSP> <ZWSP><ZWSP> <ZWSP>aveva", which reads on screen as the
+  // double and triple spaces it looks like. Worse than the look, one landing
+  // inside a word would split it in two for the dictionary, since it is not a
+  // letter in any language's alphabet either. So they go first, before
+  // anything else is decided about the line.
+  var INVISIBLE = /[\u00AD\u200B-\u200F\u2028\u2029\u2060\uFEFF]/g;
+
   /** One line of caption text, as a line rather than as it was laid out. */
   function squash(text) {
-    return String(text || '').replace(/\s+/g, ' ').replace(WRAPPED, '$1').trim();
+    return String(text || '')
+      .replace(INVISIBLE, '')
+      .replace(/\s+/g, ' ')
+      .replace(WRAPPED, '$1')
+      .trim();
   }
 
   function strip(s) {
-    return String(s).replace(/<[^>]*>/g, '').replace(/\s+/g, '');
+    return String(s).replace(/<[^>]*>/g, '').replace(INVISIBLE, '').replace(/\s+/g, '');
   }
 
   /**

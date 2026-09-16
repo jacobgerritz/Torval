@@ -45,19 +45,85 @@ showPanel(asked === 'known' ? 'words'
 // Anki
 // -------------------------------------------------------------------------
 
-const SOURCE_LABELS = [
+// 'pitch' and 'stress' are the same idea in two languages that need it
+// answered differently (a diagram for Japanese, an inline mark for Italian),
+// so only whichever matches the active language is ever offered; a note
+// type has no use for the other one.
+const SOURCE_LABELS_BASE = [
   ['', ', '],
   ['word', 'Target word'],
   ['reading', 'Reading'],
   ['sentence', 'Sentence'],
   ['definition', 'Definition'],
   ['audio', 'Word audio'],
-  ['pitch', 'Pitch accent'],
   ['image', 'Video frame'],
   ['sentenceAudio', 'Sentence audio'],
   ['sentenceBefore', 'Sentence before'],
   ['sentenceAfter', 'Sentence after']
 ];
+
+function sourceLabels() {
+  const extra = LLLLang.active() === 'it'
+    ? [['stress', 'Word stress']]
+    : [['pitch', 'Pitch accent']];
+  return SOURCE_LABELS_BASE.concat(extra);
+}
+
+// -------------------------------------------------------------------------
+// Language
+// -------------------------------------------------------------------------
+
+const languageSelect = document.getElementById('language');
+
+function fillLanguages() {
+  languageSelect.textContent = '';
+  for (const { code, name } of LLLLang.list()) {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = name;
+    if (code === LLLLang.active()) option.selected = true;
+    languageSelect.appendChild(option);
+  }
+}
+
+/*
+ * The examples on this page are words, and a word is in one language or the
+ * other. "たべました is added as 食べる" is a sentence about Japanese written
+ * for somebody reading Japanese, and on the Italian page it is not an example
+ * of anything, it is a line of a script they may well not read at all. Each
+ * language brings its own, from its profile in lang.js, for the same reason
+ * the Anki source list brings its own pitch/stress row.
+ */
+function fillExamples() {
+  const example = LLLLang.profile().examples;
+  if (!example) return;
+  const note = document.getElementById('add-text-note');
+  if (note) {
+    note.textContent = 'Something you have already read. ' +
+      example.inflected + ' is added as ' + example.lemma + '.';
+  }
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.placeholder = value;
+  };
+  set('text', example.paste);
+  set('search', example.known);
+  set('search-ignored', example.ignored);
+  const kinds = document.getElementById('ignored-kinds');
+  if (kinds) kinds.textContent = example.ignoredKinds;
+}
+
+fillExamples();
+
+if (languageSelect) {
+  fillLanguages();
+  languageSelect.addEventListener('change', () => { LLLLang.set(languageSelect.value); });
+  // Fires for this select's own change too (LLLLang.set applies synchronously
+  // before its storage write settles), as well as a switch made from the
+  // toolbar popup or this same page in another tab, so there is exactly one
+  // place that reloads the Anki panel rather than two racing each other.
+  LLLLang.onChange(() => { fillLanguages(); fillExamples(); load(); });
+}
 
 // The chosen file’s name, said in the page’s own type. The browser will not
 // show it once its own control is out of the way, and a file picker that says
@@ -84,11 +150,21 @@ const statusText = document.getElementById('status');
 
 let config = {};
 
+// The deck/note-type/field-mapping listeners only ever need setting up once;
+// load() itself is re-entrant now, called again on every language switch, so
+// setting these up inside it would pile up a duplicate set per switch.
+deckSelect.addEventListener('change', () => { config.deck = deckSelect.value; });
+modelSelect.addEventListener('change', () => { config.fields = {}; showFields(); });
+document.getElementById('save').addEventListener('click', save);
+
 load();
 
+/** The Anki config for whichever language is active right now. */
+function ankiConfigKey() { return 'ankiConfig' + LLLLang.profile().storageSuffix; }
+
 async function load() {
-  const stored = await api.storage.local.get('ankiConfig');
-  config = stored.ankiConfig || { fields: {} };
+  const stored = await api.storage.local.get(ankiConfigKey());
+  config = stored[ankiConfigKey()] || { fields: {} };
   tagsInput.value = (config.tags || []).join(', ');
   leadInput.value = typeof config.lead === 'number' ? config.lead : '';
 
@@ -98,10 +174,6 @@ async function load() {
   fill(deckSelect, reply.result.decks, config.deck);
   fill(modelSelect, reply.result.models, config.model);
   await showFields();
-
-  deckSelect.addEventListener('change', () => { config.deck = deckSelect.value; });
-  modelSelect.addEventListener('change', () => { config.fields = {}; showFields(); });
-  document.getElementById('save').addEventListener('click', save);
 }
 
 function fill(select, values, chosen) {
@@ -135,7 +207,7 @@ async function showFields() {
 
     const select = document.createElement('select');
     select.dataset.field = name;
-    for (const [value, text] of SOURCE_LABELS) {
+    for (const [value, text] of sourceLabels()) {
       const option = document.createElement('option');
       option.value = value;
       option.textContent = text;
@@ -164,7 +236,7 @@ async function save() {
     lead: leadInput.value === '' ? undefined : Math.max(0, Math.min(3, Number(leadInput.value) || 0)),
     fields
   };
-  await api.storage.local.set({ ankiConfig: config });
+  await api.storage.local.set({ [ankiConfigKey()]: config });
   statusText.textContent = 'Saved.';
   statusText.className = '';
   setTimeout(() => { statusText.textContent = ''; }, 2000);

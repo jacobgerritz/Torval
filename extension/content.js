@@ -51,18 +51,22 @@
     return false;
   }
 
-  // Hiragana, katakana, kanji, the repeat mark and halfwidth katakana, written
-  // down once, in japanese.js, because the hover, the reading of a whole passage
-  // and the marking of a page all have to agree on what counts.
-  const JAPANESE = LLLJapanese;
-  const MAX_SCAN = 16;
+  // Which characters count as part of a word, and how far a word can run:
+  // written down once per language (japanese.js/scan.js, italian.js/
+  // italian-scan.js) because the hover, the reading of a whole passage and
+  // the marking of a page all have to agree on what counts. Kept as `let`,
+  // not `const`, and refreshed below whenever the active language changes,
+  // the same way `off` already is.
+  let JAPANESE = LLLLang.profile().charClass;
+  let MAX_SCAN = LLLLang.profile().scanWindow;
   const SENTENCE_END = /[。．.！!？?…\n\r\t]/;
   const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'SELECT', 'TEXTAREA', 'OPTION']);
   const INLINE_DISPLAY = new Set(['inline', 'inline-block', 'inline-flex', 'contents', 'ruby', 'ruby-base', 'ruby-text']);
 
-  // JMdict's tags in plain words. The codes are compact but opaque, and there is
-  // room here to say what they mean. Anything not listed falls back to the
-  // dictionary's own description of it.
+  // JMdict's tags in plain words, plus the much smaller set Italian entries
+  // carry (see build-dict-it.mjs's POS_MAP). The codes are compact but
+  // opaque, and there is room here to say what they mean. Anything not
+  // listed falls back to the dictionary's own description of it.
   const LABELS = {
     // parts of speech
     n: 'noun', pn: 'pronoun', adv: 'adverb', 'adj-i': 'i-adjective', 'adj-na': 'na-adjective',
@@ -74,6 +78,10 @@
     v1: 'ichidan verb', 'v1-s': 'ichidan verb', vk: 'irregular verb', 'vs-i': 'irregular verb',
     'vs-s': 'irregular verb', vs: 'noun + する', vz: 'ずる verb', vt: 'transitive',
     vi: 'intransitive', 'vr': 'irregular り verb',
+    // Italian parts of speech (n, adv, prt, pref, suf, num and abbr above
+    // are shared with JMdict's own codes and need no separate entry)
+    v: 'verb', adj: 'adjective', prep: 'preposition', intj: 'interjection',
+    pron: 'pronoun', art: 'article',
     // usage
     uk: 'usually kana', abbr: 'abbreviation', col: 'colloquial', sl: 'slang',
     arch: 'archaic', obs: 'obsolete', rare: 'rare', dated: 'dated', hist: 'historical',
@@ -123,6 +131,17 @@
       if (off) putAway(); else bringBack();
     });
   }
+
+  // A language switch mid-page: put away whatever the previous language had
+  // marked or shown (an Italian popup left open while switching to Japanese
+  // would otherwise sit there answering to the wrong dictionary), pick up
+  // the new word-boundary rule, and let the page settle back in.
+  LLLLang.onChange(() => {
+    JAPANESE = LLLLang.profile().charClass;
+    MAX_SCAN = LLLLang.profile().scanWindow;
+    putAway();
+    if (!off) bringBack();
+  });
 
   /** Everything LLL had put on this page, taken off it again. */
   function putAway() {
@@ -1029,7 +1048,10 @@
         lastTranscript = transcript;
         try {
           const reply = await api.runtime.sendMessage({ type: 'comprehension', text: transcript });
-          if (reply && reply.ok) { LLLBar.show(reply.result); scored = true; }
+          // `skipped` is a transcript in some other language, an English
+          // video on an Italian channel, say. Not a score of zero: there is
+          // no number to show at all.
+          if (reply && reply.ok && !reply.result.skipped) { LLLBar.show(reply.result); scored = true; }
           else lastTranscript = '';
         } catch (err) {
           lastTranscript = '';   // the dictionary was still loading; the next try may do better
@@ -1359,7 +1381,18 @@
 
     const word = document.createElement('span');
     word.className = 'word';
-    word.textContent = hit.word;
+    // Italian: mark the stressed vowel inline, built from safe DOM pieces
+    // rather than the HTML string stress-it.js hands to Anki, so nothing
+    // about the word text ever passes through innerHTML.
+    if (typeof hit.stress === 'number' && hit.stress >= 0 && hit.stress < hit.word.length) {
+      word.append(
+        hit.word.slice(0, hit.stress),
+        Object.assign(document.createElement('b'), { textContent: hit.word.charAt(hit.stress) }),
+        hit.word.slice(hit.stress + 1)
+      );
+    } else {
+      word.textContent = hit.word;
+    }
     head.appendChild(word);
 
     if (hit.reading) {
@@ -1413,7 +1446,7 @@
     const meta = [];
     if (hit.band) {
       meta.push([hit.band, 'ranked #' + hit.q.toLocaleString('en-US') +
-        ' in a corpus of Japanese media']);
+        ' in a corpus of ' + (LLLLang.active() === 'it' ? 'Italian' : 'Japanese') + ' media']);
     }
     if (typeof hit.pitch === 'number') {
       meta.push(['[' + hit.pitch + ']', hit.pitch === 0
@@ -1658,12 +1691,13 @@
     const cue = fromVideo && typeof LLLSubtitles !== 'undefined'
       ? LLLSubtitles.cueFor(sentence)
       : null;
-    const settings = await api.storage.local.get('ankiConfig').catch(() => ({}));
+    const ankiConfigKey = 'ankiConfig' + LLLLang.profile().storageSuffix;
+    const settings = await api.storage.local.get(ankiConfigKey).catch(() => ({}));
     let media = {};
     if (fromVideo && typeof LLLVideo !== 'undefined') {
       const doing = cue ? saying(entryEl, 'Recording the line…') : null;
       try {
-        media = await LLLVideo.capture(sentence, cue, { lead: (settings.ankiConfig || {}).lead });
+        media = await LLLVideo.capture(sentence, cue, { lead: (settings[ankiConfigKey] || {}).lead });
       } finally {
         if (doing) doing.remove();
       }
@@ -1686,7 +1720,13 @@
       // Only ever used if a field on your note type asks for them.
       sentenceBefore: context ? escapeHtml(context.before || '') : '',
       sentenceAfter: context ? escapeHtml(context.after || '') : '',
-      definition: definitionHtml(entry, senses)
+      definition: definitionHtml(entry, senses),
+      // Computed here rather than in background.js: unlike the pitch accent,
+      // which background.js fetches from its own table by word and reading,
+      // the stress index lives right on the dictionary entry, which is
+      // already in hand at this point and does not need a second trip.
+      // Harmless no-op for Japanese entries, which never carry `st`.
+      stress: typeof LLLStressIt !== 'undefined' ? LLLStressIt.graphFor(word, entry) : ''
     };
 
     let reply;

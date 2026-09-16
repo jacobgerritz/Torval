@@ -3,17 +3,33 @@
 <title>LLL</title>
 <link rel="stylesheet" href="switch.css">
 
-<label class="switch">
-  <input type="checkbox" id="on" checked>
-  <span class="track"><span class="knob"></span></span>
-  <span class="state" id="state">On</span>
+<label class="picklabel">
+  <span>Language</span>
+  <select id="language">
+    <option value="" disabled selected hidden>Choose a language…</option>
+  </select>
 </label>
 
-<p class="note" id="note">Hovering, marking and the bar are working.</p>
+<div id="main" hidden>
+  <label class="switch">
+    <input type="checkbox" id="on" checked>
+    <span class="track"><span class="knob"></span></span>
+    <span class="state" id="state">On</span>
+  </label>
 
-<nav>
-  <button id="settings">Settings</button>
-  <button id="books">Books</button>
-</nav>
+  <p class="note" id="note">Hovering, marking and the bar are working.</p>
 
+  <nav>
+    <button id="settings">Settings</button>
+    <button id="books">Books</button>
+  </nav>
+</div>
+
+<p class="note" id="pick-hint">Pick a language above to get started.</p>
+
+<script src="japanese.js"></script>
+<script src="scan.js"></script>
+<script src="italian.js"></script>
+<script src="italian-scan.js"></script>
+<script src="lang.js"></script>
 <script src="switch.js"></script>

@@ -56,6 +56,15 @@
   addFromText();
   backupPanel();
 
+  // Every browse panel reads its list from background.js by message, and
+  // background.js answers 'knownList'/'ignoredList' for whichever language
+  // is active there; a switch made from options.js's own selector, or from
+  // the toolbar popup, has to be followed by a fresh read here too, or the
+  // words shown would keep belonging to the language just left.
+  if (typeof LLLLang !== 'undefined') {
+    LLLLang.onChange(() => { refreshers.forEach((r) => r()); });
+  }
+
   // -------------------------------------------------------------------------
   // Browsing one of the lists
   // -------------------------------------------------------------------------
@@ -250,7 +259,26 @@
     const fileEl = document.getElementById('file');
     const addButton = document.getElementById('add');
     const resultEl = document.getElementById('result');
+    const noteEl = document.getElementById('add-text-note');
     if (!textEl || !addButton) return;
+
+    // The example and the placeholder are written in whichever language is
+    // active, since a Japanese one is just noise while reading Italian.
+    const HELP = {
+      ja: { note: 'Something you have already read. たべました is added as 食べる.',
+        placeholder: '日本語のテキストをここに貼り付けてください…' },
+      it: { note: 'Something you have already read. parlavo is added as parlare.',
+        placeholder: 'Incolla qui un testo in italiano…' }
+    };
+    function paintHelp() {
+      const help = HELP[LLLLang.active()] || HELP.ja;
+      if (noteEl) noteEl.textContent = help.note;
+      textEl.placeholder = help.placeholder;
+    }
+    if (typeof LLLLang !== 'undefined') {
+      paintHelp();
+      LLLLang.onChange(paintHelp);
+    }
 
     fileEl.addEventListener('change', async () => {
       const file = fileEl.files[0];

@@ -16,8 +16,11 @@ var LLLAnki = (function () {
   var DEFAULT_URL = 'http://127.0.0.1:8765';
 
   // What LLL can put on a card. The options page lets you point each field of
-  // your note type at one of these.
-  var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio', 'pitch',
+  // your note type at one of these. 'pitch' and 'stress' both mean "how the
+  // word sounds", Japanese's pitch-accent diagram and Italian's stressed-
+  // vowel mark, and only ever one is offered at a time: options.js shows
+  // whichever matches the active language.
+  var SOURCES = ['word', 'reading', 'sentence', 'definition', 'audio', 'pitch', 'stress',
     'image', 'sentenceAudio', 'sentenceBefore', 'sentenceAfter'];
 
   // JapanesePod101's dictionary endpoint. It answers every request with an mp3
@@ -42,6 +45,7 @@ var LLLAnki = (function () {
     [/^(definitions?|dictionary definitions?|meaning|gloss(es)?|back|english)$/i, 'definition'],
     [/^(word ?audio|audio|term ?audio)$/i, 'audio'],
     [/^(pitch|pitch ?accent|accent)$/i, 'pitch'],
+    [/^(stress|word ?stress)$/i, 'stress'],
     [/^(images?|screenshot|picture|photo)$/i, 'image'],
     [/^(sentence ?audio|expression ?audio|context ?audio)$/i, 'sentenceAudio'],
     [/^(sentence ?before|previous ?(sentence|line)|line ?before|before)$/i, 'sentenceBefore'],

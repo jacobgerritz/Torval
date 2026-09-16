@@ -17,7 +17,11 @@
 
 const api = globalThis.browser || globalThis.chrome;
 
-const DB_NAME = 'lll-dictionary';
+// One dictionary database per language, so switching does not touch what the
+// other language already has imported. 'lll-dictionary' unsuffixed is what
+// every existing install already has under Japanese; LLLLang's 'ja' profile
+// keeps an empty dbSuffix for exactly that reason, so nothing has to migrate.
+function dbName() { return 'lll-dictionary' + LLLLang.profile().dbSuffix; }
 const DB_VERSION = 1;
 const ENTRIES = 'entries';
 const INDEX = 'index';
@@ -27,9 +31,24 @@ const STATE = 'state';
 // steps and sat on one number long enough to look frozen.
 const BATCH = 5000;
 
+// `Lookup()` picks the right lookup engine for whichever language is active
+// right now; every call site asks for it fresh rather than holding onto one,
+// so a language switch is picked up by the very next lookup.
+function Lookup() { return LLLLang.active() === 'it' ? LLLLookupIt : LLLLookup; }
+
+/** Storage key for one of the known/ignored/ankiConfig-shaped values, scoped
+ * to whichever language is active: unsuffixed for Japanese (every existing
+ * install's data, untouched), '_it' for Italian.
+ */
+function langKey(base) { return base + LLLLang.profile().storageSuffix; }
+
+/** Where a word list's safety copy is kept, see wordMap/saveWords below. */
+function copyKey(key) { return key + 'Copy'; }
+
 let ready = null;              // promise for the open, populated database
 let tagsPromise = null;
 let status = { state: 'starting', progress: 0 };
+let hoverReader = null;        // reassigned per language, see loadLanguage
 
 // ---------------------------------------------------------------------------
 // Catching the caption request YouTube's own player already makes
@@ -134,16 +153,21 @@ api.runtime.onMessage.addListener((message, sender) => {
     case 'extractWords': return guard(() => extractWords(message.text));
     case 'comprehension': return guard(() => comprehension(message.text, reporting(sender)));
     case 'wordPlaces':   return guard(() => wordPlaces(message.text, message.before, message.after,
+      // A subtitle line arrives already knowing it is in the right language:
+      // the video's own transcript was read and scored before the first line
+      // was drawn. Asking a ten-word line to prove it again is how a page
+      // that is plainly Italian ends up with its subtitles uncoloured.
+      message.line === true,
       // A subtitle line is thirty characters and answers instantly. Only a
       // page is worth saying anything about.
       message.text.length > 2000 ? reporting(sender) : undefined));
-    case 'knownList':    return guard(() => wordList(KNOWN));
-    case 'ignoredList':  return guard(() => wordList(IGNORED));
+    case 'knownList':    return guard(() => wordList(KNOWN()));
+    case 'ignoredList':  return guard(() => wordList(IGNORED()));
     case 'addKnownWords': return guard(() => addKnownWords(message.words));
-    case 'setKnown':     return guard(() => setWordOn(KNOWN, message.word, message.known));
-    case 'setIgnored':   return guard(() => setWordOn(IGNORED, message.word, message.ignored));
-    case 'forgetWords':  return guard(() => forgetFrom(KNOWN, message.words));
-    case 'forgetIgnored': return guard(() => forgetFrom(IGNORED, message.words));
+    case 'setKnown':     return guard(() => setWordOn(KNOWN(), message.word, message.known));
+    case 'setIgnored':   return guard(() => setWordOn(IGNORED(), message.word, message.ignored));
+    case 'forgetWords':  return guard(() => forgetFrom(KNOWN(), message.words));
+    case 'forgetIgnored': return guard(() => forgetFrom(IGNORED(), message.words));
     case 'exportWords':  return guard(() => exportWords());
     case 'importWords':  return guard(() => importWords(message.data));
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
@@ -178,23 +202,27 @@ async function guard(fn) {
  */
 /** Open Anki's card browser on a word. */
 async function ankiBrowse(word) {
-  const stored = await api.storage.local.get('ankiConfig');
-  return LLLAnki.browse(stored.ankiConfig || {}, word);
+  const stored = await api.storage.local.get(langKey('ankiConfig'));
+  return LLLAnki.browse(stored[langKey('ankiConfig')] || {}, word);
 }
 
 async function ankiDuplicate(word) {
   return guard(async () => {
-    const { ankiConfig } = await api.storage.local.get('ankiConfig');
-    return LLLAnki.alreadyHave(ankiConfig, { word });
+    const stored = await api.storage.local.get(langKey('ankiConfig'));
+    return LLLAnki.alreadyHave(stored[langKey('ankiConfig')], { word });
   });
 }
 
 async function ankiAdd(note) {
   return guard(async () => {
-    const { ankiConfig } = await api.storage.local.get('ankiConfig');
+    const stored = await api.storage.local.get(langKey('ankiConfig'));
+    const ankiConfig = stored[langKey('ankiConfig')];
     // The pitch diagram is drawn from dictionary data rather than fetched, so
     // it is filled in here; anki.js only has to place it in the right field.
     // Skipped entirely unless the card actually has somewhere to put it.
+    // Italian's stress markup, by contrast, is already computed client-side
+    // (content.js has the dictionary entry in hand there) and arrives on
+    // `note.stress` needing nothing further from here.
     const fields = (ankiConfig && ankiConfig.fields) || {};
     if (Object.keys(fields).some((f) => fields[f] === 'pitch')) {
       note = { ...note, pitch: await LLLPitch.graphFor(note.word, note.reading) };
@@ -227,21 +255,25 @@ async function handleLookup(text, point) {
     // travels with it so the popup leads with the same word the page is
     // marked with: 今日は暑い is 今日 and は, and a hover on it should not
     // answer with the greeting just because the greeting is longer.
+    const lookup = Lookup();
     const found = typeof point === 'number'
-      ? await LLLLookup.hover(text, point, hoverReader)
-      : { start: 0, groups: await LLLLookup.search(text, hoverReader) };
+      ? await lookup.hover(text, point, hoverReader)
+      : { start: 0, groups: await lookup.search(text, hoverReader) };
     const start = found.start;
     const groups = found.groups;
     const known = await knownSet();
     const ignored = await ignoredSet();
-    // The accent is one number per word and the table is already in memory, so
-    // it costs nothing to answer it here along with the definitions.
+    const italian = LLLLang.active() === 'it';
+    // The accent (Japanese) or stress mark (Italian) is one value per word,
+    // and the table or the entry itself is already in memory, so it costs
+    // nothing to answer it here along with the definitions.
     for (const group of groups) {
       for (const hit of group.hits) {
-        hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
-        hit.band = LLLLookup.frequencyBand(hit.q);
-        hit.shared = LLLLookup.sharedTags(hit.entry);
-        hit.sharedPos = LLLLookup.sharedPos(hit.entry);
+        if (italian) hit.stress = LLLStressIt.indexFor(hit.entry);
+        else hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
+        hit.band = lookup.frequencyBand(hit.q);
+        hit.shared = lookup.sharedTags(hit.entry);
+        hit.sharedPos = lookup.sharedPos(hit.entry);
         hit.known = known.has(hit.word);
         hit.ignored = ignored.has(hit.word);
       }
@@ -295,8 +327,8 @@ function cachingReader() {
 // Hovering asks about the same words over and over: the same line as the
 // cursor moves along it, and the same handful of particles on every line
 // after that. One reader kept for all of them turns nearly every hover into
-// no database work at all.
-const hoverReader = cachingReader();
+// no database work at all. Declared with the rest of the per-language state
+// near the top of the file; (re)assigned in loadLanguage.
 
 function requireDictionary() {
   if (status.state !== 'ready') {
@@ -308,7 +340,7 @@ function requireDictionary() {
 /** Every dictionary word in a passage of text, see LLLLookup.extractWords. */
 async function extractWords(text) {
   await requireDictionary();
-  return LLLLookup.extractWords(text, cachingReader());
+  return Lookup().extractWords(text, cachingReader());
 }
 
 /**
@@ -321,10 +353,23 @@ async function extractWords(text) {
 async function comprehension(text, say) {
   await requireDictionary();
   const reader = cachingReader();
-  const tokens = await LLLLookup.locateTokens(text, reader, say);
+  const lookup = Lookup();
+  const tokens = await lookup.locateTokens(text, reader, say);
+  if (!LLLLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
-  return LLLLookup.coverage(tokens, known, await ignoredSet());
+  return lookup.coverage(tokens, known, await ignoredSet());
 }
+
+/*
+ * What comes back about a passage that is not in the language being read at
+ * all. `skipped` rather than a score of zero: zero means "you know none of
+ * this", which is a real answer about a real page and keeps the bar up
+ * saying 0%, and an English page is not a page you understand none of. The
+ * caller takes it as nothing to say and puts the bar away.
+ */
+const NOT_THIS_LANGUAGE = {
+  total: 0, known: 0, counts: {}, places: {}, unmarked: [], skipped: true
+};
 
 /**
  * The stored known set, plus any expression that is not itself marked known
@@ -341,7 +386,7 @@ async function effectiveKnown(text, tokens, reader, known) {
   let extra = null;
   for (const token of tokens) {
     if (!token.expression || known.has(token.word) || checked.has(token.word)) continue;
-    const ok = await LLLLookup.decomposeKnown(text, token.start, token.length, reader, known);
+    const ok = await Lookup().decomposeKnown(text, token.start, token.length, reader, known);
     checked.set(token.word, ok);
     if (ok) { if (!extra) extra = new Set(known); extra.add(token.word); }
   }
@@ -368,19 +413,27 @@ async function effectiveKnown(text, tokens, reader, known) {
  * rather than recomputed when a word is later marked known, so ticking one
  * word does not shuffle the colour of every unrelated word after it.
  */
-async function wordPlaces(text, before, after, say) {
+async function wordPlaces(text, before, after, trusted, say) {
   await requireDictionary();
   const reader = cachingReader();
+  const lookup = Lookup();
   // Read with whatever came before and after, so that a line cut mid-word,
   // which automatic captions do constantly, is still read as the word it is.
   // Only the words starting inside this line are kept.
   const lead = String(before || '').slice(-CONTEXT);
   const trail = String(after || '').slice(0, CONTEXT);
   const whole = lead + text + trail;
-  const found = await LLLLookup.locateTokens(whole, reader, say);
-  const tokens = LLLLookup.within(found, lead.length, text.length);
+  const found = await lookup.locateTokens(whole, reader, say);
+  const tokens = lookup.within(found, lead.length, text.length);
+  if (!trusted && !LLLLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   const ignored = await ignoredSet();
+
+  // Solid against dashed, alternating, is how two words with nothing between
+  // them are told apart; a language that always spaces its words has no such
+  // pair to tell apart, and the dashed underline there is a second mark
+  // making a distinction nobody asked about.
+  const seams = LLLLang.profile().seams;
 
   const places = {};
   // Words that get no mark on the page. Two quite different reasons to be on
@@ -391,15 +444,15 @@ async function wordPlaces(text, before, after, say) {
   tokens.forEach((token, i) => {
     if (!places[token.word]) {
       places[token.word] = [];
-      if (ignored.has(token.word) || LLLLookup.isKnown(token, known)) unmarked.push(token.word);
+      if (ignored.has(token.word) || lookup.isKnown(token, known)) unmarked.push(token.word);
     }
-    places[token.word].push(token.start, token.length, i % 2);
+    places[token.word].push(token.start, token.length, seams ? i % 2 : 0);
   });
 
   // The score comes back too. This is the same passage the bar is asking
   // about, and reading a page twice over to answer two questions about it
   // would be silly.
-  const score = LLLLookup.coverage(tokens, known, ignored);
+  const score = lookup.coverage(tokens, known, ignored);
   return { total: score.total, known: score.known, counts: score.counts, places, unmarked };
 }
 
@@ -428,8 +481,10 @@ async function wordPlaces(text, before, after, say) {
 // takes noticeably longer to read.
 const CONTEXT = 24;
 
-const KNOWN = 'knownWords';
-const IGNORED = 'ignoredWords';
+// Suffixed to the active language, see langKey above: an existing install's
+// data stays exactly where it always was, under the unsuffixed 'ja' names.
+function KNOWN() { return langKey('knownWords'); }
+function IGNORED() { return langKey('ignoredWords'); }
 
 /*
  * The word lists are the one thing in LLL that cannot be rebuilt, and every
@@ -452,11 +507,12 @@ const IGNORED = 'ignoredWords';
  * than something to notice weeks later.
  */
 const COUNTS = 'wordCounts';
-const SAFE = { [KNOWN]: 'knownWordsCopy', [IGNORED]: 'ignoredWordsCopy' };
 
 // Read once and held, because a lookup asks about them on every single hover.
-// Any write clears the copy, including one made from the settings page, which
-// storage.onChanged is what catches.
+// The settings page never touches storage directly, it only ever asks this
+// script to change a list by message, so saveWords below is the one place a
+// write happens, and it keeps this cache in step itself. Nothing here needs
+// to invalidate it a second time.
 const caches = {};
 
 // Changes to the lists happen one at a time, in the order they were asked for.
@@ -476,12 +532,13 @@ async function wordSet(key) {
   return caches[key];
 }
 
-function knownSet() { return wordSet(KNOWN); }
-function ignoredSet() { return wordSet(IGNORED); }
+function knownSet() { return wordSet(KNOWN()); }
+function ignoredSet() { return wordSet(IGNORED()); }
 
+// The only outside change left to watch for is the toolbar switch, which
+// really is set from elsewhere (switch.js, its own script on its own page).
 if (api.storage.onChanged) {
   api.storage.onChanged.addListener((changes) => {
-    for (const key of Object.keys(changes)) delete caches[key];
     if (changes.off) netflixHelper(!changes.off.newValue);
   });
 }
@@ -574,7 +631,7 @@ async function wordMap(key) {
 async function saveWords(key, map) {
   const counts = (await api.storage.local.get(COUNTS))[COUNTS] || {};
   counts[key] = Object.keys(map).length;
-  await api.storage.local.set({ [key]: map, [COUNTS]: counts, [SAFE[key]]: map });
+  await api.storage.local.set({ [key]: map, [COUNTS]: counts, [copyKey(key)]: map });
   caches[key] = new Set(Object.keys(map));
   return counts[key];
 }
@@ -586,11 +643,12 @@ async function saveWords(key, map) {
  * on purpose leaves a count of nothing, which is left exactly as it is.
  */
 async function rescueLists() {
-  const stored = await api.storage.local.get([KNOWN, IGNORED, SAFE[KNOWN], SAFE[IGNORED], COUNTS]);
+  const known = KNOWN(), ignored = IGNORED();
+  const stored = await api.storage.local.get([known, ignored, copyKey(known), copyKey(ignored), COUNTS]);
   const counts = stored[COUNTS] || {};
-  for (const key of [KNOWN, IGNORED]) {
+  for (const key of [known, ignored]) {
     const live = stored[key];
-    const copy = stored[SAFE[key]];
+    const copy = stored[copyKey(key)];
     if (live && Object.keys(live).length) continue;
     if (!copy || !Object.keys(copy).length) continue;
     if (counts[key] === 0) continue;   // emptied on purpose
@@ -612,12 +670,12 @@ async function wordList(key) {
 /** Add words to the known list. Ones already on it are left alone. */
 async function addKnownWords(words) {
   return inTurn(async () => {
-    const map = await wordMap(KNOWN);
+    const map = await wordMap(KNOWN());
     let added = 0;
     for (const word of words) {
       if (!map[word]) { map[word] = Date.now(); added++; }
     }
-    return { added, total: await saveWords(KNOWN, map) };
+    return { added, total: await saveWords(KNOWN(), map) };
   });
 }
 
@@ -634,7 +692,7 @@ async function setWordOn(key, word, on) {
     const total = await saveWords(key, map);
 
     if (on) {
-      const other = key === KNOWN ? IGNORED : KNOWN;
+      const other = key === KNOWN() ? IGNORED() : KNOWN();
       const otherMap = await wordMap(other);
       if (otherMap[word]) { delete otherMap[word]; await saveWords(other, otherMap); }
     }
@@ -656,8 +714,8 @@ async function exportWords() {
     format: 'lll-words',
     version: 1,
     saved: new Date().toISOString(),
-    known: await wordMap(KNOWN),
-    ignored: await wordMap(IGNORED)
+    known: await wordMap(KNOWN()),
+    ignored: await wordMap(IGNORED())
   };
 }
 
@@ -679,8 +737,8 @@ async function importWords(data) {
 }
 
 async function merged(data) {
-  const known = await wordMap(KNOWN);
-  const ignored = await wordMap(IGNORED);
+  const known = await wordMap(KNOWN());
+  const ignored = await wordMap(IGNORED());
   const added = { known: 0, ignored: 0 };
 
   const merge = (into, from, count) => {
@@ -698,8 +756,8 @@ async function merged(data) {
 
   return {
     added,
-    known: await saveWords(KNOWN, known),
-    ignored: await saveWords(IGNORED, ignored)
+    known: await saveWords(KNOWN(), known),
+    ignored: await saveWords(IGNORED(), ignored)
   };
 }
 
@@ -726,7 +784,7 @@ async function keepACopy() {
   if (stored[LAST_COPY] === today) return;
 
   const counts = stored[COUNTS] || {};
-  if (!counts[KNOWN] && !counts[IGNORED]) return;   // nothing worth keeping yet
+  if (!counts[KNOWN()] && !counts[IGNORED()]) return;   // nothing worth keeping yet
 
   const words = await exportWords();
   const blob = new Blob([JSON.stringify(words)], { type: 'application/json' });
@@ -841,14 +899,19 @@ function mightKnow(term) {
  * megabytes; until it has finished, everything works as it did before,
  * because mightKnow says yes to everything while there is no list.
  */
-async function learnWhatIsKnown() {
+// `generation` guards against a language switch arriving while this is still
+// running: `db` here is the one this generation's start() opened, but by the
+// time the read finishes a newer loadLanguage() may already have moved
+// `fingerprints` on to a different language entirely, and this must not then
+// overwrite it with a stale answer about the language that just left.
+async function learnWhatIsKnown(db, generation) {
   try {
-    const db = await ready;
     const keys = await new Promise((resolve, reject) => {
       const request = db.transaction(INDEX, 'readonly').objectStore(INDEX).getAllKeys();
       request.onsuccess = () => resolve(request.result || []);
       request.onerror = () => reject(request.error);
     });
+    if (generation !== loadGeneration) return;
     const marks = new Uint32Array(keys.length);
     for (let i = 0; i < keys.length; i++) marks[i] = fingerprint(String(keys[i]));
     marks.sort();
@@ -907,15 +970,37 @@ async function getEntries(terms) {
 // Loading
 // ---------------------------------------------------------------------------
 
-ready = start();
-// Once the words are there, take their fingerprints. Nothing waits for this:
-// until it has finished, every question goes to the database as it always did.
-ready.then(learnWhatIsKnown, () => {});
-ready.catch((err) => {
-  console.error('LLL failed to start', err);
-  status = { state: 'error', message: String(err) };
-  setBadge('!');
-});
+// One dictionary loaded at a time, whichever language is active. Switching
+// languages (LLLLang.onChange, below) re-runs this exactly as a fresh start
+// would, against that language's own database and data files; nothing about
+// the language just left behind, including its own already-imported
+// dictionary, is touched.
+let loadGeneration = 0;
+
+function loadLanguage() {
+  const generation = ++loadGeneration;
+  status = { state: 'starting', progress: 0 };
+  fingerprints = null;
+  tagsPromise = null;
+  hoverReader = cachingReader();
+
+  ready = start();
+  // Once the words are there, take their fingerprints. Nothing waits for this:
+  // until it has finished, every question goes to the database as it always did.
+  ready.then((db) => { if (generation === loadGeneration) learnWhatIsKnown(db, generation); }, () => {});
+  ready.catch((err) => {
+    if (generation !== loadGeneration) return;
+    console.error('LLL failed to start', err);
+    status = { state: 'error', message: String(err) };
+    setBadge('!');
+  });
+}
+
+// Waits for the real stored choice before the very first load, so a fresh
+// background-script start never races the 'ja' default against whatever the
+// user actually last picked.
+LLLLang.ready().then(loadLanguage);
+LLLLang.onChange(loadLanguage);
 
 async function start() {
   // Before anything else: a list that has gone missing since last time is
@@ -1018,7 +1103,7 @@ async function importDictionary(db, meta) {
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    const req = indexedDB.open(dbName(), DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       for (const name of [ENTRIES, INDEX, STATE]) {
@@ -1062,9 +1147,16 @@ async function putAll(db, storeName, pairs, onProgress) {
 
 // ---------------------------------------------------------------------------
 
+// Every caller passes a path starting 'data/...', the Japanese layout every
+// existing install already has; swapped here for whichever language is
+// active, 'data-it/...' for Italian, rather than touching every call site.
 async function fetchJson(path) {
-  const res = await fetch(api.runtime.getURL(path));
-  if (!res.ok) throw new Error(`cannot read ${path} (${res.status}), run: node tools/build-dict.mjs`);
+  const scoped = path.replace(/^data\//, LLLLang.profile().dataPath + '/');
+  const res = await fetch(api.runtime.getURL(scoped));
+  if (!res.ok) {
+    throw new Error(`cannot read ${scoped} (${res.status}), ` +
+      `run: node tools/build-dict${LLLLang.active() === 'it' ? '-it' : ''}.mjs`);
+  }
   return res.json();
 }
 

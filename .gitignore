@@ -5,6 +5,10 @@ data/
 #   node tools/build-dict.mjs && node tools/build-pitch.mjs
 extension/data/
 
+# Built Italian dictionary data, regenerate with:
+#   node tools/build-dict-it.mjs
+extension/data-it/
+
 node_modules/
 *.log
 

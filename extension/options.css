@@ -85,6 +85,31 @@ h1 {
   color: var(--ink-quiet);
 }
 
+.sidebar-language {
+  display: block;
+  margin: 0 0 18px;
+  padding: 0 14px;
+}
+.sidebar-language span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-quiet);
+}
+.sidebar-language select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  background: #1b1d21;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
 .tab {
   display: block;
   width: 100%;

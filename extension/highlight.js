@@ -146,6 +146,16 @@ var LLLHighlight = (function () {
       return null;
     }
     if (!reply || !reply.ok) return null;
+    // Not a page in the language being read: an English article, with a
+    // handful of words that happen to spell Italian ones. Nothing is marked
+    // and nothing is scored, and whatever was marked before comes off, since
+    // a single-page app can navigate from a page in the language to one that
+    // is not without ever reloading.
+    if (reply.result.skipped) {
+      pageRanges = new Map();
+      apply();
+      return null;
+    }
 
     pageRanges = build(found, reply.result);
     apply();
@@ -195,9 +205,11 @@ var LLLHighlight = (function () {
       acceptNode: function (node) {
         var parent = node.parentElement;
         if (!parent || SKIP_TAGS[parent.tagName]) return NodeFilter.FILTER_REJECT;
-        // The cheapest test first: most nodes on most pages hold no Japanese
-        // at all, and nothing further is worth asking about those.
-        if (!LLLJapanese.test(node.data)) return NodeFilter.FILTER_REJECT;
+        // The cheapest test first: most nodes on most pages hold none of the
+        // active language's word characters at all, and nothing further is
+        // worth asking about those. Read fresh each call, not cached, so a
+        // language switch takes effect on the very next gather().
+        if (!LLLLang.profile().charClass.test(node.data)) return NodeFilter.FILTER_REJECT;
         // LLL's own subtitle line is painted on its own, every time it
         // changes; leaving it in here as well would mark it twice.
         if (skipSubtitle && parent.closest('[data-lll-subtitle]')) return NodeFilter.FILTER_REJECT;
@@ -474,7 +486,8 @@ var LLLHighlight = (function () {
     try {
       reply = await api.runtime.sendMessage({
         type: 'wordPlaces', text: found.text,
-        before: beside.before, after: beside.after
+        before: beside.before, after: beside.after,
+        line: true
       });
     } catch (err) {
       return askAgain(overlay);

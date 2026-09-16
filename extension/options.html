@@ -6,6 +6,10 @@
 <div class="layout">
   <nav class="sidebar">
     <h1>LLL</h1>
+    <label class="sidebar-language">
+      <span>Language</span>
+      <select id="language"></select>
+    </label>
     <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="anki">Anki</button>
     <span class="sidebar-spacer"></span>
@@ -24,7 +28,7 @@
 
     <section>
       <h2>Add from a text</h2>
-      <p class="note">
+      <p class="note" id="add-text-note">
         Something you have already read. たべました is added as 食べる.
       </p>
 
@@ -54,8 +58,8 @@
 
     <div class="parting"><h2>Ignored words</h2><span class="count" id="count-ignored">…</span></div>
     <p class="note count-note">
-      Names, English, misreadings. Left out of the score rather than counting
-      either way. Press ⊘ in the popup, or 3.
+      <span id="ignored-kinds">Names, English, misreadings</span>. Left out of
+      the score rather than counting either way. Press ⊘ in the popup, or 3.
     </p>
 
     <section>
@@ -147,6 +151,11 @@
   </main>
 </div>
 
+<script src="japanese.js"></script>
+<script src="scan.js"></script>
+<script src="italian.js"></script>
+<script src="italian-scan.js"></script>
+<script src="lang.js"></script>
 <script src="anki.js"></script>
 <script src="options.js"></script>
 <script src="known.js"></script>

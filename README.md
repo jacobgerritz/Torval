@@ -1,9 +1,20 @@
 # LLL
 
-A pop-up Japanese dictionary for Firefox. Hold **Shift** and point at a word;
-its meaning appears next to the cursor. Everything is on your own machine, the
-whole of JMdict, the dictionary Jisho is built from, lives in the browser. It
-works with the network off.
+A pop-up dictionary for Firefox, for Japanese and Italian. Hold **Shift** and
+point at a word; its meaning appears next to the cursor. Everything is on your
+own machine, the whole dictionary lives in the browser. It works with the
+network off.
+
+Japanese uses JMdict, the dictionary Jisho is built from. Italian uses
+Wiktextract, Wiktionary's own entries machine-extracted by kaikki.org, with
+every inflected form Wiktionary lists indexed onto the word it belongs to, so
+*intere* finds *intero* and *capirne* finds *capire*. The two
+languages are otherwise built the same way and behave the same way: pick one
+from the toolbar popup and its own dictionary, deinflector, known/ignored word
+lists and Anki settings load, independently of whatever the other language has.
+Japanese also gets pitch accent, from Kanjium; Italian gets word stress marked
+inline instead, since it has no lexical pitch accent to speak of. Only one
+language is active at a time.
 
 ---
 
@@ -11,8 +22,11 @@ works with the network off.
 
 Two steps, once.
 
-**1. Build the dictionary.** This downloads JMdict (about 10 MB) and converts it
-into a form the extension can read quickly.
+**1. Build a dictionary**, for whichever language you want first (both can be
+built; only the language picked in the toolbar popup is actually loaded).
+
+Japanese: downloads JMdict (about 10 MB) and the JPDB/BCCWJ frequency lists,
+and converts them into a form the extension can read quickly.
 
 ```bash
 node tools/build-dict.mjs
@@ -24,8 +38,21 @@ Then the pitch accent data, which is separate and much smaller:
 node tools/build-pitch.mjs
 ```
 
+Italian: downloads a Wiktextract dump of Italian entries (about 75 MB) and the
+hermitdave/FrequencyWords frequency list, and converts them the same way.
+Stress marks are computed as part of this step, from each entry's
+pronunciation, so there is no separate build for those.
+
+```bash
+node tools/build-dict-it.mjs
+```
+
 **2. Load it into Firefox.** Go to `about:debugging` → *This Firefox* → *Load
-Temporary Add-on…* and pick `extension/manifest.json`.
+Temporary Add-on…* and pick `extension/manifest.json`. The toolbar popup leads
+with a language picker the first time; pick one to get started, or switch
+later from that same popup or from Settings. Choosing a language you have not
+built the dictionary for yet just means that language's popup waits, the same
+way the very first run does for whichever language you built.
 
 The first time it runs, the extension spends a minute or so copying the
 dictionary into the browser's own storage, 218,000 entries and 465,000
@@ -133,6 +160,13 @@ rare reading has not gone anywhere. It sits right there under "other matches"
 for the rare case that is genuinely what was meant. That list is labelled
 "other" rather than "shorter" for exactly this reason: what shows up there is
 not always shorter, just not the best guess.
+
+In Italian the same search runs across spaces as well as within a word.
+Nine thousand of the dictionary's entries are more than one word long,
+*rendere conto*, *a meno che*, *pollice verso*, and looking each word up
+alone could never find any of them. The longest phrase that really is in the
+dictionary wins, and gets one unbroken mark across the space; the first word
+on its own stays under "other matches", for when that is what was wanted.
 
 It undoes conjugation on the way. 食べなかった is not in any dictionary, so it is
 walked back to 食べる and the steps taken are shown underneath, small and grey:
@@ -289,6 +323,23 @@ More of a transcript arriving is likewise a reason to work out the number
 again and not a reason to read the page again, which used to happen every
 twenty seconds for the whole length of a video.
 
+### Whether the page is in the language at all
+
+Japanese never has to be asked: a page either has Japanese characters on it
+or it does not. Italian shares its alphabet with the page around it, and an
+ordinary English page does contain Italian words, because *in*, *a*, *no* and
+*ago* (a needle) are all real entries in an Italian dictionary. Finding one
+is no evidence of anything, and the bar used to come up on every English page
+in the browser.
+
+The proportion is the evidence, not the presence. Running Italian is very
+nearly all Italian words, around nine in ten; English prose scores a quarter
+of that, from the handful of short words the two languages happen to share.
+So a page has to be more than half recognised, over at least a few words,
+before LLL says anything about it. A subtitle line is exempt: the video's
+transcript already settled the question, and ten words are too few to settle
+it again.
+
 While a page is being read, the handle counts up. It is the background
 script saying how far through the text it has got, each time it stops to ask
 the dictionary something. Several seconds of “Reading this page…” with
@@ -298,14 +349,14 @@ nothing moving is indistinguishable from nothing happening.
 
 ## Subtitles, and mining from video
 
-LLL times YouTube's Japanese subtitles so it knows exactly when each line
-starts and ends, that timing is what lets a line be replayed and recorded
+LLL times YouTube's subtitles, in whichever language is selected, so it knows
+exactly when each line starts and ends, that timing is what lets a line be replayed and recorded
 precisely, and what lets **A** and **D** jump between lines. What you see is
 drawn by LLL itself, in the same look as the popup.
 
 LLL never touches YouTube's own captions. The CC button is YouTube's and means
-what it says, LLL's line comes from the Japanese track it fetched itself, and
-either can be on without the other. Both at once is then a choice rather than
+what it says, LLL's line comes from the track it fetched itself, in the
+language being read, and either can be on without the other. Both at once is then a choice rather than
 an accident. The one exception is the last of the four ways of getting the
 timing below, which works by reading YouTube's captions off the screen, and so
 needs them running.

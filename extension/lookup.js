@@ -14,6 +14,12 @@
  * `db` is anything with an async getEntries(terms) returning Map<term, entry[]>.
  * The extension backs it with IndexedDB; the test suite backs it with a plain
  * Map, so both exercise exactly this code.
+ *
+ * Everything here that is not actually about segmenting unspaced Japanese
+ * text, ranking entries, known/ignored bookkeeping, reading a whole passage
+ * given a `segment` function, lives in lookup-common.js instead, shared with
+ * lookup-it.js. This file keeps its full original public API so nothing
+ * downstream (background.js, tools/test.mjs) has to know that split exists.
  */
 
 // In the extension these are loaded first and are already globals; under Node
@@ -24,11 +30,17 @@ if (typeof LLLDeinflect === 'undefined' && typeof require !== 'undefined') {
 if (typeof LLLJapanese === 'undefined' && typeof require !== 'undefined') {
   var LLLJapanese = require('./japanese.js');
 }
+if (typeof LLLMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var LLLMaxScan = require('./scan.js');
+}
+if (typeof LLLLookupCommon === 'undefined' && typeof require !== 'undefined') {
+  var LLLLookupCommon = require('./lookup-common.js');
+}
 
 var LLLLookup = (function () {
   'use strict';
 
-  var MAX_SCAN = 16;      // longest span of text we will try to match
+  var MAX_SCAN = LLLMaxScan;    // longest span of text we will try to match
 
   /**
    * Characters that can never begin a word, because they belong to the one
@@ -128,7 +140,7 @@ var LLLLookup = (function () {
         var entry = entries[a];
         for (var b = 0; b < infos.length; b++) {
           var info = infos[b];
-          if (!typesAllow(entry, info.types)) continue;
+          if (!LLLLookupCommon.typesAllow(entry, info.types)) continue;
 
           var group = groups.get(info.length);
           if (!group) { group = new Map(); groups.set(info.length, group); }
@@ -139,7 +151,7 @@ var LLLLookup = (function () {
           if (!existing || info.reasons.length < existing.reasons.length) {
             group.set(entry.id, Object.assign(
               { entry: entry, reasons: info.reasons, matched: term,
-                q: rankOf(entry, term) },
+                q: LLLLookupCommon.rankOf(entry, term) },
               displayForm(entry, term)));
           }
         }
@@ -300,8 +312,8 @@ var LLLLookup = (function () {
   // the full reading gives.
   var WINDOW = 60;
 
-  var HIRAGANA = /[\u3041-\u309f]/;
-  var KATAKANA = /[\u30a1-\u30ff\uff66-\uff9f]/;
+  var HIRAGANA = /[ぁ-ゟ]/;
+  var KATAKANA = /[ァ-ヿｦ-ﾟ]/;
 
   /** Are these two characters the same kind of writing? */
   function sameScript(a, b) {
@@ -322,14 +334,6 @@ var LLLLookup = (function () {
     return { from: from, to: to };
   }
 
-  /**
-   * Read `text` from `from` to `to`, which has to be one unbroken run of
-   * Japanese, and hand back the words in it.
-   *
-   * Every position is priced once, cheapest way through by the usual dynamic
-   * programme, and the winning path is walked back from the end. Text that
-   * matched nothing produces no word at all rather than a bad one.
-   */
   /**
    * Everything the dictionary will be asked about one run, worked out
    * without asking it anything. Deinflection only, so several runs can be
@@ -372,7 +376,7 @@ var LLLLookup = (function () {
         groups.forEach(function (group, length) {
           if (here + length > n) return;                          // past the end
           if (splitsCluster(text, from + here + length)) return;  // ends mid-sound
-          var cost = best[here] + wordCost(bestQ(group), length);
+          var cost = best[here] + wordCost(LLLLookupCommon.bestQ(group), length);
           if (cost < best[here + length]) {
             best[here + length] = cost;
             backLength[here + length] = length;
@@ -466,7 +470,7 @@ var LLLLookup = (function () {
       if (say) say(reached, text.length);
       // Standing aside here lets whatever else is waiting, a hover being
       // looked up above all, get a turn rather than wait for the whole page.
-      await pause();
+      await LLLLookupCommon.pause();
     };
 
     var i = 0;
@@ -598,55 +602,9 @@ var LLLLookup = (function () {
   }
 
   /**
-   * How common this entry is when it is written the way the page writes it.
-   *
-   * An entry that can be written more than one way carries a rank for each
-   * spelling, because they are not equally likely to be what is meant: 今日は
-   * is こんにちは, one of the commonest words in the language, but those three
-   * characters on a page are far more often 今日 followed by は. Whichever
-   * spelling matched is the one whose rank counts, and a spelling the corpora
-   * have never seen counts as unranked however common its neighbours are.
-   */
-  function rankOf(entry, matched) {
-    // Only the spellings that disagree with the entry are written down, so an
-    // absent one agrees. A spelling listed as 0 is one the corpora have never
-    // seen, which is a different thing from not being listed at all.
-    if (entry.qm && Object.prototype.hasOwnProperty.call(entry.qm, matched)) {
-      return entry.qm[matched];
-    }
-    return entry.q || 0;
-  }
-
-  /** The frequency rank of the commonest entry in a group of matches. */
-  function bestQ(group) {
-    var best = Infinity;
-    group.forEach(function (hit) {
-      var q = hit.q || Infinity;
-      if (q < best) best = q;
-    });
-    return best;
-  }
-
-  /**
-   * The deinflector guesses what kind of word something must be; this checks the
-   * dictionary agrees. Without it, 「少ない」 would happily "deinflect" to the
-   * non-existent ichidan verb 「少る」 and 「見る」 would match half the language.
-   */
-  function typesAllow(entry, types) {
-    if (types === null) return true;
-    for (var i = 0; i < entry.s.length; i++) {
-      var pos = entry.s[i].p;
-      for (var j = 0; j < pos.length; j++) {
-        if (types.indexOf(pos[j]) !== -1) return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * How this entry should be named on screen: the spelling and the reading.
    *
-   * Worked out here rather than in the popup so that everything downstream, 
+   * Worked out here rather than in the popup so that everything downstream,
    * what you read, what the pitch accent is looked up under, what lands on the
    * card, agrees on what the word is.
    *
@@ -674,55 +632,6 @@ var LLLLookup = (function () {
     });
     if (usuallyKana || !showable.length) return { word: matched, reading: '' };
     return { word: showable[0], reading: matched };
-  }
-
-  /**
-   * Tags carried by every sense of an entry, for some field on a sense (`m` for
-   * misc tags, `p` for part of speech).
-   *
-   * JMdict files both per sense, but some of what they carry cannot vary
-   * between definitions: "uk" says the word is usually written in kana, which
-   * is a fact about the word, not about any one meaning of it. Printed against
-   * every sense it is just noise repeated that many times. So whatever is
-   * common to every sense is lifted out and shown once, beside the word;
-   * whatever is not stays where it actually belongs.
-   *
-   * Part of speech needs this every bit as much as misc tags do. 勉強 is
-   * "n,vs,vt" for one sense and "n,vs,vi" for another and plain "n" for a
-   * third, printing the first sense's combination as though it summed up the
-   * whole word would simply be wrong for the other two.
-   */
-  function commonAcrossSenses(entry, field) {
-    if (!entry.s.length) return [];
-    var first = entry.s[0][field] || [];
-    return first.filter(function (code) {
-      return entry.s.every(function (sense) {
-        return (sense[field] || []).indexOf(code) !== -1;
-      });
-    });
-  }
-
-  function sharedTags(entry) { return commonAcrossSenses(entry, 'm'); }
-  function sharedPos(entry) { return commonAcrossSenses(entry, 'p'); }
-
-  // How common a word is, rounded to the precision the number deserves.
-  //
-  // A bare rank asks you to know the scale already: #7,261 means nothing unless
-  // you have a feel for what #3,000 is like. And it claims a precision the data
-  // does not have, the gap between #100 and #400 is real, the gap between
-  // #7,261 and #7,800 is noise. A round band says both things at once, and needs
-  // no legend to read.
-  var BANDS = [
-    [1000, 'top 1k'], [2000, 'top 2k'], [5000, 'top 5k'],
-    [10000, 'top 10k'], [20000, 'top 20k'], [50000, 'top 50k']
-  ];
-
-  function frequencyBand(rank) {
-    if (!rank) return '';
-    for (var i = 0; i < BANDS.length; i++) {
-      if (rank <= BANDS[i][0]) return BANDS[i][1];
-    }
-    return 'rare';
   }
 
   // How rare a word written exactly as it appears has to be, and how common
@@ -822,62 +731,6 @@ var LLLLookup = (function () {
   }
 
   /**
-   * Read a passage from end to end and hand back the dictionary form of every
-   * word in it, in order, the same word repeated as often as it is said.
-   *
-   * This is not a separate piece of machinery, it is `search` itself, run
-   * forward across a whole passage instead of stopping at the first word. At
-   * each position it takes the longest match, deinflects it the same way a
-   * hover would, and moves past however many characters that consumed, so
-   * 走っていました is recorded as 走る, the same dictionary form a hover on it
-   * would have shown. Reading a passage once therefore teaches the word
-   * regardless of which sentence it turned up conjugated in.
-   *
-   * Repeats are kept rather than folded away, because the two questions built
-   * on this want different things. "Which words does this teach me" wants each
-   * word once; "how much of this will I understand" has to count every time a
-   * word is said, or a page that says 私 forty times and one word you have
-   * never seen would score the same as one that says forty words you have
-   * never seen.
-   */
-  async function extractTokens(text, db) {
-    var located = await locateTokens(text, db);
-    return located.map(function (token) { return token.word; });
-  }
-
-  /**
-   * The same reading, but saying where in the text each word was found.
-   *
-   * Colouring the words on a page needs to know not just which words are
-   * there but exactly which characters each one covers, so that the mark can
-   * be put back on the page in the right place. The positions are into the
-   * text as given, so whoever assembled that text can map them back to
-   * wherever it came from.
-   */
-  async function locateTokens(text, db, say) {
-    var words = await segment(text, db, say);
-    return words.map(function (found) {
-      var hit = found.hits[0];
-      return {
-        word: hit.word, start: found.start, length: found.length,
-        // Every reading these same characters could be, not only the best
-        // one. 来た is written identically whether it is the rare
-        // interjection or the past tense of 来る; 読み is both a noun in its
-        // own right and the stem of 読む. Someone who knows any one of the
-        // readings of what is actually written on the page is not missing
-        // anything, so all of them travel together and whoever counts them
-        // can ask about the whole set.
-        words: found.hits.map(function (h) { return h.word; }),
-        // Whether JMdict itself tags this as an "expression" rather than a
-        // single word, the one fact that decides whether it is worth asking
-        // if a reader could piece it together from parts they already know.
-        // See decomposeKnown, below.
-        expression: isDecomposable(hit.entry)
-      };
-    });
-  }
-
-  /**
    * A phrase worth checking for decomposeKnown, below: JMdict tags it `exp`,
    * multiple words filed as one entry, and none of its senses are tagged
    * `id`, an idiom, JMdict's own word for "the meaning is not what the
@@ -916,184 +769,26 @@ var LLLLookup = (function () {
   /**
    * Whether a span some search already treated as one word can be understood
    * anyway, because every smaller piece it is actually built from is
-   * separately known.
-   *
-   * JMdict lists a great many ordinary grammatical patterns as their own
-   * "expression" entries purely so they can be searched for, お元気ですか
-   * ("how are you") is filed as one entry, but it is nothing more than the
-   * polite prefix お, the word 元気, the copula です and the particle か, each
-   * an entirely ordinary word someone may already know on its own. Marking
-   * only the whole four-word entry "known" and never crediting the reader for
-   * already knowing all four pieces would be wrong in the other direction
-   * from the 今日は problem above: there, a rare reading was beating a common
-   * one; here, a rare *combination* would be allowed to hide four words
-   * someone plainly already has.
-   *
-   * A genuine idiom is not like this. Knowing every word in 猫の手も借りたい
-   * word for word ("even a cat's paws would help") does not hand you its
-   * actual meaning ("desperately busy") the way it does for a plain
-   * grammatical pattern, which is exactly what isDecomposable, above, is for
-   *, this only ever runs where that says the whole entry is transparent,
-   * and even then only ever replaces "known" with "known", never with
-   * "understood"; a reader who knows all four pieces of お元気ですか still
-   * sees the real phrase in the popup exactly as before.
+   * separately known. See lookup-common.js's own copy of this comment for
+   * the full rationale; this just supplies Japanese's `search` and `isIdiom`.
    */
-  async function decomposeKnown(text, start, length, db, known) {
-    // Every position reachable from the beginning of the span using nothing
-    // but known words, worked outward until either the far end is reached or
-    // the possibilities run out.
-    //
-    // Walking greedily and taking the longest match at each step, which is
-    // how this first worked, is not good enough. ことがある breaks apart into
-    // こと, が and ある, all thoroughly ordinary words, but greedily, the
-    // step after こと takes があ, a rare entry that happens to be two
-    // characters long and so beats plain が, and from there the rest is
-    // nonsense (り, ます) that could never all be known. Asking "is there any
-    // way through" instead of "does one particular way through work" costs
-    // nothing at this length and gets the answer right.
-    var reached = new Set([0]);
-    var queue = [0];
-
-    while (queue.length) {
-      var i = queue.shift();
-      var remaining = length - i;
-      var groups = await search(text.slice(start + i, start + length), db);
-      if (!groups.length || !groups[0].hits.length) continue;
-
-      // Checked here, not left to whoever calls this, so nothing can ever
-      // mistakenly credit a genuine idiom by skipping the check upstream. An
-      // ordinary word that simply happens to reach exactly to the end, です
-      // often is the last piece of a breakdown, is not this; only a real
-      // idiom is.
-      if (i === 0 && groups[0].length === remaining && isIdiom(groups[0].hits[0].entry)) return false;
-
-      for (var g = 0; g < groups.length; g++) {
-        var group = groups[g];
-        // At the very first step, a match swallowing the whole span again is
-        // not a breakdown, it is the same answer restated, and would make
-        // this succeed immediately every time.
-        if (i === 0 && group.length === remaining) continue;
-        if (!knownAmong(group.hits, known)) continue;
-
-        var next = i + group.length;
-        if (next > length || reached.has(next)) continue;
-        if (next === length) return true;
-        reached.add(next);
-        queue.push(next);
-      }
-    }
-    return false;
+  function decomposeKnown(text, start, length, db, known) {
+    return LLLLookupCommon.decomposeKnown(text, start, length, db, known, search, isIdiom);
   }
 
-  function knownAmong(hits, known) {
-    for (var i = 0; i < hits.length; i++) {
-      if (known.has(hits[i].word)) return true;
-    }
-    return false;
+  /** Every dictionary word in a passage, see lookup-common.js's extractTokens. */
+  function extractTokens(text, db) {
+    return LLLLookupCommon.extractTokens(text, db, segment, isDecomposable);
   }
 
-  function pause() {
-    return new Promise(function (resolve) { setTimeout(resolve, 0); });
+  /** The same, saying where in the text each word was found. */
+  function locateTokens(text, db, say) {
+    return LLLLookupCommon.locateTokens(text, db, segment, isDecomposable, say);
   }
 
   /** Every dictionary word in a passage, once each, in the order first met. */
-  async function extractWords(text, db) {
-    var seen = new Set();
-    var words = [];
-    var tokens = await extractTokens(text, db);
-    for (var i = 0; i < tokens.length; i++) {
-      if (seen.has(tokens[i])) continue;
-      seen.add(tokens[i]);
-      words.push(tokens[i]);
-    }
-    return words;
-  }
-
-  /**
-   * How much of a passage is made of words already known.
-   *
-   * Counted per word said, not per distinct word: what "I understand 80% of
-   * this" means is that four times in five, the next word is one you know.
-   * `counts` comes back too, so that marking one word known afterwards can be
-   * reflected immediately, its count is exactly how much the total moves, 
-   * without reading the whole passage a second time.
-   *
-   * Ignored words leave the question entirely rather than counting against
-   * it: a name, a piece of English, something the dictionary read wrongly.
-   * Counting those as unknown would say a page is harder than it is, and
-   * counting them as known would say the opposite; neither is true, so they
-   * come out of the total altogether.
-   */
-  /**
-   * The words of a longer text as they fall across one stretch of it, counted
-   * from the start of that stretch.
-   *
-   * Reading a subtitle line on its own gets its ends wrong whenever the line
-   * was cut mid-word, which automatic captions do constantly: a line ending
-   * 見に行っ and the next beginning たので are two fragments, and neither is a
-   * word. Read together the word is whole again.
-   *
-   * A word lying across the join is kept on both lines, cut to the part of it
-   * that is actually on each. It is the same word either way, and what is on
-   * screen is what gets marked: leaving it off whichever line it did not
-   * start on would put an unmarked hole in the middle of a sentence.
-   */
-  function within(tokens, from, length) {
-    var out = [];
-    var end = from + length;
-    for (var i = 0; i < tokens.length; i++) {
-      var token = tokens[i];
-      var start = Math.max(token.start, from);
-      var stop = Math.min(token.start + token.length, end);
-      if (stop <= start) continue;
-      var moved = {};
-      for (var key in token) moved[key] = token[key];
-      moved.start = start - from;
-      moved.length = stop - start;
-      out.push(moved);
-    }
-    return out;
-  }
-
-  function coverage(tokens, known, ignored) {
-    var counts = {};
-    var hits = 0;
-    var total = 0;
-    for (var i = 0; i < tokens.length; i++) {
-      var token = tokens[i];
-      // Counted even when ignored, and only then left out of the score. An
-      // ignored word still has to say how often it was said, because that is
-      // exactly the number to give back if it stops being ignored: dropping
-      // it here left the bar unable to restore a word once the page had been
-      // read again, since by then nothing remembered there had been eleven of
-      // them.
-      counts[token.word] = (counts[token.word] || 0) + 1;
-      if (ignored && ignored.has(token.word)) continue;
-      total++;
-      if (isKnown(token, known)) hits++;
-    }
-    return { total: total, known: hits, counts: counts };
-  }
-
-  /**
-   * Whether a reader knows what a token says, which is not quite the same as
-   * whether they have marked its best reading known.
-   *
-   * The same characters can be more than one word. 来た is the past tense of
-   * 来る and also, on paper, a rare interjection; 読み is the stem of 読む and
-   * also a noun meaning "reading". Knowing any one of the readings of what is
-   * actually written means nothing is missing, so any of them counts. The
-   * looseness this allows is real but small: it takes a homograph you know of
-   * a word you do not, in a place where the one you know does not fit, and by
-   * then the page has bigger problems than the count.
-   */
-  function isKnown(token, known) {
-    if (known.has(token.word)) return true;
-    var words = token.words || [];
-    for (var i = 0; i < words.length; i++) {
-      if (known.has(words[i])) return true;
-    }
-    return false;
+  function extractWords(text, db) {
+    return LLLLookupCommon.extractWords(text, db, segment, isDecomposable);
   }
 
   return {
@@ -1103,16 +798,16 @@ var LLLLookup = (function () {
     hover: hover,
     segment: segment,
     displayForm: displayForm,
-    frequencyBand: frequencyBand,
-    sharedTags: sharedTags,
-    sharedPos: sharedPos,
+    frequencyBand: LLLLookupCommon.frequencyBand,
+    sharedTags: LLLLookupCommon.sharedTags,
+    sharedPos: LLLLookupCommon.sharedPos,
     extractWords: extractWords,
     extractTokens: extractTokens,
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
-    coverage: coverage,
-    within: within,
-    isKnown: isKnown,
+    coverage: LLLLookupCommon.coverage,
+    within: LLLLookupCommon.within,
+    isKnown: LLLLookupCommon.isKnown,
     MAX_SCAN: MAX_SCAN
   };
 })();

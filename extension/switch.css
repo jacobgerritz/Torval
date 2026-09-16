@@ -17,6 +17,29 @@ body {
   font: 14px/1.5 -apple-system, "Segoe UI", sans-serif;
 }
 
+.picklabel {
+  display: block;
+  margin-bottom: 14px;
+}
+.picklabel span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #767b84;
+}
+.picklabel select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 9px;
+  background: #1c1e22;
+  color: #e7e8ea;
+  border: 1px solid #2a2d33;
+  border-radius: 7px;
+  font: inherit;
+}
+
 .switch {
   display: flex;
   align-items: center;

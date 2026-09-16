@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LLL",
   "version": "0.1.0",
-  "description": "Hold Shift and hover any Japanese word to see what it means.",
+  "description": "Hold Shift and hover any word (Japanese or Italian) to see what it means.",
   "browser_specific_settings": {
     "gecko": {
       "id": "lll@jacobgerritz",
@@ -20,10 +20,18 @@
   "background": {
     "scripts": [
       "japanese.js",
+      "scan.js",
+      "italian.js",
+      "italian-scan.js",
+      "lang.js",
       "deinflect.js",
+      "deinflect-it.js",
+      "lookup-common.js",
       "lookup.js",
+      "lookup-it.js",
       "anki.js",
       "pitch.js",
+      "stress-it.js",
       "background.js"
     ]
   },
@@ -44,6 +52,11 @@
       ],
       "js": [
         "japanese.js",
+        "scan.js",
+        "italian.js",
+        "italian-scan.js",
+        "lang.js",
+        "stress-it.js",
         "subtitles.js",
         "video.js",
         "bar.js",

@@ -5,6 +5,12 @@
  * hovering, no marking, no bar, and YouTube gets its own subtitles back. The
  * setting is one value in storage, and every page watches it, so pages already
  * open follow along without being reloaded.
+ *
+ * This is also the first thing anybody sees, so it is where a language gets
+ * picked, before anything else: on a fresh install nothing but the language
+ * row shows, and the ordinary switch only appears once one is chosen. After
+ * that the language row stays, always changeable, above the switch rather
+ * than buried in the settings page.
  */
 
 'use strict';
@@ -15,6 +21,34 @@
   const box = document.getElementById('on');
   const state = document.getElementById('state');
   const note = document.getElementById('note');
+  const main = document.getElementById('main');
+  const pickHint = document.getElementById('pick-hint');
+  const languageSelect = document.getElementById('language');
+
+  fillLanguages();
+  paintLanguage();
+  LLLLang.onChange(paintLanguage);
+
+  languageSelect.addEventListener('change', () => {
+    if (!languageSelect.value) return;
+    LLLLang.set(languageSelect.value);
+  });
+
+  function fillLanguages() {
+    for (const { code, name } of LLLLang.list()) {
+      const option = document.createElement('option');
+      option.value = code;
+      option.textContent = name;
+      languageSelect.appendChild(option);
+    }
+  }
+
+  async function paintLanguage() {
+    const chosen = await LLLLang.chosen();
+    main.hidden = !chosen;
+    pickHint.hidden = chosen;
+    if (chosen) languageSelect.value = LLLLang.active();
+  }
 
   api.storage.local.get('off').then((stored) => paint(!stored.off)).catch(() => {});
 
