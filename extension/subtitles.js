@@ -407,20 +407,21 @@ var LLLSubtitles = (function () {
     var reader = typeof LLLNetflix !== 'undefined' ? LLLNetflix
       : (typeof window !== 'undefined' ? window.LLLNetflix : null);
     var caught = reader ? reader.track() : null;
-    if (!caught || caught.vtt === caughtFile) return;
+    if (!caught || (caught.text || caught.vtt) === caughtFile) return;
     if (caught.movie && String(caught.movie) !== String(id)) {
       // Said once about a given file, not once a second for the rest of the
       // episode.
-      if (caughtWrong !== caught.vtt) {
-        caughtWrong = caught.vtt;
+      if (caughtWrong !== (caught.text || caught.vtt)) {
+        caughtWrong = caught.text || caught.vtt;
         console.log('LLL: Netflix handed over subtitles for', caught.movie,
           'but', id, 'is playing, so they are being left alone.');
       }
       return;
     }
-    var loaded = parseVtt(caught.vtt);
+    var file = caught.text || caught.vtt;
+    var loaded = caught.format === 'ttml' ? parseTtml(file) : parseVtt(file);
     if (!loaded.length) return;
-    caughtFile = caught.vtt;
+    caughtFile = file;
     cues = loaded;
     index = 0;
     openCue = null;
@@ -463,6 +464,133 @@ var LLLSubtitles = (function () {
     var total = 0;
     for (var i = 0; i < parts.length; i++) total = total * 60 + (parseFloat(parts[i]) || 0);
     return total;
+  }
+
+  /**
+   * TTML, which is what Netflix actually serves.
+   *
+   * The WebVTT above only ever arrives when the manifest was talked into
+   * offering it. Left to itself the player downloads timed text as TTML, an
+   * XML document of <p> elements with a begin and an end, and that is the file
+   * that comes past on the way to the player whatever else happens. Japanese
+   * is delivered as IMSC 1.1 rather than plain TTML1, which changes none of
+   * what is read here.
+   *
+   * Three things about it need care. Times come in more than one shape, and
+   * Netflix uses the tick one: "108108000t", against a tick rate declared on
+   * the root element. A line's words are spread across nested elements with
+   * line breaks between them rather than sitting in one string. And furigana
+   * is written as ruby, exactly as it is in the WebVTT, so the reading has to
+   * come out or it would be read as more words: in TTML that is an attribute
+   * on a span rather than an <rt> tag.
+   */
+  function parseTtml(text) {
+    var doc;
+    try {
+      doc = new DOMParser().parseFromString(String(text), 'text/xml');
+    } catch (err) {
+      return [];
+    }
+    if (!doc || doc.getElementsByTagName('parsererror').length) return [];
+
+    var root = doc.documentElement;
+    if (!root) return [];
+    var rate = Number(attribute(root, 'tickRate')) || 0;
+    var frames = Number(attribute(root, 'frameRate')) || 0;
+
+    var out = [];
+    var paragraphs = doc.getElementsByTagNameNS('*', 'p');
+    for (var i = 0; i < paragraphs.length; i++) {
+      var p = paragraphs[i];
+      var start = ttmlTime(attribute(p, 'begin'), rate, frames);
+      if (start === null) continue;
+      var end = ttmlTime(attribute(p, 'end'), rate, frames);
+      if (end === null) {
+        var dur = ttmlTime(attribute(p, 'dur'), rate, frames);
+        end = dur === null ? start + 4 : start + dur;
+      }
+      var line = squash(spoken(p));
+      if (!line) continue;
+      // Netflix overlaps two lines by a frame or two here and there. A line
+      // that has not ended when the next one starts would leave A and D one
+      // line behind for as long as the overlap lasts.
+      if (out.length && out[out.length - 1].end > start) out[out.length - 1].end = start;
+      out.push({ start: start, end: end, text: line });
+    }
+    return out;
+  }
+
+  /**
+   * An attribute by its local name, whatever namespace it was written in.
+   * `ttp:tickRate` on one file is `tickRate` on the next, and the prefix is
+   * whatever that document happened to bind.
+   */
+  function attribute(el, name) {
+    if (!el || !el.attributes) return '';
+    var direct = el.getAttribute(name);
+    if (direct !== null && direct !== undefined && direct !== '') return direct;
+    for (var i = 0; i < el.attributes.length; i++) {
+      var at = el.attributes[i];
+      var local = at.localName || String(at.name).split(':').pop();
+      if (local === name) return at.value;
+    }
+    return '';
+  }
+
+  /** The words of one paragraph, with the ruby readings left out. */
+  function spoken(node) {
+    var said = '';
+    for (var child = node.firstChild; child; child = child.nextSibling) {
+      if (child.nodeType === 3) { said += child.nodeValue; continue; }
+      if (child.nodeType !== 1) continue;
+      var name = (child.localName || child.nodeName || '').toLowerCase();
+      if (name === 'br') { said += ' '; continue; }
+      // A ruby annotation is the reading printed above the word, which is
+      // help with the word and not more of the sentence. The word it was
+      // helping with is in the base span beside it and stays.
+      var ruby = attribute(child, 'ruby');
+      if (ruby === 'text' || ruby === 'textContainer') continue;
+      said += spoken(child);
+    }
+    return said;
+  }
+
+  /**
+   * One TTML time, in seconds, or null if there is nothing there.
+   *
+   * Either a clock, 00:01:02.500, with a fourth part for frames where a frame
+   * rate was declared; or an offset, a number and a unit: 12s, 400ms, 3.5m,
+   * 108108000t. Ticks are what Netflix writes, and a tick is only a duration
+   * at all because the root element says how many of them make a second.
+   */
+  function ttmlTime(value, rate, frames) {
+    var text = String(value || '').trim();
+    if (!text) return null;
+
+    var offset = /^([0-9]+(?:[.][0-9]+)?)(h|m|s|ms|f|t)$/.exec(text);
+    if (offset) {
+      var amount = parseFloat(offset[1]);
+      switch (offset[2]) {
+        case 'h': return amount * 3600;
+        case 'm': return amount * 60;
+        case 's': return amount;
+        case 'ms': return amount / 1000;
+        case 'f': return frames ? amount / frames : null;
+        case 't': return rate ? amount / rate : null;
+      }
+      return null;
+    }
+
+    var parts = text.split(':');
+    if (parts.length === 4) {
+      // The last part counts frames, not hundredths, and only a declared
+      // frame rate says how long one of those is.
+      var whole = clock(parts.slice(0, 3).join(':'));
+      return whole + (frames ? (parseFloat(parts[3]) || 0) / frames : 0);
+    }
+    if (parts.length >= 2) return clock(text);
+    var plain = parseFloat(text);
+    return isNaN(plain) ? null : plain;
   }
 
   // -------------------------------------------------------------------------
@@ -1353,6 +1481,7 @@ var LLLSubtitles = (function () {
     wholeLine: wholeLine,
     siteFor: siteFor,
     parseVtt: parseVtt,
+    parseTtml: parseTtml,
     status: function () { return state; },
     _setCues: function (list) { cues = list; state = 'ready'; },
     // The line in progress, which is where a line lives while it is on

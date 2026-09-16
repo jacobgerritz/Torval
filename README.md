@@ -363,8 +363,28 @@ needs them running.
 
 ### Netflix
 
-Netflix hands over its whole subtitle file before the episode has played a
-second, which sounds unlikely and turns out to be a matter of asking.
+There are two ways in, and the one that reads better on paper is not the one
+that works.
+
+**What works: taking a copy of the file as it goes past.** Netflix's subtitles
+are not part of what the DRM protects. The player downloads them from
+`oca.nflxvideo.net` as an opaque `?o=` address with no file extension and TTML
+inside it, in the clear, like any other file on any other site. So LLL watches
+what the page fetches, and anything whose body turns out to be WebVTT or TTML
+is the subtitle file, caught whole, with every timing in it. No manifest, no
+injected format, nothing to guess. The one thing it needs is for the subtitles
+to be turned on in Netflix's own player, since the file is only downloaded
+when something is going to be shown, and the track you turn on is the track
+LLL reads.
+
+This is what asbplayer does now as well. It used to carry Netflix-specific
+code and today has not one file with Netflix in its name: it watches replies
+for anything shaped like subtitles instead. A site that rearranges its
+internals every few months cannot be followed by knowing its internals.
+
+**The other way, kept because when it works it is better:** the whole track
+list before a second has played, which sounds unlikely and turns out to be a
+matter of asking.
 
 When the player starts a title it posts a request listing the formats it is
 prepared to accept, and the answer only ever offers what was asked for. The
@@ -374,7 +394,15 @@ request on its way out and the very same answer comes back with a plain,
 unencrypted address for every subtitle track in it, Japanese included.
 
 So LLL adds it. `JSON.stringify` is where the request becomes text, which is
-the last moment before it is sent, so that is where the format goes in.
+the last moment before it is sent, so that is where the format goes in. The
+track list that comes back is offered to the extension rather than filtered on
+the page: page code knows nothing about which language LLL is set to read, so
+it hands over every track the title has and is told which one to fetch back.
+
+On the account this was written against, the request goes out and its answer
+is read somewhere none of those hooks can see. That is why the file is caught
+on its way to the player instead, and why both are kept: this one costs
+nothing when it fails, and hands over the whole track list when it does not.
 
 Reading the answer took longer to place. `JSON.parse` is the obvious spot and
 it is the wrong one: nothing carrying a track list ever went through it,
@@ -413,9 +441,9 @@ Netflix altogether: after the third attempt above, a way out that is not
 
 #### When there is no file
 
-For a title with no Japanese subtitles, or an extension loaded halfway through
-an episode, LLL reads the lines off the screen as it does on YouTube, and
-Japanese has to be the subtitle language turned on in the player. It is a poor
+For a title whose file never turns up, or an extension loaded halfway through
+an episode, LLL reads the lines off the screen as it does on YouTube, and the
+language being read has to be the subtitle language turned on in the player. It is a poor
 second: the percentage can only describe the lines already watched, and **D**
 has nowhere to go, because the next line has not been said yet. The console
 says which of the two is in use.
@@ -571,7 +599,6 @@ hand their video to the browser's DRM layer, and both the frame and the audio
 come back empty, that is what the protection is for, not a limitation to be
 worked around. Where capture is refused the card is still made, without media.
 
-Subtitles are YouTube-only for now.
 
 ---
 

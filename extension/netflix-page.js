@@ -29,6 +29,31 @@
  * page's was not free. Here there is no wall. This file *is* page code, so
  * `JSON.parse` hands back exactly what it always did.
  *
+ * That was the whole of this file, and on its own it was not enough: the
+ * request goes out from this page and its answer is read somewhere none of
+ * the hooks above can see, not on the page, not in a worker, not down a
+ * channel. Every place a reply can become an object was watched and every one
+ * of them stayed empty.
+ *
+ * So there is a second way in here now, and it is the one that actually pays.
+ * The manifest is not the only plain thing Netflix fetches: the subtitle file
+ * itself is fetched, unencrypted, from oca.nflxvideo.net, as an opaque `?o=`
+ * address with no file extension and TTML inside it. Subtitles are not part of
+ * what the DRM protects, so the player downloads them the way any page
+ * downloads any file. Whatever track the viewer has turned on in Netflix's own
+ * player comes past this window as plain text, in full, with every timing in
+ * it, and taking a copy of it needs no manifest, no injected format and no
+ * guess about where the answer is read.
+ *
+ * That is what asbplayer does now too. It used to carry Netflix-specific code
+ * and no longer has a single file with Netflix in its name: it watches
+ * responses for anything shaped like subtitles instead. A site that changes
+ * its internals every few months cannot be followed by knowing its internals.
+ *
+ * Both ways are kept. The manifest one, when it works, hands over every track
+ * before a second has played, which is strictly better; the file one needs the
+ * viewer to turn the subtitles on, and then always works.
+ *
  * Getting it here took three goes. A `"world": "MAIN"` entry in the manifest's
  * content_scripts never ran at all, on a Firefox new enough to support it,
  * which is most likely Firefox rejecting the whole entry over that property.
@@ -45,6 +70,19 @@
 
   var WEBVTT = 'webvtt-lssdh-ios8';   // the one format Netflix hands over plainly
   var MANIFEST = /manifest/i;
+
+  // Where Netflix keeps the files themselves. The address carries no file
+  // extension and no content type worth trusting, so the host is the only
+  // thing about a request that says "this could be the subtitles" before its
+  // body has been looked at.
+  var FILES = /[.]nflxvideo[.]net$/i;
+  var BIGGEST = 8 * 1024 * 1024;   // a subtitle file is tens of KB; this is slack
+
+  /** The episode playing, as the address says. */
+  function movieId() {
+    var match = /[/]watch[/]([0-9]+)/.exec(location.pathname);
+    return match ? match[1] : '';
+  }
 
   function say() {
     var parts = ['LLL (Netflix):'];
@@ -139,13 +177,42 @@
     var tracks = findKey(value, 'timedtexttracks', 0);
     if (!tracks || !tracks.length) return;
     var movie = findKey(value, 'movieId', 0);
-    var track = pick(tracks);
-    if (track) return load(String(movie || ''), track);
-    var offered = [];
-    for (var i = 0; i < tracks.length; i++) offered.push(String(tracks[i].language));
-    say('this title offers no Japanese subtitles as a file. It offers:',
-      offered.join(', ') || '(nothing)');
+    var offered = usable(tracks);
+    if (!offered.length) {
+      var names = [];
+      for (var i = 0; i < tracks.length; i++) names.push(String(tracks[i].language));
+      say('this title offers no subtitle track as a plain file. It offers:',
+        names.join(', ') || '(nothing)');
+      return;
+    }
+    // Which language is being read is LLL's question, not this file's: this
+    // is page code and knows nothing about the extension's settings. So every
+    // usable track goes over the wall and the content script, which does know,
+    // asks for the one it wants back.
+    offering = {};
+    for (var t = 0; t < offered.length; t++) offering[offered[t].url] = String(movie || '');
+    say('this title offers', offered.length, 'subtitle tracks as plain files:',
+      offered.map(function (o) { return o.language; }).join(', '));
+    window.postMessage({
+      lll: 'lll-netflix-tracks', movie: String(movie || ''), tracks: offered
+    }, '*');
   }
+
+  /*
+   * Which track the content script is allowed to ask for, by address. A page
+   * has many scripts on it and any of them can post a message to this window;
+   * fetching whatever address one of them names would be handing out a fetch.
+   * Only the addresses that came out of Netflix's own track list are here.
+   */
+  var offering = {};
+
+  window.addEventListener('message', function (e) {
+    if (e.source !== window) return;
+    var data = e.data;
+    if (!data || data.lll !== 'lll-netflix-fetch' || typeof data.url !== 'string') return;
+    if (!Object.prototype.hasOwnProperty.call(offering, data.url)) return;
+    load(offering[data.url], { url: data.url });
+  });
 
   /**
    * The other two ways a reply becomes an object without JSON.parse ever
@@ -197,6 +264,18 @@
         noteRequest(this.__lllUrl);
         this.addEventListener('load', function () {
           try {
+            // The subtitle file, if this was it. Read whichever way the
+            // player asked for the body: it takes some of them as text and
+            // some as bytes, and a subtitle file is small either way.
+            if (couldBeFile(this.__lllUrl)) {
+              var body = '';
+              if (!this.responseType || this.responseType === 'text') body = this.responseText;
+              else if (this.responseType === 'arraybuffer' && this.response &&
+                this.response.byteLength < BIGGEST) {
+                body = new TextDecoder('utf-8').decode(new Uint8Array(this.response));
+              }
+              if (body && caught(body, this.__lllUrl)) return;
+            }
             if (this.responseType && this.responseType !== 'text') {
               if (this.responseType === 'json') fromReply(this.response, this.__lllUrl);
               return;
@@ -312,26 +391,32 @@
   }
 
   /**
-   * The Japanese track, preferring subtitles to closed captions.
+   * Every track that is really there to be read, said plainly.
    *
-   * A closed-caption track writes out speaker names and sounds as well as
-   * speech, which is not what you are trying to read, so the plain subtitle
-   * track wins wherever a title offers both.
+   * Forced narrative is the track that translates a sign on a wall in an
+   * otherwise undubbed scene, a handful of lines for a whole film, and the
+   * "none" track is the absence of one. Neither is a subtitle track in the
+   * sense of something to read along with.
+   *
+   * Closed captions are kept but marked: they write out speaker names and
+   * sounds as well as speech, so the plain subtitle track is the better read
+   * wherever a title has both, and the choosing happens on the other side.
    */
-  function pick(tracks) {
-    var best = null;
+  function usable(tracks) {
+    var out = [];
     for (var i = 0; i < tracks.length; i++) {
       var track = tracks[i];
       if (track.isForcedNarrative || track.isNoneTrack) continue;
-      if (String(track.language || '').slice(0, 2) !== 'ja') continue;
       var file = track.ttDownloadables && track.ttDownloadables[WEBVTT];
       var urls = file && file.urls;
       if (!urls || !urls.length || !urls[0] || !urls[0].url) continue;
-      var captions = track.rawTrackType === 'closedcaptions';
-      if (best && !(best.captions && !captions)) continue;
-      best = { url: urls[0].url, captions: captions };
+      out.push({
+        language: String(track.language || ''),
+        captions: track.rawTrackType === 'closedcaptions',
+        url: String(urls[0].url)
+      });
     }
-    return best;
+    return out;
   }
 
   var got = false;
@@ -349,11 +434,95 @@
     }).then(function (vtt) {
       if (!vtt) { say('the subtitle file came back empty'); return; }
       say('got the subtitle file,', vtt.length, 'characters');
-      window.postMessage({ lll: 'lll-netflix-subtitles', movie: movie, vtt: vtt }, '*');
+      window.postMessage({
+        lll: 'lll-netflix-subtitles', movie: movie, format: 'vtt', text: vtt, vtt: vtt
+      }, '*');
     }).catch(function (err) {
       fetched = '';                       // let a later attempt try again
       say('could not fetch the subtitle file:', err && err.message);
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // The file itself, on its way to the player
+  // ---------------------------------------------------------------------
+
+  /*
+   * A subtitle file, recognised by what is in it rather than by where it came
+   * from. Netflix's addresses say nothing: no extension, no useful content
+   * type, one opaque query parameter. What the body is, though, is either
+   * plainly WebVTT or plainly TTML, and both announce themselves in their
+   * first few characters.
+   */
+  var caughtText = '';
+
+  function looksLikeSubtitles(text) {
+    if (!text || typeof text !== 'string' || text.length > BIGGEST) return '';
+    var head = text.slice(0, 400);
+    if (/^\uFEFF?WEBVTT/.test(head)) return 'vtt';
+    // TTML, which is what Netflix actually serves unless the manifest was
+    // asked for something else: an XML document whose root element is <tt>.
+    if (/<tt[\s>]/.test(head) && /ttml|ttaf/i.test(head)) return 'ttml';
+    return '';
+  }
+
+  /** Hand a caught file over to the content script, once each. */
+  function caught(text, where) {
+    var format = looksLikeSubtitles(text);
+    if (!format) return false;
+    if (text === caughtText) return true;      // the same file, fetched twice
+    caughtText = text;
+    got = true;
+    say('caught the subtitle file the player is using,', text.length,
+      'characters of ' + format.toUpperCase() + ', from',
+      String(where || 'somewhere').slice(0, 90));
+    window.postMessage({
+      lll: 'lll-netflix-subtitles', movie: movieId(), format: format, text: text,
+      // Kept under its old name as well, so nothing that was reading `vtt`
+      // has to know that a file can now arrive in two formats.
+      vtt: format === 'vtt' ? text : ''
+    }, '*');
+    return true;
+  }
+
+  /**
+   * Worth reading the body of? Only a handful of requests are, and a subtitle
+   * file is one of them, so everything else is dropped on the address alone
+   * rather than on its contents: the player fetches a great deal of video and
+   * reading any of it into a string would be absurd.
+   */
+  function couldBeFile(where) {
+    if (!where) return false;
+    try {
+      return FILES.test(new URL(where, location.href).hostname);
+    } catch (err) {
+      return false;
+    }
+  }
+
+  /** A reply that says outright what it is. Cheaper than reading it to see. */
+  function saysSubtitles(res) {
+    try {
+      var type = res.headers && res.headers.get && res.headers.get('content-type');
+      return !!type && /vtt|ttml|dfxp|xml[+]|text[/]xml/i.test(String(type));
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function sniffResponse(res) {
+    try {
+      if (!res) return;
+      // Either the address is one of Netflix's own file addresses, or the
+      // reply says what it is. Netflix's own say nothing useful, which is why
+      // the address is checked at all; another host that serves a subtitle
+      // file properly labelled is worth catching too.
+      if (!couldBeFile(res.url) && !saysSubtitles(res)) return;
+      // A clone, so the player still gets its own body unread. Reading the
+      // real one would empty it.
+      res.clone().text().then(function (text) { caught(text, res.url); },
+        function () { /* not text, so not subtitles */ });
+    } catch (err) { /* leave the response alone */ }
   }
 
   /**
@@ -371,10 +540,19 @@
   if (typeof fetch === 'function') {
     var realFetch = fetch;
     fetch = function (input, init) {
+      var where = '';
       try {
-        noteRequest(typeof input === 'string' ? input : (input && input.url) || '');
+        where = typeof input === 'string' ? input : (input && input.url) || '';
+        noteRequest(where);
       } catch (err) { /* leave the request alone */ }
-      return realFetch.apply(this || window, arguments);
+      var answer = realFetch.apply(this || window, arguments);
+      try {
+        // A derived promise: a failure in here can never become an unhandled
+        // rejection on the one the player is waiting for. What it costs for
+        // every other request on the site is one header lookup.
+        answer.then(function (res) { sniffResponse(res); }, function () {});
+      } catch (err) { /* leave the request alone */ }
+      return answer;
     };
   }
 

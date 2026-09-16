@@ -1328,6 +1328,114 @@ const run = async () => {
       Subs.parseVtt('WEBVTT').length === 0);
   }
 
+  // --- Netflix's own subtitle file, as it really arrives ---------------------
+  // WebVTT is what Netflix sends when the manifest has been talked into
+  // offering it. Left alone it sends TTML, and that is the file that goes past
+  // on the way to the player whether or not anything was injected, so it is
+  // the one that has to be read.
+  //
+  // parseTtml uses DOMParser, which the browser has and Node does not. What
+  // stands in for it here is the smallest XML reader that answers the handful
+  // of questions parseTtml asks: elements, their attributes by local name,
+  // their children in order, and their text. It is a stand-in for the
+  // browser's parser, not a test of one.
+  {
+    globalThis.DOMParser = class {
+      parseFromString(text) {
+        const decode = (raw) => String(raw)
+          .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&');
+        const node = (name, attrs) => ({
+          nodeType: 1, localName: name.split(':').pop(), nodeName: name,
+          attributes: attrs, childNodes: [], firstChild: null, nextSibling: null,
+          getAttribute(wanted) {
+            const found = this.attributes.find((a) => a.name === wanted);
+            return found ? found.value : null;
+          }
+        });
+        const finish = (el) => {
+          el.childNodes.forEach((child, i) => {
+            child.nextSibling = el.childNodes[i + 1] || null;
+            if (child.nodeType === 1) finish(child);
+          });
+          el.firstChild = el.childNodes[0] || null;
+        };
+        const source = String(text).replace(/<[?!][^>]*>/g, '');
+        const stack = [node('#document', [])];
+        const tag = /<(\/?)([\w:.-]+)((?:\s[^<>]*?)?)(\/?)>/g;
+        let at = 0;
+        let match;
+        while ((match = tag.exec(source))) {
+          const between = source.slice(at, match.index);
+          if (between.trim() || /[^\s]/.test(between)) {
+            stack[stack.length - 1].childNodes.push(
+              { nodeType: 3, nodeValue: decode(between) });
+          }
+          at = tag.lastIndex;
+          const [, closing, name, rawAttrs, empty] = match;
+          if (closing) { stack.pop(); continue; }
+          const attrs = [];
+          const attr = /([\w:.-]+)\s*=\s*"([^"]*)"/g;
+          let one;
+          while ((one = attr.exec(rawAttrs || ''))) {
+            attrs.push({ name: one[1], value: decode(one[2]),
+              localName: one[1].split(':').pop() });
+          }
+          const made = node(name, attrs);
+          stack[stack.length - 1].childNodes.push(made);
+          if (!empty) stack.push(made);
+        }
+        const doc = stack[0];
+        finish(doc);
+        const every = [];
+        const walk = (el) => el.childNodes.forEach((child) => {
+          if (child.nodeType !== 1) return;
+          every.push(child);
+          walk(child);
+        });
+        walk(doc);
+        doc.documentElement = doc.childNodes.find((c) => c.nodeType === 1) || null;
+        doc.getElementsByTagNameNS = (ns, name) =>
+          every.filter((el) => el.localName === name);
+        doc.getElementsByTagName = (name) =>
+          every.filter((el) => el.localName === name);
+        return doc;
+      }
+    };
+
+    // Netflix writes its times as ticks against a rate declared on the root,
+    // which is the one shape a reader written for WebVTT would get wrong
+    // without noticing: "108108000t" parses as a perfectly good number.
+    const ttml = [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      '<tt xmlns="http://www.w3.org/ns/ttml" ttp:tickRate="10000000"',
+      '    ttp:frameRate="24" xml:lang="it">',
+      '<body><div>',
+      '<p begin="10000000t" end="35000000t">Mi chiamo Giuseppe<br/>e ho una missione</p>',
+      '<p begin="00:00:04.000" end="00:00:06.500">Perch\u00e9 nel posto</p>',
+      '<p begin="00:00:08.000" dur="00:00:02.000">in cui nessuno &amp; nulla</p>',
+      '<p begin="120000000t" end="130000000t">',
+      '<span ruby="container"><span ruby="base">\u7686</span>',
+      '<span ruby="text">\u307f\u306a</span></span>\u3055\u3093</p>',
+      '</div></body></tt>'
+    ].join('\n');
+    const cues = Subs.parseTtml(ttml);
+    check('every paragraph of a TTML file is read', cues.length === 4, cues.length);
+    check('ticks are read against the rate the file declares',
+      cues[0].start === 1 && cues[0].end === 3.5, JSON.stringify(cues[0]));
+    check('a line broken in two is still one line',
+      cues[0].text === 'Mi chiamo Giuseppe e ho una missione', cues[0].text);
+    check('a clock time is read as a clock time',
+      cues[1].start === 4 && cues[1].end === 6.5, JSON.stringify(cues[1]));
+    check('a length is as good as an end', cues[2].end === 10, cues[2].end);
+    check('and what the file says is what is read',
+      cues[2].text === 'in cui nessuno & nulla', cues[2].text);
+    check('ruby is a reading, not more of the sentence',
+      cues[3].text === '\u7686\u3055\u3093', cues[3].text);
+    check('a file that is not a file at all is no lines rather than a crash',
+      Subs.parseTtml('not xml at all').length === 0);
+  }
+
   // --- asking Netflix for a format that can be read -------------------------
   // netflix-page.js runs as page code, so its whole world is the page: two
   // hooks on JSON and a fetch. A sandbox with a JSON of its own is therefore
@@ -1335,18 +1443,37 @@ const run = async () => {
   {
     let posted = null;
     let asked = null;
+    const heard = [];
+    const listeners = [];
+    const bodies = {};
     const sandbox = {
       console: { log() {}, warn() {}, error() {} },
+      // A file comes back for whatever is asked for: the WebVTT a chosen
+      // track answers with, unless this test has put something else at that
+      // address. `clone`, because a response read on its way past has to be
+      // read from a copy, or the player would be handed an empty body.
       fetch: async (url) => {
         asked = url;
-        return { ok: true, text: async () => 'WEBVTT' };
+        const body = Object.prototype.hasOwnProperty.call(bodies, url) ? bodies[url] : 'WEBVTT';
+        return { ok: true, url, text: async () => body, clone() { return this; } };
       },
-      window: { postMessage(message) { posted = message; } },
+      // The page and the content script talk by posting messages to the one
+      // window they share, so both halves of that are needed here: what the
+      // page says, and what it is told back.
+      window: {
+        postMessage(message) { posted = message; heard.push(message); },
+        addEventListener(kind, fn) { if (kind === 'message') listeners.push(fn); }
+      },
       // A reply becomes an object by one of three routes, and only one of
       // them is JSON.parse. These are the other two.
       Response: function Response() {},
-      location: { href: 'https://www.netflix.com/watch/81234567' },
+      location: { href: 'https://www.netflix.com/watch/81234567',
+        pathname: '/watch/81234567' },
       navigator: {},
+      // Both of these are a browser's, and the page script uses them to tell
+      // a subtitle file from the rest of what the player downloads.
+      URL,
+      TextDecoder,
       XMLHttpRequest: function XMLHttpRequest() {},
       // The page script sets a timer to say so if nothing ever comes back.
       // Let go of it, or the tests would sit and wait out its twenty-five
@@ -1367,6 +1494,10 @@ const run = async () => {
 
     const stringify = (value) => vm.runInContext('JSON.stringify(value)',
       Object.assign(sandbox, { value }));
+
+    /** The content script answering, which is a message from the same window. */
+    const fromContentScript = (message) =>
+      listeners.forEach((fn) => fn({ source: sandbox.window, data: message }));
 
     const request = { url: '/nq/msl_v1/cadmium/pbo_manifests',
       manifest: { profiles: ['playready-h264'] } };
@@ -1406,13 +1537,34 @@ const run = async () => {
     check('and handed back as one of the page’s own objects',
       vm.runInContext('JSON.parse(answer) instanceof Object', sandbox) === true);
     await new Promise((r) => setTimeout(r, 10));
-    check('the Japanese subtitles are fetched, not the English',
-      asked === 'https://x/ja.vtt', asked);
-    check('and the plain track is preferred to the closed captions',
-      asked !== 'https://x/ja-cc.vtt', asked);
+    // Which language to read is the extension's question and not this file's:
+    // page code knows nothing about LLL's settings, so it offers what the
+    // title has and is told which of them to fetch.
+    check('every track that can be read is offered, the forced one is not',
+      posted && posted.lll === 'lll-netflix-tracks' && posted.tracks.length === 3,
+      JSON.stringify(posted));
+    check('and each is offered with the language it is in',
+      posted.tracks.map((t) => t.language).join(',') === 'en,ja,ja', JSON.stringify(posted));
+    check('a closed-caption track says that it is one',
+      posted.tracks[1].captions === true && posted.tracks[2].captions === false,
+      JSON.stringify(posted.tracks));
+    check('nothing is fetched until it is asked for', asked === null, asked);
+
+    fromContentScript({ lll: 'lll-netflix-fetch', url: 'https://x/ja.vtt' });
+    await new Promise((r) => setTimeout(r, 10));
+    check('the track asked for is the track fetched', asked === 'https://x/ja.vtt', asked);
     check('the file reaches the rest of LLL, with the episode it belongs to',
       posted && posted.lll === 'lll-netflix-subtitles' && posted.movie === '81234567' &&
-      posted.vtt === 'WEBVTT', JSON.stringify(posted));
+      posted.text === 'WEBVTT' && posted.format === 'vtt', JSON.stringify(posted));
+
+    // A page has many scripts on it and any of them can post to its window.
+    // Only the addresses that came out of Netflix's own track list are ever
+    // fetched, or this would be handing out a fetch to whoever asks.
+    asked = null;
+    fromContentScript({ lll: 'lll-netflix-fetch', url: 'https://somewhere.else/private' });
+    await new Promise((r) => setTimeout(r, 10));
+    check('an address LLL never offered is not fetched for whoever asked',
+      asked === null, asked);
 
     // The same answer, arriving the way fetch delivers one. response.json()
     // never calls JSON.parse, the browser parses the body itself, so a site
@@ -1437,7 +1589,8 @@ const run = async () => {
       value.result.movieId === 81234567 && value.result.timedtexttracks.length === 4);
     await new Promise((r) => setTimeout(r, 10));
     check('the subtitles are found in it all the same',
-      asked === 'https://x/ja2.vtt', asked);
+      posted && posted.lll === 'lll-netflix-tracks' &&
+      posted.tracks.some((t) => t.url === 'https://x/ja2.vtt'), JSON.stringify(posted));
 
     // What a reply is judged on is what is in it, and only that. Every other
     // reply on the site passes through the same hook and is dropped after one
@@ -1449,8 +1602,89 @@ const run = async () => {
     other.body = JSON.stringify({ result: { movieId: 5, episodes: ['a', 'b'] } });
     await other.json();
     await new Promise((r) => setTimeout(r, 10));
-    check('a reply with no track list in it is left alone', asked === null, asked);
+    check('a reply with no track list in it is left alone', posted === null, posted);
+
+    // --- and the way that needs no manifest at all -------------------------
+    // The subtitle file itself is fetched in the clear, from Netflix's own
+    // delivery network, whatever the manifest was or was not talked into
+    // offering. Whatever the viewer has turned on comes past this window.
+    posted = null;
+    const ttmlFile = '<?xml version="1.0"?><tt xmlns="http://www.w3.org/ns/ttml" ' +
+      'ttp:tickRate="10000000"><body><div><p begin="10000000t" end="20000000t">' +
+      'Mi chiamo Giuseppe</p></div></body></tt>';
+    bodies['https://oca.nflxvideo.net/?o=1&v=2'] = ttmlFile;
+    bodies['https://oca.nflxvideo.net/?o=1&v=3'] = ttmlFile;
+    bodies['https://oca.nflxvideo.net/range/0-100'] = 'not subtitles at all';
+    await vm.runInContext('fetch("https://oca.nflxvideo.net/?o=1&v=2")', sandbox);
+    await new Promise((r) => setTimeout(r, 10));
+    check('the subtitle file is caught on its way to the player',
+      posted && posted.lll === 'lll-netflix-subtitles' && posted.format === 'ttml' &&
+      posted.text === ttmlFile, JSON.stringify(posted && posted.format));
+
+    posted = null;
+    await vm.runInContext('fetch("https://oca.nflxvideo.net/?o=1&v=3")', sandbox);
+    await new Promise((r) => setTimeout(r, 10));
+    check('and the same file arriving twice is caught once', posted === null, posted);
+
+    posted = null;
+    await vm.runInContext('fetch("https://oca.nflxvideo.net/range/0-100")', sandbox);
+    await new Promise((r) => setTimeout(r, 10));
+    check('what is not a subtitle file is not taken for one', posted === null, posted);
   }
+  // --- choosing which of Netflix's tracks to read ---------------------------
+  // The page script offers every track the title has, because page code knows
+  // nothing about LLL's settings. netflix.js is the half that does know, and
+  // the whole of its job here is to name one of them.
+  {
+    let posted = null;
+    const listeners = [];
+    const sandbox = {
+      console: { log() {}, warn() {}, error() {} },
+      window: {
+        postMessage(message) { posted = message; },
+        addEventListener(kind, fn) { if (kind === 'message') listeners.push(fn); }
+      },
+      LLLLang: { profile: () => ({ subtitles: ['it', 'it-IT'], name: 'Italian' }) }
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix.js'), 'utf8'),
+      sandbox, { filename: 'netflix.js' });
+    const arrives = (message) =>
+      listeners.forEach((fn) => fn({ source: sandbox.window, data: message }));
+
+    arrives({ lll: 'lll-netflix-tracks', movie: '81234567', tracks: [
+      { language: 'ja', captions: false, url: 'https://x/ja.vtt' },
+      { language: 'en', captions: false, url: 'https://x/en.vtt' },
+      { language: 'it-IT', captions: true, url: 'https://x/it-cc.vtt' },
+      { language: 'it', captions: false, url: 'https://x/it.vtt' }
+    ] });
+    check('the track asked for is the one in the language being read',
+      posted && posted.lll === 'lll-netflix-fetch' && posted.url === 'https://x/it.vtt',
+      JSON.stringify(posted));
+
+    posted = null;
+    arrives({ lll: 'lll-netflix-tracks', tracks: [
+      { language: 'it-IT', captions: true, url: 'https://x/it-cc.vtt' }
+    ] });
+    check('closed captions will do when they are all there is',
+      posted && posted.url === 'https://x/it-cc.vtt', JSON.stringify(posted));
+
+    posted = null;
+    arrives({ lll: 'lll-netflix-tracks', tracks: [
+      { language: 'ja', captions: false, url: 'https://x/ja.vtt' }
+    ] });
+    check('and a title with nothing to read in it is not asked for anything',
+      posted === null, JSON.stringify(posted));
+
+    arrives({ lll: 'lll-netflix-subtitles', movie: '81234567', format: 'ttml',
+      text: '<tt/>', vtt: '' });
+    const held = vm.runInContext('LLLNetflix.track()', sandbox);
+    check('a file that arrives is held with the format it is in',
+      held && held.format === 'ttml' && held.text === '<tt/>' && held.movie === '81234567',
+      JSON.stringify(held));
+  }
+
   check('and nor is anywhere else', Subs.siteFor('example.com') === null);
 
   Subs._setCues(parsed);

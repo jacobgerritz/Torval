@@ -60,13 +60,57 @@ var LLLNetflix = (function () {
 
   var caught = null;
   window.addEventListener('message', function (e) {
-    // Only this page, and only this message. Anything can post to a window.
+    // Only this page, and only these messages. Anything can post to a window.
     if (e.source !== window) return;
     var data = e.data;
-    if (!data || data.lll !== 'lll-netflix-subtitles') return;
-    if (typeof data.vtt !== 'string' || !data.vtt) return;
-    caught = { movie: String(data.movie || ''), vtt: data.vtt };
+    if (!data) return;
+    if (data.lll === 'lll-netflix-subtitles') {
+      var text = typeof data.text === 'string' && data.text ? data.text : data.vtt;
+      if (typeof text !== 'string' || !text) return;
+      caught = {
+        movie: String(data.movie || ''),
+        format: data.format === 'ttml' ? 'ttml' : 'vtt',
+        text: text,
+        // The old name, for anything still reading it.
+        vtt: text
+      };
+      return;
+    }
+    if (data.lll === 'lll-netflix-tracks' && Array.isArray(data.tracks)) {
+      askFor(data.tracks);
+    }
   });
+
+  /**
+   * Which of the tracks Netflix offered to ask for.
+   *
+   * netflix-page.js is page code and knows nothing about which language LLL
+   * is set to read, so it offers all of them and this chooses. The language
+   * comes from the active profile, the same list the YouTube side filters
+   * its tracks with, and a plain subtitle track beats a closed-caption one:
+   * closed captions write out speaker names and sounds as well as speech.
+   */
+  function askFor(tracks) {
+    var wanted = (typeof LLLLang !== 'undefined' && LLLLang.profile().subtitles) || ['ja'];
+    var best = null;
+    for (var i = 0; i < tracks.length; i++) {
+      var track = tracks[i];
+      var code = String(track.language || '');
+      var matches = wanted.some(function (want) {
+        return code === want || code.slice(0, 2) === String(want).slice(0, 2);
+      });
+      if (!matches) continue;
+      if (best && !(best.captions && !track.captions)) continue;
+      best = track;
+    }
+    if (!best) {
+      say('this title has no', wanted[0], 'subtitle file. It offers:',
+        tracks.map(function (t) { return t.language; }).join(', ') || '(nothing)');
+      return;
+    }
+    say('asking for the', best.language, 'subtitle file');
+    window.postMessage({ lll: 'lll-netflix-fetch', url: best.url }, '*');
+  }
 
   /**
    * What the player itself is holding, said out loud.
