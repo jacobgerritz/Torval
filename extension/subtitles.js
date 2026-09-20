@@ -1882,9 +1882,30 @@ var TorvalSubtitles = (function () {
     TorvalBar.skipButton(canSkip(), skipping, skipSpeed);
   }
 
-  /** Is there anything to skip: a video, and the whole of its transcript? */
+  /**
+   * Is there anything to skip: a video, and the whole of its transcript?
+   *
+   * The transcript is the part people notice. Torval gets one for most
+   * videos, but when YouTube has no track in the language being read, or
+   * hands back nothing for the one it has, it falls back to reading the
+   * captions off the screen, and then a line is not known until it has
+   * been shown. Skipping ahead through what has not been read yet would
+   * race through speech, so the switch is not offered at all.
+   *
+   * That is the answer to "why is the button missing on this one", and it
+   * is said once per video in the console, since a control that is simply
+   * absent explains nothing by itself.
+   */
+  var saidWhyNot = '';
+
   function canSkip() {
-    return !!(enabled && !suspended && video && state === 'ready' && cues.length);
+    var able = !!(enabled && !suspended && video && state === 'ready' && cues.length);
+    if (!able && videoId && state === 'watching' && saidWhyNot !== videoId) {
+      saidWhyNot = videoId;
+      console.log('Torval: no skipping on this video. Its subtitles are being read ' +
+        'off the screen, so what has not been played yet is not known.');
+    }
+    return able;
   }
 
   /**
