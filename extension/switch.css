@@ -90,7 +90,17 @@ body {
   color: #767b84;
 }
 
-nav { display: flex; gap: 8px; }
+/*
+ * The two doors, under the switch rather than against it. Without the
+ * margin they sat flush to the On row, which read as one control with a
+ * toggle stuck to the top of it instead of two separate things. 14px is
+ * the same gap the language picker already leaves beneath itself.
+ *
+ * A margin here rather than a gap on #main, because #main carries the
+ * hidden attribute until a language has been picked, and giving it a
+ * display of its own would override that and show it empty.
+ */
+nav { display: flex; gap: 8px; margin-top: 14px; }
 
 nav button {
   flex: 1;
