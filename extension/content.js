@@ -1225,10 +1225,45 @@
     card.addEventListener('mousedown', (e) => e.stopPropagation());
 
     root.append(style, card);
-    (document.body || document.documentElement).appendChild(host);
     ui = { host, card };
+    attach();
     watchSize(card);
+
+    // Going in or out of full screen moves the popup, and closes it. Moving
+    // it is the fix; closing it is because the screen it was measured
+    // against has just been replaced by a different one, and a card left
+    // pinned to coordinates from the old one lands somewhere arbitrary.
+    document.addEventListener('fullscreenchange', () => {
+      attach();
+      hide();
+    });
     return ui;
+  }
+
+  /*
+   * Where the popup hangs.
+   *
+   * Ordinarily the end of the body, which is the right answer for a page.
+   * Full screen is the exception, and it is not a styling problem that can
+   * be fixed with a larger z-index: while an element is full screen the
+   * browser draws that element and its descendants and nothing else, so a
+   * popup parked at the end of the body is still there, still positioned,
+   * still on top of everything, and completely invisible. This is why
+   * hovering a Netflix subtitle full screen did nothing: the lookup ran, the
+   * card was built and filled, and it was drawn somewhere nobody could see.
+   *
+   * So it hangs inside whatever is full screen, and comes back out
+   * afterwards. Re-checked whenever the popup is placed as well, because a
+   * player that rebuilds itself takes anything hanging inside it along.
+   */
+  function popupParent() {
+    return document.fullscreenElement || document.body || document.documentElement;
+  }
+
+  function attach() {
+    if (!ui) return;
+    const parent = popupParent();
+    if (ui.host.parentNode !== parent) parent.appendChild(ui.host);
   }
 
   function hide() {
@@ -1844,6 +1879,7 @@
    */
   function place(at) {
     const { host, card } = ui;
+    attach();
     host.style.display = 'block';
     host.style.left = '0px';
     host.style.top = '0px';
