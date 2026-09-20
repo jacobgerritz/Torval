@@ -1,5 +1,5 @@
 /*
- * The Netflix end of things, on LLL's side of the page.
+ * The Netflix end of things, on Torval's side of the page.
  *
  * Two jobs, both about the player rather than about the words.
  *
@@ -21,11 +21,11 @@
  * reason netflix-page.js is a separate file living in a different world.
  */
 
-var LLLNetflix = (function () {
+var TorvalNetflix = (function () {
   'use strict';
 
   function say() {
-    var parts = ['LLL (Netflix):'];
+    var parts = ['Torval (Netflix):'];
     for (var i = 0; i < arguments.length; i++) parts.push(arguments[i]);
     console.log.apply(console, parts);
   }
@@ -64,7 +64,7 @@ var LLLNetflix = (function () {
     if (e.source !== window) return;
     var data = e.data;
     if (!data) return;
-    if (data.lll === 'lll-netflix-subtitles') {
+    if (data.torval === 'torval-netflix-subtitles') {
       var text = typeof data.text === 'string' && data.text ? data.text : data.vtt;
       if (typeof text !== 'string' || !text) return;
       caught = {
@@ -76,7 +76,7 @@ var LLLNetflix = (function () {
       };
       return;
     }
-    if (data.lll === 'lll-netflix-tracks' && Array.isArray(data.tracks)) {
+    if (data.torval === 'torval-netflix-tracks' && Array.isArray(data.tracks)) {
       askFor(data.tracks);
     }
   });
@@ -95,27 +95,27 @@ var LLLNetflix = (function () {
    * and the language it reads is only settled once storage has answered.
    */
   function announce() {
-    var wanted = (typeof LLLLang !== 'undefined' && LLLLang.profile().subtitles) || null;
+    var wanted = (typeof TorvalLang !== 'undefined' && TorvalLang.profile().subtitles) || null;
     if (!wanted) return;
-    window.postMessage({ lll: 'lll-netflix-want', languages: wanted }, '*');
+    window.postMessage({ torval: 'torval-netflix-want', languages: wanted }, '*');
   }
 
   announce();
   setTimeout(announce, 2000);
   setTimeout(announce, 6000);
-  if (typeof LLLLang !== 'undefined' && LLLLang.onChange) LLLLang.onChange(announce);
+  if (typeof TorvalLang !== 'undefined' && TorvalLang.onChange) TorvalLang.onChange(announce);
 
   /**
    * Which of the tracks Netflix offered to ask for.
    *
-   * netflix-page.js is page code and knows nothing about which language LLL
+   * netflix-page.js is page code and knows nothing about which language Torval
    * is set to read, so it offers all of them and this chooses. The language
    * comes from the active profile, the same list the YouTube side filters
    * its tracks with, and a plain subtitle track beats a closed-caption one:
    * closed captions write out speaker names and sounds as well as speech.
    */
   function askFor(tracks) {
-    var wanted = (typeof LLLLang !== 'undefined' && LLLLang.profile().subtitles) || ['ja'];
+    var wanted = (typeof TorvalLang !== 'undefined' && TorvalLang.profile().subtitles) || ['ja'];
     var best = null;
     for (var i = 0; i < tracks.length; i++) {
       var track = tracks[i];
@@ -133,7 +133,7 @@ var LLLNetflix = (function () {
       return;
     }
     say('asking for the', best.language, 'subtitle file');
-    window.postMessage({ lll: 'lll-netflix-fetch', url: best.url }, '*');
+    window.postMessage({ torval: 'torval-netflix-fetch', url: best.url }, '*');
   }
 
   /**
@@ -143,7 +143,7 @@ var LLLNetflix = (function () {
    * its question, which was no: twenty tracks, each with a name, a language
    * and a type, and nothing to fetch and no cues. Kept because it is the
    * first thing to run again if Netflix changes, and because it costs
-   * nothing sitting here. Nothing calls it; type LLLNetflix.describe() in
+   * nothing sitting here. Nothing calls it; type TorvalNetflix.describe() in
    * the console on a playing episode.
    *
    * This only reads and reports. It changes nothing.
@@ -204,10 +204,10 @@ var LLLNetflix = (function () {
   };
 })();
 
-// Named on the window as well as declared. LLL's other content scripts and
+// Named on the window as well as declared. Torval's other content scripts and
 // this one are separate entries in the manifest, and while the browser gives
 // every content script of one extension the same world to live in, one line
 // here is cheaper than depending on that.
-if (typeof window !== 'undefined') window.LLLNetflix = LLLNetflix;
+if (typeof window !== 'undefined') window.TorvalNetflix = TorvalNetflix;
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLNetflix;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalNetflix;

@@ -1,13 +1,13 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>PREVIEW, not your real LLL reader</title>
+<title>PREVIEW, not your real Torval reader</title>
 <!--
   A page for working on the reader without reloading the extension in Firefox
   every time.
 
       node tools/serve.mjs   ->  http://localhost:8137/tools/reader-preview.html
 
-  It runs the real reader.html, reader.js and the page scripts LLL loads into
+  It runs the real reader.html, reader.js and the page scripts Torval loads into
   a book. tools/sample.epub is a small two chapter book to drop on it, ruby
   and all, built by tools/make-epub.mjs. The markup is fetched from the extension rather than copied, so this
   cannot drift out of step with what ships. The fake parts are the dictionary,
@@ -33,6 +33,13 @@
 </style>
 
 <script src="../extension/japanese.js"></script>
+<script src="../extension/scan.js"></script>
+<script src="../extension/italian.js"></script>
+<script src="../extension/italian-scan.js"></script>
+<script src="../extension/spanish.js"></script>
+<script src="../extension/spanish-scan.js"></script>
+<script src="../extension/lang.js"></script>
+<script src="../extension/stress.js"></script>
 <script src="../extension/deinflect.js"></script>
 <script src="../extension/lookup.js"></script>
 <script src="preview-words.js"></script>
@@ -40,9 +47,9 @@
 // The book is kept in this tab's own session storage rather than in the
 // extension's. It survives a reload, so coming back to a book can be tried
 // here, and it is gone when the tab closes.
-const stored = JSON.parse(sessionStorage.getItem("lll-preview-store") || "{}");
+const stored = JSON.parse(sessionStorage.getItem("torval-preview-store") || "{}");
 const remember = () => {
-  try { sessionStorage.setItem("lll-preview-store", JSON.stringify(stored)); } catch (e) {}
+  try { sessionStorage.setItem("torval-preview-store", JSON.stringify(stored)); } catch (e) {}
 };
 
 window.browser = {
@@ -76,13 +83,13 @@ window.browser = {
         case 'tags': return TAGS;
         case 'lookup': {
           const found = typeof msg.point === 'number'
-            ? await LLLLookup.hover(msg.text, msg.point, db)
-            : { start: 0, groups: await LLLLookup.search(msg.text, db) };
+            ? await TorvalLookup.hover(msg.text, msg.point, db)
+            : { start: 0, groups: await TorvalLookup.search(msg.text, db) };
           for (const group of found.groups) {
             for (const hit of group.hits) {
-              hit.band = LLLLookup.frequencyBand(hit.q);
-              hit.shared = LLLLookup.sharedTags(hit.entry);
-              hit.sharedPos = LLLLookup.sharedPos(hit.entry);
+              hit.band = TorvalLookup.frequencyBand(hit.q);
+              hit.shared = TorvalLookup.sharedTags(hit.entry);
+              hit.sharedPos = TorvalLookup.sharedPos(hit.entry);
               hit.known = known.has(hit.word);
               hit.ignored = ignored.has(hit.word);
             }
@@ -90,21 +97,21 @@ window.browser = {
           return { status: { state: 'ready' }, groups: found.groups, start: found.start };
         }
         case 'comprehension': {
-          const tokens = await LLLLookup.locateTokens(msg.text, db);
-          return { ok: true, result: LLLLookup.coverage(tokens, known, ignored) };
+          const tokens = await TorvalLookup.locateTokens(msg.text, db);
+          return { ok: true, result: TorvalLookup.coverage(tokens, known, ignored) };
         }
         case 'wordPlaces': {
-          const tokens = await LLLLookup.locateTokens(msg.text, db);
+          const tokens = await TorvalLookup.locateTokens(msg.text, db);
           const places = {};
           const unmarked = [];
           tokens.forEach((t, i) => {
             if (!places[t.word]) {
               places[t.word] = [];
-              if (ignored.has(t.word) || LLLLookup.isKnown(t, known)) unmarked.push(t.word);
+              if (ignored.has(t.word) || TorvalLookup.isKnown(t, known)) unmarked.push(t.word);
             }
             places[t.word].push(t.start, t.length, i % 2);
           });
-          const score = LLLLookup.coverage(tokens, known, ignored);
+          const score = TorvalLookup.coverage(tokens, known, ignored);
           return { ok: true, result: { ...score, places, unmarked } };
         }
         case 'setKnown': return { ok: true, result: { word: msg.word, on: msg.known } };

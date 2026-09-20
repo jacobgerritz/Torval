@@ -1,9 +1,9 @@
 /*
- * LLL, what counts as Japanese
+ * Torval, what counts as Japanese
  *
  * Hiragana, katakana, kanji, the repeat mark 々 and halfwidth katakana.
  *
- * Four separate parts of LLL need to answer "is this character Japanese":
+ * Four separate parts of Torval need to answer "is this character Japanese":
  * deciding where a word could start under the cursor, reading a passage end to
  * end, working out which text on a page is worth marking, and skipping over
  * everything else. They must all answer it the same way, a character one of
@@ -16,6 +16,6 @@
  * asked last.
  */
 
-var LLLJapanese = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
+var TorvalJapanese = /[々〆぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLJapanese;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalJapanese;

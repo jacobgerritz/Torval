@@ -1,5 +1,5 @@
 /*
- * LLL, the comprehension bar
+ * Torval, the comprehension bar
  *
  * One number, across the top of the page: how much of what is in front of you
  * is made of words you already know. On a video that is the whole transcript,
@@ -18,7 +18,7 @@
  * clicked. Pin it and it stays down instead, the way it always used to.
  */
 
-var LLLBar = (function () {
+var TorvalBar = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
@@ -37,7 +37,7 @@ var LLLBar = (function () {
 
   var HANDLE_TITLE = 'How much of this page you understand';
 
-  // What LLL is in the middle of, and the timer waiting to say so.
+  // What Torval is in the middle of, and the timer waiting to say so.
   var pending = null;
   var pendingTimer = null;
 
@@ -83,14 +83,14 @@ var LLLBar = (function () {
 
 
   /**
-   * Say what LLL is busy doing, before there is any number to show.
+   * Say what Torval is busy doing, before there is any number to show.
    *
    * Building the dictionary takes a minute the first time and reading a page
    * takes a moment every time, and until now both happened in complete
    * silence, nothing on the page said anything at all, so the only thing to
    * conclude was that nothing worked. The handle carries it, since that is
-   * what is visible while the bar is tucked away: "LLL 42%" while the
-   * dictionary is still being built, "LLL ·" while a page is being read.
+   * what is visible while the bar is tucked away: "Torval 42%" while the
+   * dictionary is still being built, "Torval ·" while a page is being read.
    */
   function busy(what, progress) {
     pending = { what: what, progress: progress };
@@ -112,8 +112,8 @@ var LLLBar = (function () {
 
   function paintBusy() {
     els.handle.textContent = typeof pending.progress === 'number'
-      ? 'LLL ' + Math.round(pending.progress * 100) + '%'
-      : 'LLL ·';
+      ? 'Torval ' + Math.round(pending.progress * 100) + '%'
+      : 'Torval ·';
     els.handle.classList.add('busy');
     els.handle.title = pending.what;
     els.note.textContent = pending.what;
@@ -131,7 +131,7 @@ var LLLBar = (function () {
   function idle() {
     stopWaiting();
     if (!host) return;
-    els.handle.textContent = 'LLL';
+    els.handle.textContent = 'Torval';
     els.handle.classList.remove('busy');
     els.handle.title = HANDLE_TITLE;
     els.note.hidden = true;
@@ -141,7 +141,7 @@ var LLLBar = (function () {
 
   /**
    * There turned out to be nothing to say about this page. If a number has
-   * been shown before, go back to it; if not, LLL has no business being on
+   * been shown before, go back to it; if not, Torval has no business being on
    * this page at all, so it takes itself off it.
    */
   function quiet() {
@@ -221,7 +221,7 @@ var LLLBar = (function () {
     if (host) return;
 
     host = document.createElement('div');
-    host.setAttribute('data-lll-bar', '');
+    host.setAttribute('data-torval-bar', '');
     root = host.attachShadow({ mode: 'open' });
 
     var style = document.createElement('style');
@@ -229,7 +229,7 @@ var LLLBar = (function () {
 
     els.handle = document.createElement('button');
     els.handle.className = 'handle';
-    els.handle.textContent = 'LLL';
+    els.handle.textContent = 'Torval';
     els.handle.title = HANDLE_TITLE;
     els.handle.addEventListener('click', function () { setExpanded(!expanded); });
 
@@ -244,7 +244,7 @@ var LLLBar = (function () {
 
     var mark = document.createElement('span');
     mark.className = 'mark';
-    mark.textContent = 'LLL';
+    mark.textContent = 'Torval';
 
     els.score = document.createElement('span');
     els.score.className = 'score';
@@ -263,7 +263,7 @@ var LLLBar = (function () {
     var refresh = button('⟳', 'Read this page again', function () {
       if (onRefresh) onRefresh();
     });
-    var settings = button('⚙', 'LLL settings', function () {
+    var settings = button('⚙', 'Torval settings', function () {
       api.runtime.sendMessage({ type: 'openOptions' }).catch(function () {});
     });
     // Not an emoji: an emoji renders in its own colours whatever the CSS
@@ -529,4 +529,4 @@ var LLLBar = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLBar;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalBar;

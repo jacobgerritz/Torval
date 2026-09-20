@@ -1,5 +1,5 @@
 /*
- * LLL, talking to Anki
+ * Torval, talking to Anki
  *
  * Anki itself has no way to accept a card from outside. AnkiConnect, the add-on,
  * opens a small web server on your own machine (port 8765) that does. So adding
@@ -10,12 +10,12 @@
  * which is exactly as it should be.
  */
 
-var LLLAnki = (function () {
+var TorvalAnki = (function () {
   'use strict';
 
   var DEFAULT_URL = 'http://127.0.0.1:8765';
 
-  // What LLL can put on a card. The options page lets you point each field of
+  // What Torval can put on a card. The options page lets you point each field of
   // your note type at one of these. 'pitch' and 'stress' both mean "how the
   // word sounds", Japanese's pitch-accent diagram and Italian's stressed-
   // vowel mark, and only ever one is offered at a time: options.js shows
@@ -164,7 +164,7 @@ var LLLAnki = (function () {
 
   /** Anki media filenames have to survive every filesystem. */
   function audioFilename(word, reading) {
-    return 'lll-' + (word + '-' + (reading || '')).replace(/[^\p{L}\p{N}-]/gu, '') + '.mp3';
+    return 'torval-' + (word + '-' + (reading || '')).replace(/[^\p{L}\p{N}-]/gu, '') + '.mp3';
   }
 
   /** Does the card have a field pointed at this? */
@@ -179,7 +179,7 @@ var LLLAnki = (function () {
    */
   async function addNote(config, note) {
     if (!config || !config.deck || !config.model) {
-      throw new Error('No deck chosen yet, open LLL’s options and pick one.');
+      throw new Error('No deck chosen yet, open Torval’s options and pick one.');
     }
 
     // Only go looking for audio if somewhere on the card wants it.
@@ -210,7 +210,7 @@ var LLLAnki = (function () {
       var value = note[config.fields[field]];
       if (value) { fields[field] = value; any = true; }
     });
-    if (!any) throw new Error('None of the note type’s fields are mapped yet, see LLL’s options.');
+    if (!any) throw new Error('None of the note type’s fields are mapped yet, see Torval’s options.');
 
     // Duplicates are allowed on purpose: mining a second word from a sentence
     // you have already mined once is completely ordinary. Anki's own
@@ -223,7 +223,7 @@ var LLLAnki = (function () {
         deckName: config.deck,
         modelName: config.model,
         fields: fields,
-        tags: config.tags && config.tags.length ? config.tags : ['lll'],
+        tags: config.tags && config.tags.length ? config.tags : ['torval'],
         options: { allowDuplicate: true }
       }
     });
@@ -268,7 +268,7 @@ var LLLAnki = (function () {
    * Open Anki's card browser on a word, and bring Anki to the front.
    *
    * The word and nothing else: every deck, every field, whatever is in the
-   * collection. Searching the deck and field LLL mines into would answer a
+   * collection. Searching the deck and field Torval mines into would answer a
    * narrower question than the one being asked, which is simply "what do I
    * have with this word in it".
    *
@@ -313,4 +313,4 @@ var LLLAnki = (function () {
   };
 })();
 
-if (typeof module !== "undefined" && module.exports) module.exports = LLLAnki;
+if (typeof module !== "undefined" && module.exports) module.exports = TorvalAnki;

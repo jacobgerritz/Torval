@@ -1,17 +1,18 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>LLL settings</title>
+<title>Torval settings</title>
 <link rel="stylesheet" href="options.css">
 
 <div class="layout">
   <nav class="sidebar">
-    <h1>LLL</h1>
+    <h1>Torval</h1>
     <label class="sidebar-language">
       <span>Language</span>
       <select id="language"></select>
     </label>
     <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="anki">Anki</button>
+    <button class="tab" data-panel="about">About</button>
     <span class="sidebar-spacer"></span>
     <button id="open-reader" class="sidebar-action">Open your books</button>
   </nav>
@@ -28,9 +29,6 @@
 
     <section>
       <h2>Add from a text</h2>
-      <p class="note" id="add-text-note">
-        Something you have already read. たべました is added as 食べる.
-      </p>
 
       <textarea id="text" rows="6" spellcheck="false"
         placeholder="日本語のテキストをここに貼り付けてください…"></textarea>
@@ -73,24 +71,21 @@
     </section>
 
     <div class="parting"><h2>Keeping a copy</h2></div>
-    <p class="note count-note">
-      Both lists in one file. This is the only part of LLL that cannot be
-      rebuilt, and it lives in one browser profile.
-    </p>
 
     <section>
-      <p class="row">
-        <button id="save-words" class="primary">Save to a file</button>
-        <span id="save-note" class="note"></span>
-      </p>
+      <!--
+        One row, laid out like the "Choose a file … Add these words" row
+        above it: the file you pick on the left, the button that does the
+        thing on the right. Stacked, these two small buttons left a card of
+        mostly empty space.
+      -->
       <p class="row">
         <label class="pick" for="load-words">Load from a file</label>
         <input type="file" id="load-words" accept=".json,application/json">
         <span id="load-note" class="note"></span>
-      </p>
-      <p class="note">
-        Loading adds to what is here. Nothing is removed, so an old copy is safe.
-        LLL also writes a copy to Downloads/LLL once a day by itself.
+        <span class="spacer"></span>
+        <span id="save-note" class="note"></span>
+        <button id="save-words" class="primary">Save to a file</button>
       </p>
     </section>
   </div>
@@ -117,15 +112,12 @@
 
       <label>
         <span>Tags</span>
-        <input id="tags" type="text" placeholder="lll" spellcheck="false">
+        <input id="tags" type="text" placeholder="torval" spellcheck="false">
       </label>
     </section>
 
     <section id="mapping-section" hidden>
       <h2>What goes in each field</h2>
-      <p class="note">
-        One row per field on your note type. Anything left blank stays empty.
-      </p>
       <div id="mapping"></div>
     </section>
 
@@ -148,6 +140,55 @@
     </p>
   </div>
 
+  <!-- ------------------------------------------------------------------ -->
+
+  <!--
+    Where the words come from. This is not decoration: the dictionaries are
+    other people's work, shared on terms that ask to be named, and a copy of
+    Torval handed to anybody else carries that obligation with it. It is a
+    page in the settings rather than a file in the download because the
+    people who need to read it are the people using the program.
+  -->
+  <div class="panel" id="panel-about" hidden>
+    <section>
+      <h2>Torval <span id="version" class="quiet"></span></h2>
+      <p class="note">
+        A pop-up dictionary that runs entirely on this machine. Nothing you
+        read, look up or mark is sent anywhere; there is no account, no
+        telemetry and no server. The dictionaries were downloaded once, when
+        they were built, and are read out of this browser's own storage.
+      </p>
+      <p class="note">
+        The program is MIT licensed. Its source is at
+        <a href="https://github.com/jacobgerritz/torval">github.com/jacobgerritz/torval</a>.
+      </p>
+    </section>
+
+    <section>
+      <h2>Japanese</h2>
+      <p class="note">
+        <b>JMdict</b>, from the Electronic Dictionary Research and
+        Development Group, under
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+        The same dictionary Jisho is built on.<br>
+        <b>Pitch accent</b> from the Kanjium accent data.<br>
+        <b>Frequency</b> from JPDB and from the Balanced Corpus of
+        Contemporary Written Japanese.
+      </p>
+    </section>
+
+    <section>
+      <h2>Italian and Spanish</h2>
+      <p class="note">
+        <b>Wiktextract</b>, kaikki.org's machine extraction of English
+        Wiktionary, under
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.<br>
+        <b>Frequency</b> from hermitdave/FrequencyWords, built from
+        OpenSubtitles, MIT licensed.
+      </p>
+    </section>
+  </div>
+
   </main>
 </div>
 
@@ -155,6 +196,8 @@
 <script src="scan.js"></script>
 <script src="italian.js"></script>
 <script src="italian-scan.js"></script>
+<script src="spanish.js"></script>
+<script src="spanish-scan.js"></script>
 <script src="lang.js"></script>
 <script src="anki.js"></script>
 <script src="options.js"></script>

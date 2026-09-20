@@ -1,5 +1,5 @@
 /*
- * LLL, test suite
+ * Torval, test suite
  *
  *   node --max-old-space-size=4096 tools/test.mjs
  *
@@ -26,6 +26,11 @@ const Pitch = require(join(ROOT, 'extension', 'pitch.js'));
 const Video = require(join(ROOT, 'extension', 'video.js'));
 const Subs = require(join(ROOT, 'extension', 'subtitles.js'));
 const Highlight = require(join(ROOT, 'extension', 'highlight.js'));
+const Lang = require(join(ROOT, 'extension', 'lang.js'));
+const DeinflectEs = require(join(ROOT, 'extension', 'deinflect-es.js'));
+const DeinflectIt = require(join(ROOT, 'extension', 'deinflect-it.js'));
+const LookupLatin = require(join(ROOT, 'extension', 'lookup-latin.js'));
+const { stressIndex: stressEs } = await import('./stress-es.mjs');
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
@@ -58,6 +63,36 @@ const db = {
     return out;
   }
 };
+
+/** The same, for a second built dictionary read out of its own directory. */
+function loadDictionary(dir) {
+  const own = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8'));
+  const rows = [];
+  for (let i = 0; i < own.entryChunks; i++) {
+    const name = `entries-${String(i).padStart(3, '0')}.json`;
+    for (const e of JSON.parse(readFileSync(join(dir, name), 'utf8'))) {
+      e.id = rows.length;
+      rows.push(e);
+    }
+  }
+  const terms = new Map();
+  for (let i = 0; i < own.indexChunks; i++) {
+    const name = `index-${String(i).padStart(3, '0')}.json`;
+    for (const [term, ids] of JSON.parse(readFileSync(join(dir, name), 'utf8'))) {
+      terms.set(term, ids);
+    }
+  }
+  return {
+    async getEntries(asked) {
+      const out = new Map();
+      for (const term of asked) {
+        const ids = terms.get(term);
+        if (ids) out.set(term, ids.map((id) => rows[id]));
+      }
+      return out;
+    }
+  };
+}
 
 let passed = 0;
 const failures = [];
@@ -269,15 +304,15 @@ const run = async () => {
   await Anki.addNote(
     { deck: 'D', model: 'M', fields: { Images: 'image', 'Sentence Audio': 'sentenceAudio' } },
     { word: '食べる', media: {
-      image: { filename: 'lll-abc.jpg', data: 'AAAA' },
-      sentenceAudio: { filename: 'lll-abc.webm', data: 'BBBB' } } });
+      image: { filename: 'torval-abc.jpg', data: 'AAAA' },
+      sentenceAudio: { filename: 'torval-abc.webm', data: 'BBBB' } } });
   const added = mediaCalls.find((c) => c.action === 'addNote').params.note.fields;
   check('a frame is stored and referenced as an image',
     mediaCalls.filter((c) => c.action === 'storeMediaFile').length === 2 &&
-    added['Images'] === '<img src="lll-abc.jpg">',
+    added['Images'] === '<img src="torval-abc.jpg">',
     JSON.stringify(added));
   check('the line’s audio is stored and referenced as a sound',
-    added['Sentence Audio'] === '[sound:lll-abc.webm]', JSON.stringify(added));
+    added['Sentence Audio'] === '[sound:torval-abc.webm]', JSON.stringify(added));
 
   // What was said just before and just after. Optional: they go on the card
   // only where a field on the note type asks for them, so nobody who has not
@@ -370,7 +405,7 @@ const run = async () => {
   Anki._deadlines(10, 8);
 
   // B opens Anki's browser on a word, with the same search the duplicate
-  // check uses, so what Anki shows is what LLL meant by "already in your
+  // check uses, so what Anki shows is what Torval meant by "already in your
   // collection".
   let sentToAnki = null;
   globalThis.fetch = async (url, init) => {
@@ -420,7 +455,7 @@ const run = async () => {
     return { ok: true, json: async () => ({ result: 1, error: null }) };
   };
   await Anki.addNote(
-    { deck: 'D', model: 'M', fields: guessed, tags: ['lll'] },
+    { deck: 'D', model: 'M', fields: guessed, tags: ['torval'] },
     { word: '食べる', reading: 'たべる', sentence: '<b>食べなかった</b>。',
       definition: '1. to eat' });
   check('the card carries the word, reading, sentence and definition',
@@ -432,7 +467,7 @@ const run = async () => {
   check('unmapped fields are left off the card entirely',
     !('Pitch' in sent.params.note.fields), JSON.stringify(Object.keys(sent.params.note.fields)));
   // Anki would compare first fields, which on a sentence-mining note type is
-  // the sentence; LLL asks about the word instead. See the duplicate tests below.
+  // the sentence; Torval asks about the word instead. See the duplicate tests below.
   check('Anki’s first-field duplicate rule is left off',
     sent.params.note.options.allowDuplicate === true);
 
@@ -458,7 +493,7 @@ const run = async () => {
   check('an unreachable audio host does not throw', (await Anki.fetchAudio('食べる')) === null);
 
   check('media filenames survive any filesystem',
-    /^lll-[\p{L}\p{N}-]+\.mp3$/u.test(Anki.audioFilename('食べる', 'たべる')),
+    /^torval-[\p{L}\p{N}-]+\.mp3$/u.test(Anki.audioFilename('食べる', 'たべる')),
     Anki.audioFilename('食べる', 'たべる'));
 
   // A card must still be made when there is no audio to be had.
@@ -490,7 +525,7 @@ const run = async () => {
   const withAudio = calls.find((c) => c.action === 'addNote');
   check('audio is stored in Anki and referenced by a sound tag',
     calls.some((c) => c.action === 'storeMediaFile') && withAudio &&
-    /^\[sound:lll-.+\.mp3\]$/.test(withAudio.params.note.fields['Word Audio']),
+    /^\[sound:torval-.+\.mp3\]$/.test(withAudio.params.note.fields['Word Audio']),
     JSON.stringify(calls.map((c) => c.action)) + ' ' +
     JSON.stringify(withAudio && withAudio.params.note.fields));
 
@@ -1503,7 +1538,7 @@ const run = async () => {
 
     const request = { url: '/nq/msl_v1/cadmium/pbo_manifests',
       manifest: { profiles: ['playready-h264'] } };
-    check('the request for a title asks for a subtitle format LLL can read',
+    check('the request for a title asks for a subtitle format Torval can read',
       JSON.parse(stringify(request)).manifest.profiles[0] === 'webvtt-lssdh-ios8',
       stringify(request));
     check('and asking twice does not ask for it twice',
@@ -1540,10 +1575,10 @@ const run = async () => {
       vm.runInContext('JSON.parse(answer) instanceof Object', sandbox) === true);
     await new Promise((r) => setTimeout(r, 10));
     // Which language to read is the extension's question and not this file's:
-    // page code knows nothing about LLL's settings, so it offers what the
+    // page code knows nothing about Torval's settings, so it offers what the
     // title has and is told which of them to fetch.
     check('every track that can be read is offered, the forced one is not',
-      posted && posted.lll === 'lll-netflix-tracks' && posted.tracks.length === 3,
+      posted && posted.torval === 'torval-netflix-tracks' && posted.tracks.length === 3,
       JSON.stringify(posted));
     check('and each is offered with the language it is in',
       posted.tracks.map((t) => t.language).join(',') === 'en,ja,ja', JSON.stringify(posted));
@@ -1552,20 +1587,20 @@ const run = async () => {
       JSON.stringify(posted.tracks));
     check('nothing is fetched until it is asked for', asked === null, asked);
 
-    fromContentScript({ lll: 'lll-netflix-fetch', url: 'https://x/ja.vtt' });
+    fromContentScript({ torval: 'torval-netflix-fetch', url: 'https://x/ja.vtt' });
     await new Promise((r) => setTimeout(r, 10));
     check('the track asked for is the track fetched', asked === 'https://x/ja.vtt', asked);
-    check('the file reaches the rest of LLL, with the episode it belongs to',
-      posted && posted.lll === 'lll-netflix-subtitles' && posted.movie === '81234567' &&
+    check('the file reaches the rest of Torval, with the episode it belongs to',
+      posted && posted.torval === 'torval-netflix-subtitles' && posted.movie === '81234567' &&
       posted.text === 'WEBVTT' && posted.format === 'vtt', JSON.stringify(posted));
 
     // A page has many scripts on it and any of them can post to its window.
     // Only the addresses that came out of Netflix's own track list are ever
     // fetched, or this would be handing out a fetch to whoever asks.
     asked = null;
-    fromContentScript({ lll: 'lll-netflix-fetch', url: 'https://somewhere.else/private' });
+    fromContentScript({ torval: 'torval-netflix-fetch', url: 'https://somewhere.else/private' });
     await new Promise((r) => setTimeout(r, 10));
-    check('an address LLL never offered is not fetched for whoever asked',
+    check('an address Torval never offered is not fetched for whoever asked',
       asked === null, asked);
 
     // The same answer, arriving the way fetch delivers one. response.json()
@@ -1591,7 +1626,7 @@ const run = async () => {
       value.result.movieId === 81234567 && value.result.timedtexttracks.length === 4);
     await new Promise((r) => setTimeout(r, 10));
     check('the subtitles are found in it all the same',
-      posted && posted.lll === 'lll-netflix-tracks' &&
+      posted && posted.torval === 'torval-netflix-tracks' &&
       posted.tracks.some((t) => t.url === 'https://x/ja2.vtt'), JSON.stringify(posted));
 
     // What a reply is judged on is what is in it, and only that. Every other
@@ -1620,7 +1655,7 @@ const run = async () => {
     await vm.runInContext('fetch("https://oca.nflxvideo.net/?o=1&v=2")', sandbox);
     await new Promise((r) => setTimeout(r, 10));
     check('the subtitle file is caught on its way to the player',
-      posted && posted.lll === 'lll-netflix-subtitles' && posted.format === 'ttml' &&
+      posted && posted.torval === 'torval-netflix-subtitles' && posted.format === 'ttml' &&
       posted.text === ttmlFile, JSON.stringify(posted && posted.format));
 
     posted = null;
@@ -1635,7 +1670,7 @@ const run = async () => {
   }
   // --- turning the track on, so there is a file to catch ---------------------
   // The file is only fetched when the player is about to show something. The
-  // player will do that when asked, so LLL asks, takes the file that causes,
+  // player will do that when asked, so Torval asks, takes the file that causes,
   // and puts the viewer's own choice back.
   {
     let posted = null;
@@ -1700,7 +1735,7 @@ const run = async () => {
     check('nothing is touched before the extension says what it reads',
       chosen.length === 0, chosen.length);
 
-    arrives({ lll: 'lll-netflix-want', languages: ['it', 'it-IT'] });
+    arrives({ torval: 'torval-netflix-want', languages: ['it', 'it-IT'] });
     check('the track for the language being read is turned on',
       chosen.length === 1 && chosen[0] === tracks[2], chosen.length);
     check('and speech is preferred to the track that writes out sounds',
@@ -1715,16 +1750,16 @@ const run = async () => {
     await new Promise((r) => setTimeout(r, 900));
     check('the file is caught, and the player put back as the viewer had it',
       chosen.length === 2 && chosen[1] === none, JSON.stringify(chosen.length));
-    check('and it is the file that reaches the rest of LLL',
-      posted && posted.lll === 'lll-netflix-subtitles' && posted.format === 'ttml',
-      JSON.stringify(posted && posted.lll));
+    check('and it is the file that reaches the rest of Torval',
+      posted && posted.torval === 'torval-netflix-subtitles' && posted.format === 'ttml',
+      JSON.stringify(posted && posted.torval));
 
     timers.forEach(clearInterval);
   }
 
   // --- choosing which of Netflix's tracks to read ---------------------------
   // The page script offers every track the title has, because page code knows
-  // nothing about LLL's settings. netflix.js is the half that does know, and
+  // nothing about Torval's settings. netflix.js is the half that does know, and
   // the whole of its job here is to name one of them.
   {
     let posted = null;
@@ -1735,7 +1770,7 @@ const run = async () => {
         postMessage(message) { posted = message; },
         addEventListener(kind, fn) { if (kind === 'message') listeners.push(fn); }
       },
-      LLLLang: { profile: () => ({ subtitles: ['it', 'it-IT'], name: 'Italian' }) },
+      TorvalLang: { profile: () => ({ subtitles: ['it', 'it-IT'], name: 'Italian' }) },
       // It says which language it reads more than once at the start, since
       // the two scripts begin at different moments.
       setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
@@ -1748,33 +1783,33 @@ const run = async () => {
     const arrives = (message) =>
       listeners.forEach((fn) => fn({ source: sandbox.window, data: message }));
 
-    arrives({ lll: 'lll-netflix-tracks', movie: '81234567', tracks: [
+    arrives({ torval: 'torval-netflix-tracks', movie: '81234567', tracks: [
       { language: 'ja', captions: false, url: 'https://x/ja.vtt' },
       { language: 'en', captions: false, url: 'https://x/en.vtt' },
       { language: 'it-IT', captions: true, url: 'https://x/it-cc.vtt' },
       { language: 'it', captions: false, url: 'https://x/it.vtt' }
     ] });
     check('the track asked for is the one in the language being read',
-      posted && posted.lll === 'lll-netflix-fetch' && posted.url === 'https://x/it.vtt',
+      posted && posted.torval === 'torval-netflix-fetch' && posted.url === 'https://x/it.vtt',
       JSON.stringify(posted));
 
     posted = null;
-    arrives({ lll: 'lll-netflix-tracks', tracks: [
+    arrives({ torval: 'torval-netflix-tracks', tracks: [
       { language: 'it-IT', captions: true, url: 'https://x/it-cc.vtt' }
     ] });
     check('closed captions will do when they are all there is',
       posted && posted.url === 'https://x/it-cc.vtt', JSON.stringify(posted));
 
     posted = null;
-    arrives({ lll: 'lll-netflix-tracks', tracks: [
+    arrives({ torval: 'torval-netflix-tracks', tracks: [
       { language: 'ja', captions: false, url: 'https://x/ja.vtt' }
     ] });
     check('and a title with nothing to read in it is not asked for anything',
       posted === null, JSON.stringify(posted));
 
-    arrives({ lll: 'lll-netflix-subtitles', movie: '81234567', format: 'ttml',
+    arrives({ torval: 'torval-netflix-subtitles', movie: '81234567', format: 'ttml',
       text: '<tt/>', vtt: '' });
-    const held = vm.runInContext('LLLNetflix.track()', sandbox);
+    const held = vm.runInContext('TorvalNetflix.track()', sandbox);
     check('a file that arrives is held with the format it is in',
       held && held.format === 'ttml' && held.text === '<tt/>' && held.movie === '81234567',
       JSON.stringify(held));
@@ -1950,6 +1985,74 @@ const run = async () => {
     Subs.pickTrack([{ languageCode: 'en', baseUrl: 'x', auto: false }]) === undefined ||
     Subs.pickTrack([{ languageCode: 'en', baseUrl: 'x', auto: false }]) === null);
 
+  // --- asking the transcript panel for a language --------------------------
+  // The panel answers in whichever language it happens to open on, which is
+  // the caption track the viewer last switched on. Left unchecked it handed
+  // back the English transcript of a Japanese video to anybody who had not
+  // already picked Japanese by hand, which is exactly what made choosing the
+  // language by hand feel compulsory.
+  const menu = (items) => ({ anything: { deep: { sortFilterSubMenuRenderer: { subMenuItems: items } } } });
+  const japanese = { languageCode: 'ja', baseUrl: 'x', name: 'Japanese', auto: false };
+
+  check('the language menu is found however deeply it is buried',
+    Subs.languageMenu(menu([
+      { title: 'English', selected: true },
+      { title: { simpleText: 'Japanese' } }
+    ])).map((i) => i.title).join(',') === 'English,Japanese');
+
+  const switched = Subs.wantedLanguage(menu([
+    { title: 'English', selected: true },
+    { title: 'Japanese',
+      continuation: { reloadContinuationData: { continuation: 'token-ja' } } }
+  ]), japanese, [japanese, { languageCode: 'en' }]);
+  check('a panel open on the wrong language is asked again for the right one',
+    switched && switched.params === 'token-ja', JSON.stringify(switched));
+
+  check('a panel already open on the right language is used as it is',
+    Subs.wantedLanguage(menu([
+      { title: 'English' },
+      { title: 'Japanese', selected: true,
+        continuation: { reloadContinuationData: { continuation: 'token-ja' } } }
+    ]), japanese, [japanese]) === null);
+
+  // An auto-generated track is named "Japanese (auto-generated)" in one place
+  // and sometimes just "Japanese" in the other.
+  const auto = { languageCode: 'ja', baseUrl: 'x', name: 'Japanese (auto-generated)', auto: true };
+  const near = Subs.wantedLanguage(menu([
+    { title: 'English', selected: true },
+    { title: 'Japanese', serviceEndpoint: { getTranscriptEndpoint: { params: 'p-ja' } } }
+  ]), auto, [auto, { languageCode: 'en' }]);
+  check('a track and a menu item that name the language slightly differently still match',
+    near && near.params === 'p-ja', JSON.stringify(near));
+
+  // The whole point: when the language cannot be shown to be the right one,
+  // the transcript is refused and the caption file, which names its own
+  // language, settles it instead.
+  check('a panel offering nothing in the language being read is refused',
+    Subs.wantedLanguage(menu([
+      { title: 'English', selected: true },
+      { title: 'German', continuation: { reloadContinuationData: { continuation: 't' } } }
+    ]), japanese, [japanese, { languageCode: 'en' }]) === Subs.REJECT);
+  check('a panel with no language menu on it is refused when the video has several tracks',
+    Subs.wantedLanguage({}, japanese, [japanese, { languageCode: 'en' }]) === Subs.REJECT);
+  check('but trusted when the video has only the one track it could be',
+    Subs.wantedLanguage({}, japanese, [japanese]) === null);
+  check('with no track list to check against, the panel is taken as it comes',
+    Subs.wantedLanguage(menu([{ title: 'English', selected: true }]), null, null) === null);
+
+  // --- the address the player itself asked for ----------------------------
+  // It is for whichever track the viewer has on, which is very often not the
+  // language being read: arriving unchecked, an English one overwrote a
+  // correct Japanese transcript that had already been fetched.
+  check('a caption address in the language being read is taken',
+    Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&lang=ja&signature=x'));
+  check('one in another language is left alone',
+    !Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&lang=en&signature=x'));
+  check('a track being translated into another language goes by what comes back',
+    !Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&lang=ja&tlang=en'));
+  check('and one that says no language at all is not vouched for',
+    !Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&signature=x'));
+
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its
   // files instead of filling the collection with copies.
@@ -1958,7 +2061,7 @@ const run = async () => {
     name1 === Video.name('食べなかったので、お腹が空いた。', 'jpg'));
   check('a different line gets a different one',
     Video.name('図書館で本を読んでいました。', 'jpg') !== name1);
-  check('filenames survive any filesystem', /^lll-[a-z0-9]+\.jpg$/.test(name1), name1);
+  check('filenames survive any filesystem', /^torval-[a-z0-9]+\.jpg$/.test(name1), name1);
   check('the extension is kept', Video.name('x', 'webm').endsWith('.webm'));
 
   // --- how long a line actually lasts ---------------------------------------
@@ -2148,11 +2251,12 @@ const run = async () => {
     };
     sandbox.globalThis = sandbox;
     vm.createContext(sandbox);
-    // background.js now asks LLLLang which language is active before it does
+    // background.js now asks TorvalLang which language is active before it does
     // almost anything (which dictionary to open, which storage keys to use),
     // so the sandbox needs the same language-registry files the manifest
     // loads before background.js in the real extension.
-    for (const f of ['japanese.js', 'scan.js', 'italian.js', 'italian-scan.js', 'lang.js']) {
+    for (const f of ['japanese.js', 'scan.js', 'italian.js', 'italian-scan.js',
+      'spanish.js', 'spanish-scan.js', 'lang.js']) {
       vm.runInContext(readFileSync(join(ROOT, 'extension', f), 'utf8'), sandbox, { filename: f });
     }
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
@@ -2218,7 +2322,7 @@ const run = async () => {
     stored.knownWords = { '本': NEW };
     stored.ignoredWords = { 'ネカフェ': NEW };
     const file = {
-      format: 'lll-words', version: 1, saved: '2026-01-01',
+      format: 'torval-words', version: 1, saved: '2026-01-01',
       known: { '本': OLD, '読む': OLD },
       ignored: { 'ＡＢＣ': OLD }
     };
@@ -2238,7 +2342,7 @@ const run = async () => {
       JSON.stringify(reply.result.added));
 
     await send({ type: 'importWords',
-      data: { format: 'lll-words', known: {}, ignored: { '本': OLD } } });
+      data: { format: 'torval-words', known: {}, ignored: { '本': OLD } } });
     check('known beats ignored when a file disagrees',
       '本' in stored.knownWords && !('本' in stored.ignoredWords),
       JSON.stringify(stored.ignoredWords));
@@ -2302,13 +2406,145 @@ const run = async () => {
 
     const saved = await send({ type: 'exportWords' });
     check('a saved file is marked as ours and carries both lists',
-      saved.ok && saved.result.format === 'lll-words' &&
+      saved.ok && saved.result.format === 'torval-words' &&
       '本' in saved.result.known && 'ネカフェ' in saved.result.ignored,
       JSON.stringify(saved.result && saved.result.format));
     const round = await send({ type: 'importWords', data: saved.result });
     check('saving and loading straight back changes nothing',
       round.result.added.known === 0 && round.result.added.ignored === 0,
       JSON.stringify(round.result.added));
+
+    // A file saved before this was called Torval. The word list is the one
+    // thing here that cannot be rebuilt, so a rename must not be able to
+    // make last month's copy of it unreadable.
+    const older = await send({ type: 'importWords', data: {
+      format: 'lll-words', version: 1, saved: '2026-01-01',
+      known: { '読む': Date.parse('2026-01-01') }, ignored: {}
+    } });
+    check('a word file saved under the old name still opens',
+      older.ok && older.result.added.known === 1,
+      JSON.stringify(older.result || older.error));
+    const nonsense = await send({ type: 'importWords', data: { format: 'something-else' } });
+    check('and a file that is not one of ours still does not',
+      !nonsense.ok, JSON.stringify(nonsense));
+  }
+
+  // --- Spanish ----------------------------------------------------------
+  // Spanish shares its lookup engine with Italian and brings three things of
+  // its own: a character class, a deinflector and a stress rule. The first
+  // two are checked here without a dictionary; the third needs none by
+  // design, since Spanish spelling says where the stress is.
+
+  // Where the stress falls. Not a guess in this language: the accent, then
+  // the last letter, settle it outright, so these are answers rather than
+  // approximations and a wrong one is a bug.
+  const STRESS = [
+    ['hablar', 4, 'no accent, ends in a consonant: the last syllable'],
+    ['casa', 1, 'no accent, ends in a vowel: the next-to-last'],
+    ['hablas', 1, 'a plural -s does not move the stress'],
+    ['joven', 1, 'nor does a final -n'],
+    ['canción', 5, 'a written accent wins outright'],
+    ['árbol', 0, 'including on the first syllable'],
+    ['feliz', 3, 'ends in z, so the last syllable'],
+    ['ciudad', 4, 'iu is one syllable, not two'],
+    ['caer', 2, 'ae is two syllables, not one'],
+    ['reír', 2, 'an accent on a weak vowel breaks the diphthong'],
+    ['veinte', 1, 'ei is one syllable and the e carries it'],
+    ['bueno', 2, 'ue is one syllable and the e carries it'],
+    ['guerra', 2, 'the u of gue is written but not said'],
+    ['pingüino', 5, 'the ü of güi is said, which is what the mark is for'],
+    ['agua', 0, 'gua is one syllable: a-gua, stressed on the a']
+  ];
+  for (const [word, at, why] of STRESS) {
+    const got = stressEs(word);
+    check('Spanish stress: ' + word + ' (' + why + ')', got === at,
+      'got ' + got + ' (' + word[got] + '), wanted ' + at + ' (' + word[at] + ')');
+  }
+  check('a dictionary phrase gets no single stressed letter',
+    stressEs('dar a luz') === null, String(stressEs('dar a luz')));
+
+  // Deinflection. Everything here is a form the rule table has to reach on
+  // its own, without the dictionary's own index of written-down forms.
+  const UNDO = [
+    ['hablábamos', 'hablar', 'regular imperfect'],
+    ['comiste', 'comer', 'regular preterite, which Italian does not attempt'],
+    ['vivimos', 'vivir', 'and the -ir class it shares its endings with'],
+    ['hablaré', 'hablar', 'the future, built on the whole infinitive'],
+    ['comeríamos', 'comer', 'and the conditional with it'],
+    ['hables', 'hablar', 'present subjunctive'],
+    ['hablara', 'hablar', 'past subjunctive, the -ra one'],
+    ['hablase', 'hablar', 'and the -se one'],
+    ['dijeron', 'decir', 'an irregular preterite'],
+    ['fue', 'ser', 'a preterite that is two verbs at once'],
+    ['fue', 'ir', 'and the other of them'],
+    ['tendría', 'tener', 'an irregular conditional, off its own stem'],
+    ['hubiera', 'haber', 'the subjunctive of the auxiliary'],
+    ['dármelo', 'dar', 'two pronouns and the accent they add'],
+    ['hablarme', 'hablar', 'one pronoun, which adds no accent'],
+    ['diciéndoselo', 'decir', 'an irregular gerund wearing two pronouns'],
+    ['hablándome', 'hablar', 'and a regular one wearing one'],
+    ['altas', 'alto', 'feminine plural'],
+    ['luces', 'luz', 'a plural that changes the letter before it'],
+    ['canciones', 'canción', 'and one that drops a written accent'],
+    ['rápidamente', 'rápido', 'an adverb built on the feminine']
+  ];
+  for (const [word, lemma, why] of UNDO) {
+    const terms = DeinflectEs.deinflect(word).map((r) => r.term);
+    check('Spanish: ' + word + ' -> ' + lemma + ' (' + why + ')',
+      terms.includes(lemma), JSON.stringify(terms.slice(0, 10)));
+  }
+  check('Spanish deinflection returns the untouched word first',
+    DeinflectEs.deinflect('hablar')[0].term === 'hablar');
+  check('and terminates on pathological input',
+    DeinflectEs.deinflect('aaaaaaaaaaaaaaaaaaaa').length < 400,
+    String(DeinflectEs.deinflect('aaaaaaaaaaaaaaaaaaaa').length));
+
+  // The two Romance tables share one solver now. Italian has to keep
+  // answering exactly as it did before that was true.
+  check('Italian still deinflects through the shared solver',
+    DeinflectIt.deinflect('parlavamo').map((r) => r.term).includes('parlare'));
+  check('and Italian and Spanish do not answer for each other',
+    !DeinflectIt.deinflect('hablábamos').map((r) => r.term).includes('hablar') &&
+    !DeinflectEs.deinflect('parlavamo').map((r) => r.term).includes('parlare'));
+
+  // The lookup engine reads whichever language is active, and has to change
+  // its mind the moment that changes rather than at the next reload.
+  Lang._setActive('it');
+  check('the shared lookup engine takes its scan window from the language',
+    LookupLatin.MAX_SCAN === Lang.profile().scanWindow);
+  Lang._setActive('es');
+  check('and its deinflector, so a switch is picked up by the next lookup',
+    Lang.profile().deinflector() === DeinflectEs);
+  Lang._setActive('ja');
+
+  // The whole Spanish path, against the real built dictionary, when there is
+  // one: it is gitignored like the others, so a fresh clone has none and
+  // these are skipped rather than failed.
+  const SPANISH = join(ROOT, 'extension', 'data-es');
+  if (existsSync(join(SPANISH, 'meta.json'))) {
+    const esDb = loadDictionary(SPANISH);
+    Lang._setActive('es');
+    const SENTENCES = [
+      ['Hablábamos de la ciudad.', 0, 'hablar'],
+      ['Las casas son bonitas.', 4, 'casa'],
+      ['No quiero dármelo ahora.', 10, 'dar'],
+      ['Estaba diciéndoselo a ella.', 7, 'decir'],
+      ['Me gustan las canciones.', 15, 'canción']
+    ];
+    for (const [text, at, lemma] of SENTENCES) {
+      const found = await LookupLatin.hover(text, at, esDb);
+      const hit = found.groups[0] && found.groups[0].hits[0];
+      check('Spanish lookup: ' + text, hit && hit.entry.k[0] === lemma,
+        hit ? 'got ' + hit.entry.k[0] : 'nothing found');
+    }
+    const casa = await LookupLatin.hover('la casa', 3, esDb);
+    check('and the stress mark comes with the entry',
+      casa.groups[0].hits[0].entry.st === 1,
+      JSON.stringify(casa.groups[0].hits[0].entry.st));
+    Lang._setActive('ja');
+  } else {
+    console.log('  (no Spanish dictionary built; skipping its lookup checks. ' +
+      'Run: node tools/build-dict-es.mjs)');
   }
 
   // --- deinflector sanity ----------------------------------------------

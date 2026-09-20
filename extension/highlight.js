@@ -1,5 +1,5 @@
 /*
- * LLL, colouring the words you do not know
+ * Torval, colouring the words you do not know
  *
  * The bar at the top says how much of a page you understand. This says which
  * parts you do not: every word not in your known list gets marked where it
@@ -19,10 +19,10 @@
  * touched, only one <style> element is added, so there is nothing for a
  * site to trip over, and turning the colouring off is one line rather than an
  * unpicking job. Firefox has had this since version 140; where it is missing,
- * everything else in LLL carries on and only the colouring is skipped.
+ * everything else in Torval carries on and only the colouring is skipped.
  */
 
-var LLLHighlight = (function () {
+var TorvalHighlight = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
@@ -39,10 +39,10 @@ var LLLHighlight = (function () {
   // other, no space, no punctuation, nothing marking where one ends and the
   // next begins, which is ordinary in Japanese, still show a visible seam,
   // without ever suggesting one of them is a different kind of thing.
-  var PAGE_A = 'lll-unknown';
-  var PAGE_B = 'lll-unknown-alt';
-  var LINE_A = 'lll-unknown-line';
-  var LINE_B = 'lll-unknown-line-alt';
+  var PAGE_A = 'torval-unknown';
+  var PAGE_B = 'torval-unknown-alt';
+  var LINE_A = 'torval-unknown-line';
+  var LINE_B = 'torval-unknown-line-alt';
 
   var MAX_TEXT = 100000;    // characters read from one page
   var MAX_RANGES = 20000;   // marks painted at once, so a pathological page cannot hang
@@ -82,7 +82,7 @@ var LLLHighlight = (function () {
     if (started) return supported();
     started = true;
     if (!supported()) {
-      console.log('LLL: this Firefox cannot colour words without rewriting the page ' +
+      console.log('Torval: this Firefox cannot colour words without rewriting the page ' +
         '(needs Firefox 140 or newer), everything else still works.');
       return false;
     }
@@ -136,8 +136,8 @@ var LLLHighlight = (function () {
 
     var reply;
     try {
-      var beside = typeof LLLSubtitles !== 'undefined' && LLLSubtitles.around
-        ? LLLSubtitles.around(found.text)
+      var beside = typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.around
+        ? TorvalSubtitles.around(found.text)
         : { before: '', after: '' };
       reply = await api.runtime.sendMessage({
         type: 'wordPlaces', text: found.text, before: beside.before, after: beside.after
@@ -172,7 +172,7 @@ var LLLHighlight = (function () {
    * and never wanting to hear about it are different states elsewhere, but on
    * the page they look the same, which is no mark at all.
    */
-  /** Take every mark off the page, for when LLL is switched off. */
+  /** Take every mark off the page, for when Torval is switched off. */
   function clear() {
     if (!supported()) return;
     for (var name of [PAGE_A, PAGE_B, LINE_A, LINE_B]) CSS.highlights.delete(name);
@@ -209,10 +209,10 @@ var LLLHighlight = (function () {
         // active language's word characters at all, and nothing further is
         // worth asking about those. Read fresh each call, not cached, so a
         // language switch takes effect on the very next gather().
-        if (!LLLLang.profile().charClass.test(node.data)) return NodeFilter.FILTER_REJECT;
-        // LLL's own subtitle line is painted on its own, every time it
+        if (!TorvalLang.profile().charClass.test(node.data)) return NodeFilter.FILTER_REJECT;
+        // Torval's own subtitle line is painted on its own, every time it
         // changes; leaving it in here as well would mark it twice.
-        if (skipSubtitle && parent.closest('[data-lll-subtitle]')) return NodeFilter.FILTER_REJECT;
+        if (skipSubtitle && parent.closest('[data-torval-subtitle]')) return NodeFilter.FILTER_REJECT;
         if (parent.checkVisibility && !parent.checkVisibility()) return NodeFilter.FILTER_REJECT;
         if (nearOnly && !nearScreen(parent, reach)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -321,7 +321,7 @@ var LLLHighlight = (function () {
       if (a.size) CSS.highlights.set(nameA, a); else CSS.highlights.delete(nameA);
       if (b.size) CSS.highlights.set(nameB, b); else CSS.highlights.delete(nameB);
     } catch (err) {
-      console.warn('LLL: could not colour the words:', err && err.message);
+      console.warn('Torval: could not colour the words:', err && err.message);
     }
   }
 
@@ -340,9 +340,9 @@ var LLLHighlight = (function () {
    * being asked when there is only one.
    */
   function ensureStyle() {
-    if (document.getElementById('lll-highlight-style')) return;
+    if (document.getElementById('torval-highlight-style')) return;
     var style = document.createElement('style');
-    style.id = 'lll-highlight-style';
+    style.id = 'torval-highlight-style';
     style.textContent =
       '::highlight(' + PAGE_A + '),::highlight(' + LINE_A + '){' +
       'background-color:rgba(203,142,74,.16);' +
@@ -386,7 +386,7 @@ var LLLHighlight = (function () {
     // The overlay is created once, lazily, the first time a line is drawn, 
     // this waits for it to exist and then never has to look again.
     var attach = setInterval(function () {
-      var overlay = document.querySelector('[data-lll-subtitle]');
+      var overlay = document.querySelector('[data-torval-subtitle]');
       if (!overlay) return;
       clearInterval(attach);
       lineOverlay = overlay;
@@ -478,8 +478,8 @@ var LLLHighlight = (function () {
     // line are kept, so a word running over the join is marked as far as the
     // line goes and no further.
     var beside = { before: "", after: "" };
-    if (typeof LLLSubtitles !== 'undefined' && LLLSubtitles.around) {
-      beside = LLLSubtitles.around(text) || beside;
+    if (typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.around) {
+      beside = TorvalSubtitles.around(text) || beside;
     }
 
     var reply;
@@ -514,4 +514,4 @@ var LLLHighlight = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLHighlight;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalHighlight;

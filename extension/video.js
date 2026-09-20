@@ -1,5 +1,5 @@
 /*
- * LLL, capturing from video
+ * Torval, capturing from video
  *
  * Two things come off the screen when you mine a line: the frame you were
  * looking at, and the line being spoken.
@@ -7,7 +7,7 @@
  * The frame is taken the instant you press "+", before anything else moves.
  *
  * The audio is taken by replaying the line. Knowing exactly when the line runs
- * from and to, which is why LLL fetches the subtitles itself, the video is
+ * from and to, which is why Torval fetches the subtitles itself, the video is
  * sent back to the start of it, recorded to the end of it, and put back where it
  * was: same moment, same speed, same paused or playing.
  *
@@ -24,7 +24,7 @@
  * back empty. That is what the protection is for. YouTube is fine.
  */
 
-var LLLVideo = (function () {
+var TorvalVideo = (function () {
   'use strict';
 
   var MAX_WIDTH = 1280;         // frames are scaled down to this before saving
@@ -378,7 +378,7 @@ var LLLVideo = (function () {
     for (var i = 0; i < text.length; i++) {
       hash = ((hash << 5) - hash + text.charCodeAt(i)) | 0;
     }
-    return 'lll-' + (hash >>> 0).toString(36) + '.' + extension;
+    return 'torval-' + (hash >>> 0).toString(36) + '.' + extension;
   }
 
   return {
@@ -388,4 +388,4 @@ var LLLVideo = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLVideo;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalVideo;

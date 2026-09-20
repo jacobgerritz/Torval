@@ -1,5 +1,5 @@
 /*
- * LLL, the known and ignored word panels
+ * Torval, the known and ignored word panels
  *
  * Two lists of words, browsed exactly the same way, so they are one piece of
  * code told which list it is looking at.
@@ -61,8 +61,8 @@
   // is active there; a switch made from options.js's own selector, or from
   // the toolbar popup, has to be followed by a fresh read here too, or the
   // words shown would keep belonging to the language just left.
-  if (typeof LLLLang !== 'undefined') {
-    LLLLang.onChange(() => { refreshers.forEach((r) => r()); });
+  if (typeof TorvalLang !== 'undefined') {
+    TorvalLang.onChange(() => { refreshers.forEach((r) => r()); });
   }
 
   // -------------------------------------------------------------------------
@@ -191,7 +191,7 @@
 
       const words = reply.result;
       const day = new Date().toISOString().slice(0, 10);
-      download('lll-words-' + day + '.json', JSON.stringify(words, null, 2));
+      download('torval-words-' + day + '.json', JSON.stringify(words, null, 2));
       saveNote.textContent = count(words.known) + ' known, ' +
         count(words.ignored) + ' ignored.';
     });
@@ -209,7 +209,7 @@
         } catch (bad) {
           // Whatever the parser complains about, the answer is the same one:
           // this is not the file they meant to pick.
-          throw new Error('That file is not one LLL saved.');
+          throw new Error('That file is not one Torval saved.');
         }
 
         const reply = await api.runtime.sendMessage({ type: 'importWords', data });
@@ -259,25 +259,20 @@
     const fileEl = document.getElementById('file');
     const addButton = document.getElementById('add');
     const resultEl = document.getElementById('result');
-    const noteEl = document.getElementById('add-text-note');
     if (!textEl || !addButton) return;
 
-    // The example and the placeholder are written in whichever language is
-    // active, since a Japanese one is just noise while reading Italian.
-    const HELP = {
-      ja: { note: 'Something you have already read. たべました is added as 食べる.',
-        placeholder: '日本語のテキストをここに貼り付けてください…' },
-      it: { note: 'Something you have already read. parlavo is added as parlare.',
-        placeholder: 'Incolla qui un testo in italiano…' }
-    };
+    // The placeholder is written in whichever language is active, since a
+    // Japanese one is just noise while reading Spanish. It comes from the
+    // language's own profile in lang.js, which is also where the settings
+    // page gets its placeholders: two lists of languages meant one of them
+    // being forgotten, and it was this one.
     function paintHelp() {
-      const help = HELP[LLLLang.active()] || HELP.ja;
-      if (noteEl) noteEl.textContent = help.note;
-      textEl.placeholder = help.placeholder;
+      const example = TorvalLang.profile().examples;
+      if (example) textEl.placeholder = example.paste;
     }
-    if (typeof LLLLang !== 'undefined') {
+    if (typeof TorvalLang !== 'undefined') {
       paintHelp();
-      LLLLang.onChange(paintHelp);
+      TorvalLang.onChange(paintHelp);
     }
 
     fileEl.addEventListener('change', async () => {

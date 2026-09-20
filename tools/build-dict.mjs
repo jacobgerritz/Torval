@@ -1,5 +1,5 @@
 /*
- * LLL, dictionary build step
+ * Torval, dictionary build step
  *
  * Turns the raw JMdict file (a ~120 MB XML document) into small JSON chunks the
  * extension can stream into its own database on first run. This runs once on
@@ -397,7 +397,16 @@ function decode(s) {
     .trim();
 }
 
-/** Split an array into files of roughly CHUNK_BYTES each. */
+/**
+ * Split an array into files of roughly CHUNK_BYTES each.
+ *
+ * Bytes, not characters. This counted string length, which is the same
+ * number for Latin text and a third of the truth for Japanese, where every
+ * kanji is three bytes of UTF-8: a "four megabyte" chunk of JMdict came out
+ * at six and a half. That matters beyond tidiness, because the add-on
+ * store's validator refuses to parse any file over five megabytes and
+ * reports it as an error against the submission.
+ */
 function writeChunks(name, items) {
   let chunk = [];
   let bytes = 0;
@@ -411,9 +420,10 @@ function writeChunks(name, items) {
   };
   for (const item of items) {
     const json = JSON.stringify(item);
-    if (bytes + json.length > CHUNK_BYTES) flush();
+    const width = Buffer.byteLength(json, 'utf8');
+    if (bytes + width > CHUNK_BYTES) flush();
     chunk.push(item);
-    bytes += json.length + 1;
+    bytes += width + 1;
   }
   flush();
   return n;

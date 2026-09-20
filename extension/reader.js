@@ -1,8 +1,8 @@
 /*
- * LLL, the reader
+ * Torval, the reader
  *
  * Opens epub and plain text files and shows them as ordinary pages, which is
- * the whole trick: this page loads LLL's own scripts, so hovering, the popup,
+ * the whole trick: this page loads Torval's own scripts, so hovering, the popup,
  * the marking and the comprehension bar all work on a book exactly as they do
  * on a website. Nothing here knows anything about dictionaries.
  *
@@ -48,7 +48,7 @@
   };
 
   // The bar belongs down on a page that exists only to be read in.
-  if (typeof LLLBar !== 'undefined') LLLBar.alwaysDown();
+  if (typeof TorvalBar !== 'undefined') TorvalBar.alwaysDown();
 
   let books = [];
   let book = null;   // the one being read, or null on the shelf
@@ -133,13 +133,13 @@
     els.title.textContent = 'Your books';
     els.empty.hidden = books.length > 0;
     if (!books.length) say('');
-    document.title = 'LLL reader';
+    document.title = 'Torval reader';
 
     els.list.textContent = '';
     for (const shelved of books) els.list.appendChild(row(shelved));
 
     // The bar measures the page it is on, and the shelf is not Japanese.
-    document.dispatchEvent(new CustomEvent('lll-reread'));
+    document.dispatchEvent(new CustomEvent('torval-reread'));
     fill();
   }
 
@@ -206,7 +206,7 @@
       if (!cell) return;   // the shelf went away while this was being worked out
       if (percent === null) { cell.textContent = ''; continue; }
       cell.textContent = percent + '%';
-      if (typeof LLLBar !== 'undefined') cell.style.color = LLLBar.colourFor(percent);
+      if (typeof TorvalBar !== 'undefined') cell.style.color = TorvalBar.colourFor(percent);
     }
   }
 
@@ -328,7 +328,7 @@
     savePlace(book.id, at, down || 0);
     // The page has been replaced, so whatever was measured and marked on it
     // belongs to the last chapter. content.js listens for this.
-    document.dispatchEvent(new CustomEvent('lll-reread'));
+    document.dispatchEvent(new CustomEvent('torval-reread'));
   }
 
   /**
@@ -587,7 +587,7 @@
 
   async function inflate(entry) {
     if (entry.method === 0) return entry.body;
-    if (entry.method !== 8) throw new Error('That epub is packed in a way LLL cannot open.');
+    if (entry.method !== 8) throw new Error('That epub is packed in a way Torval cannot open.');
     const stream = new Blob([entry.body]).stream()
       .pipeThrough(new DecompressionStream('deflate-raw'));
     return new Uint8Array(await new Response(stream).arrayBuffer());

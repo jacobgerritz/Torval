@@ -1,5 +1,5 @@
 /*
- * LLL, tiny static file server, for the preview page only.
+ * Torval, tiny static file server, for the preview page only.
  *
  *   node tools/serve.mjs        then open http://localhost:8137/tools/preview.html
  *
@@ -17,7 +17,8 @@ const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8'
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml; charset=utf-8'
 };
 
 createServer(async (req, res) => {

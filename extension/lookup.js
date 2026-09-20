@@ -1,5 +1,5 @@
 /*
- * LLL, lookup
+ * Torval, lookup
  *
  * Japanese does not put spaces between words, so we never actually know where
  * the word under the cursor ends. Instead we take the text starting at the
@@ -18,29 +18,29 @@
  * Everything here that is not actually about segmenting unspaced Japanese
  * text, ranking entries, known/ignored bookkeeping, reading a whole passage
  * given a `segment` function, lives in lookup-common.js instead, shared with
- * lookup-it.js. This file keeps its full original public API so nothing
+ * lookup-latin.js. This file keeps its full original public API so nothing
  * downstream (background.js, tools/test.mjs) has to know that split exists.
  */
 
 // In the extension these are loaded first and are already globals; under Node
 // (the test suite) we pull them in ourselves.
-if (typeof LLLDeinflect === 'undefined' && typeof require !== 'undefined') {
-  var LLLDeinflect = require('./deinflect.js');
+if (typeof TorvalDeinflect === 'undefined' && typeof require !== 'undefined') {
+  var TorvalDeinflect = require('./deinflect.js');
 }
-if (typeof LLLJapanese === 'undefined' && typeof require !== 'undefined') {
-  var LLLJapanese = require('./japanese.js');
+if (typeof TorvalJapanese === 'undefined' && typeof require !== 'undefined') {
+  var TorvalJapanese = require('./japanese.js');
 }
-if (typeof LLLMaxScan === 'undefined' && typeof require !== 'undefined') {
-  var LLLMaxScan = require('./scan.js');
+if (typeof TorvalMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var TorvalMaxScan = require('./scan.js');
 }
-if (typeof LLLLookupCommon === 'undefined' && typeof require !== 'undefined') {
-  var LLLLookupCommon = require('./lookup-common.js');
+if (typeof TorvalLookupCommon === 'undefined' && typeof require !== 'undefined') {
+  var TorvalLookupCommon = require('./lookup-common.js');
 }
 
-var LLLLookup = (function () {
+var TorvalLookup = (function () {
   'use strict';
 
-  var MAX_SCAN = LLLMaxScan;    // longest span of text we will try to match
+  var MAX_SCAN = TorvalMaxScan;    // longest span of text we will try to match
 
   /**
    * Characters that can never begin a word, because they belong to the one
@@ -99,7 +99,7 @@ var LLLLookup = (function () {
     var byTerm = new Map();
     var scan = Math.min(text.length, MAX_SCAN);
     for (var len = scan; len >= 1; len--) {
-      var candidates = LLLDeinflect.deinflect(text.slice(0, len));
+      var candidates = TorvalDeinflect.deinflect(text.slice(0, len));
       for (var i = 0; i < candidates.length; i++) {
         var c = candidates[i];
         // Thirty-odd shapes are proposed per character and one or two of
@@ -140,7 +140,7 @@ var LLLLookup = (function () {
         var entry = entries[a];
         for (var b = 0; b < infos.length; b++) {
           var info = infos[b];
-          if (!LLLLookupCommon.typesAllow(entry, info.types)) continue;
+          if (!TorvalLookupCommon.typesAllow(entry, info.types)) continue;
 
           var group = groups.get(info.length);
           if (!group) { group = new Map(); groups.set(info.length, group); }
@@ -151,7 +151,7 @@ var LLLLookup = (function () {
           if (!existing || info.reasons.length < existing.reasons.length) {
             group.set(entry.id, Object.assign(
               { entry: entry, reasons: info.reasons, matched: term,
-                q: LLLLookupCommon.rankOf(entry, term) },
+                q: TorvalLookupCommon.rankOf(entry, term) },
               displayForm(entry, term)));
           }
         }
@@ -329,8 +329,8 @@ var LLLLookup = (function () {
    */
   function runAround(text, at) {
     var from = at, to = at;
-    while (from > 0 && LLLJapanese.test(text.charAt(from - 1))) from--;
-    while (to < text.length && LLLJapanese.test(text.charAt(to))) to++;
+    while (from > 0 && TorvalJapanese.test(text.charAt(from - 1))) from--;
+    while (to < text.length && TorvalJapanese.test(text.charAt(to))) to++;
     return { from: from, to: to };
   }
 
@@ -376,7 +376,7 @@ var LLLLookup = (function () {
         groups.forEach(function (group, length) {
           if (here + length > n) return;                          // past the end
           if (splitsCluster(text, from + here + length)) return;  // ends mid-sound
-          var cost = best[here] + wordCost(LLLLookupCommon.bestQ(group), length);
+          var cost = best[here] + wordCost(TorvalLookupCommon.bestQ(group), length);
           if (cost < best[here + length]) {
             best[here + length] = cost;
             backLength[here + length] = length;
@@ -470,12 +470,12 @@ var LLLLookup = (function () {
       if (say) say(reached, text.length);
       // Standing aside here lets whatever else is waiting, a hover being
       // looked up above all, get a turn rather than wait for the whole page.
-      await LLLLookupCommon.pause();
+      await TorvalLookupCommon.pause();
     };
 
     var i = 0;
     while (i < text.length) {
-      if (!LLLJapanese.test(text.charAt(i))) { i++; continue; }
+      if (!TorvalJapanese.test(text.charAt(i))) { i++; continue; }
       var run = runAround(text, i);
       batch.push(prepareRun(text, run.from, run.to, asking, knows));
       i = run.to;
@@ -499,7 +499,7 @@ var LLLLookup = (function () {
    * `length` is 0 when the character belongs to nothing the dictionary knows.
    */
   async function tokenAt(text, at, db) {
-    if (!LLLJapanese.test(text.charAt(at))) return { start: at, length: 0 };
+    if (!TorvalJapanese.test(text.charAt(at))) return { start: at, length: 0 };
     var run = runAround(text, at);
     var from = Math.max(run.from, at - WINDOW);
     var to = Math.min(run.to, at + WINDOW);
@@ -773,22 +773,22 @@ var LLLLookup = (function () {
    * the full rationale; this just supplies Japanese's `search` and `isIdiom`.
    */
   function decomposeKnown(text, start, length, db, known) {
-    return LLLLookupCommon.decomposeKnown(text, start, length, db, known, search, isIdiom);
+    return TorvalLookupCommon.decomposeKnown(text, start, length, db, known, search, isIdiom);
   }
 
   /** Every dictionary word in a passage, see lookup-common.js's extractTokens. */
   function extractTokens(text, db) {
-    return LLLLookupCommon.extractTokens(text, db, segment, isDecomposable);
+    return TorvalLookupCommon.extractTokens(text, db, segment, isDecomposable);
   }
 
   /** The same, saying where in the text each word was found. */
   function locateTokens(text, db, say) {
-    return LLLLookupCommon.locateTokens(text, db, segment, isDecomposable, say);
+    return TorvalLookupCommon.locateTokens(text, db, segment, isDecomposable, say);
   }
 
   /** Every dictionary word in a passage, once each, in the order first met. */
   function extractWords(text, db) {
-    return LLLLookupCommon.extractWords(text, db, segment, isDecomposable);
+    return TorvalLookupCommon.extractWords(text, db, segment, isDecomposable);
   }
 
   return {
@@ -798,18 +798,18 @@ var LLLLookup = (function () {
     hover: hover,
     segment: segment,
     displayForm: displayForm,
-    frequencyBand: LLLLookupCommon.frequencyBand,
-    sharedTags: LLLLookupCommon.sharedTags,
-    sharedPos: LLLLookupCommon.sharedPos,
+    frequencyBand: TorvalLookupCommon.frequencyBand,
+    sharedTags: TorvalLookupCommon.sharedTags,
+    sharedPos: TorvalLookupCommon.sharedPos,
     extractWords: extractWords,
     extractTokens: extractTokens,
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
-    coverage: LLLLookupCommon.coverage,
-    within: LLLLookupCommon.within,
-    isKnown: LLLLookupCommon.isKnown,
+    coverage: TorvalLookupCommon.coverage,
+    within: TorvalLookupCommon.within,
+    isKnown: TorvalLookupCommon.isKnown,
     MAX_SCAN: MAX_SCAN
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLLookup;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalLookup;

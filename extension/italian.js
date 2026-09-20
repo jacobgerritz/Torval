@@ -1,5 +1,5 @@
 /*
- * LLL, what counts as Italian
+ * Torval, what counts as Italian
  *
  * Latin letters, the accented vowels Italian actually uses (à, è, é, ì, ò, ù,
  * and the rarer î/ó/ú some spellings still carry), and the apostrophe that
@@ -18,6 +18,6 @@
  * differently depending on who asked first.
  */
 
-var LLLItalian = /[A-Za-zÀ-ÖØ-öø-ÿ'’]/;
+var TorvalItalian = /[A-Za-zÀ-ÖØ-öø-ÿ'’]/;
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLItalian;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalItalian;

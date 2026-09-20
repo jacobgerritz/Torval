@@ -1,5 +1,5 @@
 /*
- * LLL, pitch accent build step
+ * Torval, pitch accent build step
  *
  *   node tools/build-pitch.mjs
  *

@@ -1,23 +1,26 @@
 /*
- * LLL, Italian word stress
+ * Torval, word stress
  *
- * Italian has no lexical pitch accent the way Japanese does, just stress:
- * one syllable in every word is said louder and a little longer than the
- * rest. Usually that falls on the next-to-last syllable, but not always, and
- * it can be the only thing distinguishing two otherwise identical words:
- * ancora ("still/yet", stressed an-CO-ra) against àncora ("anchor",
- * stressed AN-co-ra).
+ * Neither Italian nor Spanish has lexical pitch accent the way Japanese
+ * does, just stress: one syllable in every word is said louder and a little
+ * longer than the rest. It can be the only thing distinguishing two
+ * otherwise identical words: Italian ancora ("still/yet", an-CO-ra) against
+ * àncora ("anchor", AN-co-ra), Spanish hablo ("I speak") against habló ("he
+ * spoke").
  *
  * Unlike pitch.js, this needs no diagram and no lookup file of its own: the
- * stressed vowel's position is worked out once, at dictionary build time
- * (tools/build-dict-it.mjs, from the entry's IPA transcription where
- * Wiktextract provides one, else a penultimate-syllable guess), and stored
- * right on the entry as `st`, a character index into its spelling. This
- * module's only job is turning that index into something to show: the
+ * stressed vowel's position is worked out once, at dictionary build time,
+ * and stored right on the entry as `st`, a character index into its
+ * spelling. How it is worked out is each language's own business and each
+ * language's build does it (tools/build-dict-it.mjs reads a pronunciation or
+ * guesses, tools/stress-es.mjs applies a rule with no exceptions in it);
+ * by the time anything reaches here the answer is already a number.
+ *
+ * This module's only job is turning that number into something to show: the
  * stressed vowel wrapped in <b>, both for the popup and for the Anki field.
  */
 
-var LLLStressIt = (function () {
+var TorvalStress = (function () {
   'use strict';
 
   /** The stressed vowel's character index in the entry's spelling, or null. */
@@ -56,4 +59,4 @@ var LLLStressIt = (function () {
   return { indexFor: indexFor, mark: mark, markFor: markFor, graphFor: graphFor };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLStressIt;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalStress;

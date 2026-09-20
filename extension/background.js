@@ -1,5 +1,5 @@
 /*
- * LLL, background
+ * Torval, background
  *
  * This is the part of the extension that owns the dictionary. It runs once for
  * the whole browser, not once per tab, which matters: 218,000 entries should be
@@ -18,10 +18,37 @@
 const api = globalThis.browser || globalThis.chrome;
 
 // One dictionary database per language, so switching does not touch what the
-// other language already has imported. 'lll-dictionary' unsuffixed is what
-// every existing install already has under Japanese; LLLLang's 'ja' profile
-// keeps an empty dbSuffix for exactly that reason, so nothing has to migrate.
-function dbName() { return 'lll-dictionary' + LLLLang.profile().dbSuffix; }
+// other language already has imported. 'torval-dictionary' unsuffixed is the
+// Japanese one, which is why TorvalLang's 'ja' profile keeps an empty
+// dbSuffix.
+function dbName() { return 'torval-dictionary' + TorvalLang.profile().dbSuffix; }
+
+// What these databases were called when this was called LLL. A dictionary is
+// pure cache, rebuilt from files that ship with the extension, so the rename
+// costs one import and nothing else; what it must not cost is a few hundred
+// megabytes sitting in the profile under a name nothing will ever open
+// again. Dropped once the new database is up, so a failed build never
+// deletes the only copy of anything, not that anything here is the only copy
+// of anything: the word lists live in storage.local and were never in here.
+const FORMER_NAMES = ['lll-dictionary', 'lll-dictionary-it', 'lll-dictionary-es'];
+
+async function dropFormerDatabases() {
+  if (!api.storage || !indexedDB || typeof indexedDB.deleteDatabase !== 'function') return;
+  const done = await api.storage.local.get('droppedFormerDatabases');
+  if (done.droppedFormerDatabases) return;
+  for (const name of FORMER_NAMES) {
+    try {
+      await new Promise((resolve) => {
+        const request = indexedDB.deleteDatabase(name);
+        request.onsuccess = resolve;
+        request.onerror = resolve;
+        request.onblocked = resolve;   // another tab has it open; next start
+      });
+    } catch (err) { /* nothing there, which is the ordinary case */ }
+  }
+  await api.storage.local.set({ droppedFormerDatabases: true }).catch(() => {});
+  console.log('Torval: dropped the dictionary databases left behind by the old name.');
+}
 const DB_VERSION = 1;
 const ENTRIES = 'entries';
 const INDEX = 'index';
@@ -33,14 +60,17 @@ const BATCH = 5000;
 
 // `Lookup()` picks the right lookup engine for whichever language is active
 // right now; every call site asks for it fresh rather than holding onto one,
-// so a language switch is picked up by the very next lookup.
-function Lookup() { return LLLLang.active() === 'it' ? LLLLookupIt : LLLLookup; }
+// so a language switch is picked up by the very next lookup. Which engine
+// that is belongs to the language, not to a list kept here: adding one used
+// to mean editing this line, and forgetting to is a language that silently
+// gets read with the wrong grammar.
+function Lookup() { return TorvalLang.profile().lookup(); }
 
 /** Storage key for one of the known/ignored/ankiConfig-shaped values, scoped
  * to whichever language is active: unsuffixed for Japanese (every existing
- * install's data, untouched), '_it' for Italian.
+ * install's data, untouched), '_it' for Italian, '_es' for Spanish.
  */
-function langKey(base) { return base + LLLLang.profile().storageSuffix; }
+function langKey(base) { return base + TorvalLang.profile().storageSuffix; }
 
 /** Where a word list's safety copy is kept, see wordMap/saveWords below. */
 function copyKey(key) { return key + 'Copy'; }
@@ -67,12 +97,12 @@ let hoverReader = null;        // reassigned per language, see loadLanguage
  * rather than build it, this waits for it: `onBeforeRequest` sees every
  * request the page itself makes, YouTube's own included, and a real one for
  * captions turns up the moment the video actually has a caption track
- * active, which is exactly the state LLL already asks for. Once one is
+ * active, which is exactly the state Torval already asks for. Once one is
  * seen, it is handed to that tab's content script to fetch, plainly, with
  * nothing done to it, no special headers, no routing trick. If the address
  * itself was always what was missing, nothing else needed to be.
  *
- * `&lll=1` marks LLL's own re-fetch of that address so it is not mistaken for
+ * `&torval=1` marks Torval's own re-fetch of that address so it is not mistaken for
  * a second genuine request and forwarded right back again.
  */
 if (api.webRequest && api.webRequest.onBeforeRequest) {
@@ -80,7 +110,7 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
   api.webRequest.onBeforeRequest.addListener(
     (details) => {
       if (details.tabId < 0) return;
-      if (details.url.indexOf('lll=1') !== -1) return;          // LLL's own re-fetch
+      if (details.url.indexOf('torval=1') !== -1) return;          // Torval's own re-fetch
       if (details.url.indexOf('signature') === -1) return;       // not a genuine signed track
       if (seenPerTab.get(details.tabId) === details.url) return; // already forwarded this one
       seenPerTab.set(details.tabId, details.url);
@@ -101,7 +131,7 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
  * So both fixes are needed together, not one instead of the other. This adds
  * the CORS permission the response never carries, before the browser decides
  * whether the read is allowed, the same technique CORS-unblocking extensions
- * use generally, scoped only to the address LLL itself asks for again.
+ * use generally, scoped only to the address Torval itself asks for again.
  */
 if (api.webRequest && api.webRequest.onHeadersReceived) {
   api.webRequest.onHeadersReceived.addListener(
@@ -148,8 +178,8 @@ api.runtime.onMessage.addListener((message, sender) => {
     case 'ankiAdd':      return ankiAdd(message.note);
     case 'ankiDuplicate': return ankiDuplicate(message.word);
     case 'ankiBrowse':   return guard(() => ankiBrowse(message.word));
-    case 'ankiDescribe': return guard(() => LLLAnki.describe(message.url));
-    case 'ankiFields':   return guard(() => LLLAnki.fieldNames(message.url, message.model));
+    case 'ankiDescribe': return guard(() => TorvalAnki.describe(message.url));
+    case 'ankiFields':   return guard(() => TorvalAnki.fieldNames(message.url, message.model));
     case 'extractWords': return guard(() => extractWords(message.text));
     case 'comprehension': return guard(() => comprehension(message.text, reporting(sender)));
     case 'wordPlaces':   return guard(() => wordPlaces(message.text, message.before, message.after,
@@ -176,7 +206,7 @@ api.runtime.onMessage.addListener((message, sender) => {
       // and the caller's `await` sits there for ever, which is exactly how a
       // whole feature can be wired up, look right in every preview, and do
       // nothing at all once installed.
-      if (message && message.type) console.warn('LLL: no handler for message', message.type);
+      if (message && message.type) console.warn('Torval: no handler for message', message.type);
       return undefined;
   }
 });
@@ -203,13 +233,13 @@ async function guard(fn) {
 /** Open Anki's card browser on a word. */
 async function ankiBrowse(word) {
   const stored = await api.storage.local.get(langKey('ankiConfig'));
-  return LLLAnki.browse(stored[langKey('ankiConfig')] || {}, word);
+  return TorvalAnki.browse(stored[langKey('ankiConfig')] || {}, word);
 }
 
 async function ankiDuplicate(word) {
   return guard(async () => {
     const stored = await api.storage.local.get(langKey('ankiConfig'));
-    return LLLAnki.alreadyHave(stored[langKey('ankiConfig')], { word });
+    return TorvalAnki.alreadyHave(stored[langKey('ankiConfig')], { word });
   });
 }
 
@@ -225,9 +255,9 @@ async function ankiAdd(note) {
     // `note.stress` needing nothing further from here.
     const fields = (ankiConfig && ankiConfig.fields) || {};
     if (Object.keys(fields).some((f) => fields[f] === 'pitch')) {
-      note = { ...note, pitch: await LLLPitch.graphFor(note.word, note.reading) };
+      note = { ...note, pitch: await TorvalPitch.graphFor(note.word, note.reading) };
     }
-    return LLLAnki.addNote(ankiConfig, note);
+    return TorvalAnki.addNote(ankiConfig, note);
   });
 }
 
@@ -263,14 +293,15 @@ async function handleLookup(text, point) {
     const groups = found.groups;
     const known = await knownSet();
     const ignored = await ignoredSet();
-    const italian = LLLLang.active() === 'it';
-    // The accent (Japanese) or stress mark (Italian) is one value per word,
-    // and the table or the entry itself is already in memory, so it costs
-    // nothing to answer it here along with the definitions.
+    const stress = TorvalLang.profile().accent === 'stress';
+    // The pitch accent (Japanese) or the stress mark (the others) is one
+    // value per word, and the table or the entry itself is already in
+    // memory, so it costs nothing to answer it here along with the
+    // definitions.
     for (const group of groups) {
       for (const hit of group.hits) {
-        if (italian) hit.stress = LLLStressIt.indexFor(hit.entry);
-        else hit.pitch = await LLLPitch.accentFor(hit.word, hit.reading);
+        if (stress) hit.stress = TorvalStress.indexFor(hit.entry);
+        else hit.pitch = await TorvalPitch.accentFor(hit.word, hit.reading);
         hit.band = lookup.frequencyBand(hit.q);
         hit.shared = lookup.sharedTags(hit.entry);
         hit.sharedPos = lookup.sharedPos(hit.entry);
@@ -280,7 +311,7 @@ async function handleLookup(text, point) {
     }
     return { status, groups, start };
   } catch (err) {
-    console.error('LLL lookup failed', err);
+    console.error('Torval lookup failed', err);
     return { status: { state: 'error', message: String(err) }, groups: [] };
   }
 }
@@ -337,7 +368,7 @@ function requireDictionary() {
   return ready;
 }
 
-/** Every dictionary word in a passage of text, see LLLLookup.extractWords. */
+/** Every dictionary word in a passage of text, see TorvalLookup.extractWords. */
 async function extractWords(text) {
   await requireDictionary();
   return Lookup().extractWords(text, cachingReader());
@@ -355,7 +386,7 @@ async function comprehension(text, say) {
   const reader = cachingReader();
   const lookup = Lookup();
   const tokens = await lookup.locateTokens(text, reader, say);
-  if (!LLLLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
+  if (!TorvalLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   return lookup.coverage(tokens, known, await ignoredSet());
 }
@@ -425,7 +456,7 @@ async function wordPlaces(text, before, after, trusted, say) {
   const whole = lead + text + trail;
   const found = await lookup.locateTokens(whole, reader, say);
   const tokens = lookup.within(found, lead.length, text.length);
-  if (!trusted && !LLLLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
+  if (!trusted && !TorvalLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   const ignored = await ignoredSet();
 
@@ -433,7 +464,7 @@ async function wordPlaces(text, before, after, trusted, say) {
   // them are told apart; a language that always spaces its words has no such
   // pair to tell apart, and the dashed underline there is a second mark
   // making a distinction nobody asked about.
-  const seams = LLLLang.profile().seams;
+  const seams = TorvalLang.profile().seams;
 
   const places = {};
   // Words that get no mark on the page. Two quite different reasons to be on
@@ -487,7 +518,7 @@ function KNOWN() { return langKey('knownWords'); }
 function IGNORED() { return langKey('ignoredWords'); }
 
 /*
- * The word lists are the one thing in LLL that cannot be rebuilt, and every
+ * The word lists are the one thing in Torval that cannot be rebuilt, and every
  * change to them is a read, an edit and a write of the whole list. That shape
  * has two ways of losing everything, and both of them have to be closed.
  *
@@ -564,12 +595,12 @@ if (api.storage.onChanged) {
  * the one that other tools use. The same property the manifest would not
  * take is accepted here.
  *
- * It follows the switch on the toolbar button. Turning LLL off takes the
+ * It follows the switch on the toolbar button. Turning Torval off takes the
  * script off Netflix altogether, so if it ever misbehaves on Netflix's own
  * pages there is a way out that does not involve uninstalling anything.
  */
 const NETFLIX_HELPER = {
-  id: 'lll-netflix-page',
+  id: 'torval-netflix-page',
   js: ['netflix-page.js'],
   matches: ['*://*.netflix.com/*'],
   runAt: 'document_start',
@@ -580,7 +611,7 @@ const NETFLIX_HELPER = {
 
 async function netflixHelper(on) {
   if (!api.scripting || !api.scripting.registerContentScripts) {
-    console.warn('LLL: this browser has no way to run LLL’s Netflix helper, ' +
+    console.warn('Torval: this browser has no way to run Torval’s Netflix helper, ' +
       'so Netflix will read its subtitles off the screen.');
     return;
   }
@@ -593,7 +624,7 @@ async function netflixHelper(on) {
     if (already.length) await api.scripting.updateContentScripts([NETFLIX_HELPER]);
     else await api.scripting.registerContentScripts([NETFLIX_HELPER]);
   } catch (err) {
-    console.warn('LLL: could not put LLL’s Netflix helper on the page:', err && err.message);
+    console.warn('Torval: could not put Torval’s Netflix helper on the page:', err && err.message);
   }
 }
 
@@ -654,7 +685,7 @@ async function rescueLists() {
     if (counts[key] === 0) continue;   // emptied on purpose
     await api.storage.local.set({ [key]: copy });
     delete caches[key];
-    console.warn('LLL: the ' + key + ' list was missing and has been put back from its copy, ' +
+    console.warn('Torval: the ' + key + ' list was missing and has been put back from its copy, ' +
       Object.keys(copy).length + ' words');
   }
 }
@@ -703,7 +734,7 @@ async function setWordOn(key, word, on) {
 /**
  * Both lists, with the dates, as one plain object to save somewhere safe.
  *
- * This is the part of LLL that cannot be rebuilt. The dictionary can be
+ * This is the part of Torval that cannot be rebuilt. The dictionary can be
  * downloaded again and the settings retyped in a minute, but a known list is
  * however many months of reading, and until now it existed in exactly one
  * place, this browser profile, belonging to an add-on that has to be loaded
@@ -711,7 +742,7 @@ async function setWordOn(key, word, on) {
  */
 async function exportWords() {
   return {
-    format: 'lll-words',
+    format: 'torval-words',
     version: 1,
     saved: new Date().toISOString(),
     known: await wordMap(KNOWN()),
@@ -728,10 +759,18 @@ async function exportWords() {
  * A word cannot be on both lists, so if a file somehow says otherwise, known
  * wins, it is the answer that costs less to be wrong about, since an ignored
  * word is one you have said you never want to see again.
+ *
+ * Files saved before this was called Torval say 'lll-words' inside, and are
+ * read too. A word list is the one thing here that cannot be rebuilt, and
+ * refusing to read last month's copy of it because the program has since
+ * been given a different name would be the worst possible reason to lose
+ * one.
  */
+const WORD_FILE = ['torval-words', 'lll-words'];
+
 async function importWords(data) {
   if (!data || typeof data !== 'object') throw new Error('That file is not a saved word list.');
-  if (data.format !== 'lll-words') throw new Error('That is not a file LLL saved.');
+  if (!WORD_FILE.includes(data.format)) throw new Error('That is not a file Torval saved.');
 
   return inTurn(async () => merged(data));
 }
@@ -764,7 +803,7 @@ async function merged(data) {
 /*
  * A copy of the word lists, in the Downloads folder, once a day.
  *
- * Everything else LLL keeps lives inside the extension: the lists, the deck
+ * Everything else Torval keeps lives inside the extension: the lists, the deck
  * settings, the dictionary. When that goes, it all goes at once, which is
  * what a browser restart can do to an add-on loaded from about:debugging.
  * The dictionary downloads again and the settings are a minute of typing,
@@ -792,14 +831,14 @@ async function keepACopy() {
   try {
     await api.downloads.download({
       url,
-      filename: 'LLL/lll-words-' + today + '.json',
+      filename: 'Torval/torval-words-' + today + '.json',
       conflictAction: 'overwrite',
       saveAs: false
     });
     await api.storage.local.set({ [LAST_COPY]: today });
-    console.log('LLL: kept a copy of your words in Downloads/LLL');
+    console.log('Torval: kept a copy of your words in Downloads/Torval');
   } catch (err) {
-    console.warn('LLL: could not keep a copy of your words:', err && err.message);
+    console.warn('Torval: could not keep a copy of your words:', err && err.message);
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
@@ -855,7 +894,7 @@ function loadTags() {
  *
  * Each of those was a separate read of the database. This answers them
  * instead, in memory, before the database is troubled at all: a sorted list
- * of one number per word LLL knows, and a number not in the list is a word
+ * of one number per word Torval knows, and a number not in the list is a word
  * that certainly is not there. Two million bytes, and it turns the great
  * majority of a page read into no database work whatsoever.
  *
@@ -916,11 +955,11 @@ async function learnWhatIsKnown(db, generation) {
     for (let i = 0; i < keys.length; i++) marks[i] = fingerprint(String(keys[i]));
     marks.sort();
     fingerprints = marks;
-    console.log('LLL:', keys.length, 'words fingerprinted, so most of reading a page ' +
+    console.log('Torval:', keys.length, 'words fingerprinted, so most of reading a page ' +
       'now needs no database at all.');
   } catch (err) {
     // Not being able to do this costs speed and nothing else.
-    console.warn('LLL: could not fingerprint the dictionary:', err && err.message);
+    console.warn('Torval: could not fingerprint the dictionary:', err && err.message);
   }
 }
 
@@ -971,7 +1010,7 @@ async function getEntries(terms) {
 // ---------------------------------------------------------------------------
 
 // One dictionary loaded at a time, whichever language is active. Switching
-// languages (LLLLang.onChange, below) re-runs this exactly as a fresh start
+// languages (TorvalLang.onChange, below) re-runs this exactly as a fresh start
 // would, against that language's own database and data files; nothing about
 // the language just left behind, including its own already-imported
 // dictionary, is touched.
@@ -990,7 +1029,7 @@ function loadLanguage() {
   ready.then((db) => { if (generation === loadGeneration) learnWhatIsKnown(db, generation); }, () => {});
   ready.catch((err) => {
     if (generation !== loadGeneration) return;
-    console.error('LLL failed to start', err);
+    console.error('Torval failed to start', err);
     status = { state: 'error', message: String(err) };
     setBadge('!');
   });
@@ -999,15 +1038,15 @@ function loadLanguage() {
 // Waits for the real stored choice before the very first load, so a fresh
 // background-script start never races the 'ja' default against whatever the
 // user actually last picked.
-LLLLang.ready().then(loadLanguage);
-LLLLang.onChange(loadLanguage);
+TorvalLang.ready().then(loadLanguage);
+TorvalLang.onChange(loadLanguage);
 
 async function start() {
   // Before anything else: a list that has gone missing since last time is
   // put back, and a copy of both is written somewhere the extension cannot
   // lose. Neither depends on the dictionary, and both matter most in exactly
   // the case where the dictionary is about to be rebuilt from nothing.
-  await rescueLists().catch((err) => console.warn('LLL: could not check the word lists:', err && err.message));
+  await rescueLists().catch((err) => console.warn('Torval: could not check the word lists:', err && err.message));
   keepACopy().catch(() => {});
 
   const db = await openDatabase();
@@ -1017,10 +1056,12 @@ async function start() {
   if (installed && installed.version === meta.version) {
     status = { state: 'ready', progress: 1 };
     setBadge('');
+    dropFormerDatabases().catch(() => {});
     return db;
   }
 
   await importDictionary(db, meta);
+  dropFormerDatabases().catch(() => {});
   return db;
 }
 
@@ -1050,9 +1091,9 @@ async function importDictionary(db, meta) {
     await run(db, INDEX, 'readwrite', (store) => store.clear());
     progress = { version: meta.version, entries: 0, index: 0, nextId: 0 };
     await save();
-    console.log('LLL: building the dictionary');
+    console.log('Torval: building the dictionary');
   } else {
-    console.log(`LLL: resuming, ${progress.entries}/${meta.entryChunks} entry chunks,` +
+    console.log(`Torval: resuming, ${progress.entries}/${meta.entryChunks} entry chunks,` +
       ` ${progress.index}/${meta.indexChunks} index chunks already in`);
   }
 
@@ -1083,7 +1124,7 @@ async function importDictionary(db, meta) {
   await run(db, STATE, 'readwrite', (store) => store.delete('import'));
   status = { state: 'ready', progress: 1 };
   setBadge('');
-  console.log(`LLL: dictionary ready, ${meta.entries} entries, ${meta.terms} forms`);
+  console.log(`Torval: dictionary ready, ${meta.entries} entries, ${meta.terms} forms`);
 
   function save() {
     return run(db, STATE, 'readwrite', (store) => store.put(progress, 'import'));
@@ -1149,13 +1190,14 @@ async function putAll(db, storeName, pairs, onProgress) {
 
 // Every caller passes a path starting 'data/...', the Japanese layout every
 // existing install already has; swapped here for whichever language is
-// active, 'data-it/...' for Italian, rather than touching every call site.
+// active, 'data-it/...' for Italian and 'data-es/...' for Spanish, rather
+// than touching every call site.
 async function fetchJson(path) {
-  const scoped = path.replace(/^data\//, LLLLang.profile().dataPath + '/');
+  const scoped = path.replace(/^data\//, TorvalLang.profile().dataPath + '/');
   const res = await fetch(api.runtime.getURL(scoped));
   if (!res.ok) {
     throw new Error(`cannot read ${scoped} (${res.status}), ` +
-      `run: node tools/build-dict${LLLLang.active() === 'it' ? '-it' : ''}.mjs`);
+      `run: ${TorvalLang.profile().build}`);
   }
   return res.json();
 }

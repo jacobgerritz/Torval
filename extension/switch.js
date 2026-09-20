@@ -1,7 +1,7 @@
 /*
- * LLL, the panel behind the toolbar button.
+ * Torval, the panel behind the toolbar button.
  *
- * Turning LLL off leaves it installed and stops it doing anything: no
+ * Turning Torval off leaves it installed and stops it doing anything: no
  * hovering, no marking, no bar, and YouTube gets its own subtitles back. The
  * setting is one value in storage, and every page watches it, so pages already
  * open follow along without being reloaded.
@@ -20,22 +20,21 @@
 
   const box = document.getElementById('on');
   const state = document.getElementById('state');
-  const note = document.getElementById('note');
   const main = document.getElementById('main');
   const pickHint = document.getElementById('pick-hint');
   const languageSelect = document.getElementById('language');
 
   fillLanguages();
   paintLanguage();
-  LLLLang.onChange(paintLanguage);
+  TorvalLang.onChange(paintLanguage);
 
   languageSelect.addEventListener('change', () => {
     if (!languageSelect.value) return;
-    LLLLang.set(languageSelect.value);
+    TorvalLang.set(languageSelect.value);
   });
 
   function fillLanguages() {
-    for (const { code, name } of LLLLang.list()) {
+    for (const { code, name } of TorvalLang.list()) {
       const option = document.createElement('option');
       option.value = code;
       option.textContent = name;
@@ -44,10 +43,10 @@
   }
 
   async function paintLanguage() {
-    const chosen = await LLLLang.chosen();
+    const chosen = await TorvalLang.chosen();
     main.hidden = !chosen;
     pickHint.hidden = chosen;
-    if (chosen) languageSelect.value = LLLLang.active();
+    if (chosen) languageSelect.value = TorvalLang.active();
   }
 
   api.storage.local.get('off').then((stored) => paint(!stored.off)).catch(() => {});
@@ -69,11 +68,11 @@
     window.close();
   });
 
+  // The switch says On or Off and that is the whole of it. There used to be
+  // a sentence under it explaining what On means, which is a sentence you
+  // read once and then read past forever.
   function paint(on) {
     box.checked = on;
     state.textContent = on ? 'On' : 'Off';
-    note.textContent = on
-      ? 'Hovering, marking and the bar are working.'
-      : 'Installed and out of the way. Pages already open follow along.';
   }
 })();

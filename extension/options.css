@@ -1,5 +1,5 @@
 /*
- * LLL, settings.
+ * Torval, settings.
  *
  * Same restraint as the popup, a little roomier. The page is a sidebar of
  * places and a column of cards, and the cards are what does the work: a
@@ -217,8 +217,22 @@ input[type="number"] { flex: 0 0 110px; }
   gap: 12px;
 }
 
-.row { margin-top: 12px; }
+.row { margin: 12px 0 0; }
 .spacer { flex: 1; }
+
+/*
+ * A note sitting in a row is a word beside a button, not a paragraph under
+ * one, so it drops the paragraph spacing it would otherwise bring with it.
+ *
+ * Both of these were doing damage where it was easiest to miss: an empty
+ * <span class="note">, waiting to say "saved", is still a flex item with 18
+ * pixels hanging off the bottom of it, which made every row that holds one
+ * 18 pixels taller than the button in it. Where a card was nothing but such
+ * rows, the "Keeping a copy" card, that plus the paragraph's own bottom
+ * margin was a box half again as tall as the two buttons inside it, with the
+ * spare room pooled underneath them.
+ */
+.row > .note { margin-bottom: 0; }
 
 /* Saving is the whole point of the Anki page, so it does not scroll away. */
 .actions {
@@ -316,8 +330,16 @@ input[type="file"] {
   clip-path: inset(50%);
 }
 
+/*
+ * A label that stands in for a file input, since a file input cannot be
+ * styled. It is a button in every way that matters, so it is shaped like
+ * one, and it drops the 10px that `label` carries for stacked form rows:
+ * inside a centred row that margin is counted as part of the label's height
+ * and pushes it five pixels above the real button beside it.
+ */
 .pick {
   flex: 0 0 auto;
+  margin-bottom: 0;
   padding: 9px 18px;
   background: #23252a;
   color: var(--ink);
@@ -403,3 +425,20 @@ input[type="file"]:focus-visible ~ .pick,
 .check > span { flex: 1 1 auto; white-space: normal; color: var(--ink); }
 
 .picked.chosen { color: var(--ink); }
+
+/* --- about ----------------------------------------------------------------
+ * The version beside the name, and the links in the credits. Muted, because
+ * this is a page you read once. */
+
+.quiet {
+  margin-left: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.note a { color: var(--accent); }
+.note a:hover { color: #6fa3b8; }
+
+/* The last card on a page has nothing under it to be spaced from. */
+.panel section:last-child { margin-bottom: 0; }

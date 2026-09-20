@@ -1,5 +1,5 @@
 /*
- * LLL, deinflection
+ * Torval, deinflection
  *
  * Japanese verbs and adjectives change shape depending on tense, politeness and
  * so on. A dictionary only ever lists the plain form ("食べる"), so before we can
@@ -27,7 +27,7 @@
  * conjugated further on top of it (you cannot conjugate an imperative).
  */
 
-var LLLDeinflect = (function () {
+var TorvalDeinflect = (function () {
   'use strict';
 
   var rules = [];
@@ -356,4 +356,4 @@ var LLLDeinflect = (function () {
   return { deinflect: deinflect, rules: rules, matches: matches };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLDeinflect;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalDeinflect;

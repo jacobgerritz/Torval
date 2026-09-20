@@ -1,5 +1,5 @@
 /*
- * LLL, settings
+ * Torval, settings
  *
  * Two things live here and they have nothing to do with each other: where
  * cards go, and which words you already know. They are tabs rather than one
@@ -45,10 +45,11 @@ showPanel(asked === 'known' ? 'words'
 // Anki
 // -------------------------------------------------------------------------
 
-// 'pitch' and 'stress' are the same idea in two languages that need it
-// answered differently (a diagram for Japanese, an inline mark for Italian),
-// so only whichever matches the active language is ever offered; a note
-// type has no use for the other one.
+// 'pitch' and 'stress' are the same idea answered differently (a diagram
+// for Japanese, an inline mark for Italian and Spanish), so only whichever
+// matches the active language is ever offered; a note type has no use for
+// the other one. Which one a language wants is on its profile, so a new
+// language says so once, in lang.js, rather than here as well.
 const SOURCE_LABELS_BASE = [
   ['', ', '],
   ['word', 'Target word'],
@@ -63,7 +64,7 @@ const SOURCE_LABELS_BASE = [
 ];
 
 function sourceLabels() {
-  const extra = LLLLang.active() === 'it'
+  const extra = TorvalLang.profile().accent === 'stress'
     ? [['stress', 'Word stress']]
     : [['pitch', 'Pitch accent']];
   return SOURCE_LABELS_BASE.concat(extra);
@@ -77,31 +78,25 @@ const languageSelect = document.getElementById('language');
 
 function fillLanguages() {
   languageSelect.textContent = '';
-  for (const { code, name } of LLLLang.list()) {
+  for (const { code, name } of TorvalLang.list()) {
     const option = document.createElement('option');
     option.value = code;
     option.textContent = name;
-    if (code === LLLLang.active()) option.selected = true;
+    if (code === TorvalLang.active()) option.selected = true;
     languageSelect.appendChild(option);
   }
 }
 
 /*
- * The examples on this page are words, and a word is in one language or the
- * other. "たべました is added as 食べる" is a sentence about Japanese written
- * for somebody reading Japanese, and on the Italian page it is not an example
- * of anything, it is a line of a script they may well not read at all. Each
- * language brings its own, from its profile in lang.js, for the same reason
- * the Anki source list brings its own pitch/stress row.
+ * The placeholders on this page are words, and a word is in one language.
+ * 日本語のテキストをここに貼り付けてください is not a prompt to somebody
+ * reading Spanish, it is a line of a script they may well not read at all.
+ * Each language brings its own, from its profile in lang.js, for the same
+ * reason the Anki source list brings its own pitch/stress row.
  */
 function fillExamples() {
-  const example = LLLLang.profile().examples;
+  const example = TorvalLang.profile().examples;
   if (!example) return;
-  const note = document.getElementById('add-text-note');
-  if (note) {
-    note.textContent = 'Something you have already read. ' +
-      example.inflected + ' is added as ' + example.lemma + '.';
-  }
   const set = (id, value) => {
     const el = document.getElementById(id);
     if (el) el.placeholder = value;
@@ -117,12 +112,12 @@ fillExamples();
 
 if (languageSelect) {
   fillLanguages();
-  languageSelect.addEventListener('change', () => { LLLLang.set(languageSelect.value); });
-  // Fires for this select's own change too (LLLLang.set applies synchronously
+  languageSelect.addEventListener('change', () => { TorvalLang.set(languageSelect.value); });
+  // Fires for this select's own change too (TorvalLang.set applies synchronously
   // before its storage write settles), as well as a switch made from the
   // toolbar popup or this same page in another tab, so there is exactly one
   // place that reloads the Anki panel rather than two racing each other.
-  LLLLang.onChange(() => { fillLanguages(); fillExamples(); load(); });
+  TorvalLang.onChange(() => { fillLanguages(); fillExamples(); load(); });
 }
 
 // The chosen file’s name, said in the page’s own type. The browser will not
@@ -160,7 +155,7 @@ document.getElementById('save').addEventListener('click', save);
 load();
 
 /** The Anki config for whichever language is active right now. */
-function ankiConfigKey() { return 'ankiConfig' + LLLLang.profile().storageSuffix; }
+function ankiConfigKey() { return 'ankiConfig' + TorvalLang.profile().storageSuffix; }
 
 async function load() {
   const stored = await api.storage.local.get(ankiConfigKey());
@@ -197,7 +192,7 @@ async function showFields() {
   // Keep whatever was already chosen for this note type; guess the rest.
   const existing = config.fields || {};
   const known = names.some((n) => existing[n] !== undefined);
-  const mapping = known ? existing : LLLAnki.guessMapping(names);
+  const mapping = known ? existing : TorvalAnki.guessMapping(names);
 
   mappingBox.textContent = '';
   for (const name of names) {
@@ -245,6 +240,13 @@ async function save() {
 function fail(message) {
   statusText.textContent = message;
   statusText.className = 'error';
+}
+
+// The version on the About page comes from the manifest rather than being
+// typed here as well, so there is one place it can be wrong.
+const versionEl = document.getElementById('version');
+if (versionEl && api.runtime.getManifest) {
+  versionEl.textContent = api.runtime.getManifest().version;
 }
 
 // The reader is a page rather than a panel, since it is a place to be

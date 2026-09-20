@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>PREVIEW, not your real LLL settings</title>
+<title>PREVIEW, not your real Torval settings</title>
 <!--
   A page for working on how the settings look, without reloading the extension
   in Firefox every time.
@@ -39,8 +39,8 @@
 <script>
 // --- stand in for Anki and for browser storage ------------------------------
 const DECKS = ['Default', '日本語::Mining', 'Core 2k'];
-const MODELS = ['LLL', 'Basic'];
-const FIELDS = { LLL: ['Word', 'Reading', 'Sentence', 'Definition', 'Audio', 'Pitch', 'Image'], Basic: ['Front', 'Back'] };
+const MODELS = ['Torval', 'Basic'];
+const FIELDS = { Torval: ['Word', 'Reading', 'Sentence', 'Definition', 'Audio', 'Pitch', 'Image'], Basic: ['Front', 'Back'] };
 
 // A word list big enough to show what browsing a real one is like, including
 // the scrolling and the search. The filler is named so that nobody reading it
@@ -54,7 +54,7 @@ for (let i = 0; i < 400; i++) known.set('（例' + i + '・にせもの）', Dat
 const ignored = new Map();
 ['ネカフェ', '（にせもの・な・まえ）', 'ＡＢＣ'].forEach((word, i) => ignored.set(word, Date.now() - i * 3600000));
 
-let stored = { ankiConfig: { deck: '日本語::Mining', model: 'LLL', tags: ['lll'], fields: {} } };
+let stored = { ankiConfig: { deck: '日本語::Mining', model: 'Torval', tags: ['torval'], fields: {} } };
 
 window.browser = {
   storage: {
@@ -88,12 +88,12 @@ window.browser = {
             .sort((a, b) => b.added - a.added) };
         case 'exportWords':
           return { ok: true, result: {
-            format: 'lll-words', version: 1, saved: new Date().toISOString(),
+            format: 'torval-words', version: 1, saved: new Date().toISOString(),
             known: Object.fromEntries(known), ignored: Object.fromEntries(ignored)
           } };
         case 'importWords': {
           const data = msg.data;
-          if (!data || data.format !== 'lll-words') return { ok: false, error: 'That is not a file LLL saved.' };
+          if (!data || data.format !== 'torval-words') return { ok: false, error: 'That is not a file Torval saved.' };
           const added = { known: 0, ignored: 0 };
           for (const [word, when] of Object.entries(data.known || {})) {
             if (!known.has(word)) { known.set(word, when); added.known++; }
@@ -144,7 +144,7 @@ window.browser = {
   warning.innerHTML = '<b>Preview, made-up data.</b> ' +
     '<span>This is not your settings and not your words. Nothing here is saved, ' +
     'and nothing here can reach the extension. Your real settings open from ' +
-    'LLL&rsquo;s toolbar button, or the &#9881; on the bar at the top of a page.</span>';
+    'Torval&rsquo;s toolbar button, or the &#9881; on the bar at the top of a page.</span>';
   // Above the sidebar and the panel both, not squeezed into either, the
   // layout below is a flex row, and a banner stuffed inside it would just
   // become a third column rather than a strip across the top.

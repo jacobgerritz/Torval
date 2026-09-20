@@ -1,6 +1,6 @@
 <!doctype html>
 <meta charset="utf-8">
-<title>LLL preview</title>
+<title>Torval preview</title>
 <!--
   A page for working on how the popup looks and behaves, without having to
   reload the extension in Firefox every time.
@@ -30,7 +30,7 @@
 </style>
 
 <main>
-  <h1>LLL preview</h1>
+  <h1>Torval preview</h1>
   <p class="hint">Hold <b>Shift</b> and point at a word. <b>Esc</b> closes.</p>
 
   <p>日本語を勉強しています。</p>
@@ -44,15 +44,26 @@
   <p>単子葉植物の一つの科である。全世界で約70属3700種がある。</p>
   <p>でもそれって、すごいですね。</p>
   <p>僕もちえこさんも猫です。</p>
+  <!-- Only the Italian and Spanish dictionaries carry a word built out of
+       another word, so preview-words.js fakes one entry that does, and this
+       is the line to point at to see the "built from" link. -->
+  <p>犬に食べさせるのは大変です。</p>
 
   <p class="hint">The line below stands in for a caption, the middle of three.
   It ends in the middle of 嬉しかった, so both the popup and the yellow
   marking have to see 嬉しかっ as part of 嬉しかった rather than as かっ on
   its own.</p>
-  <p data-lll-subtitle>なってるのでとっても嬉しかっ</p>
+  <p data-torval-subtitle>なってるのでとっても嬉しかっ</p>
 </main>
 
 <script src="../extension/japanese.js"></script>
+<script src="../extension/scan.js"></script>
+<script src="../extension/italian.js"></script>
+<script src="../extension/italian-scan.js"></script>
+<script src="../extension/spanish.js"></script>
+<script src="../extension/spanish-scan.js"></script>
+<script src="../extension/lang.js"></script>
+<script src="../extension/stress.js"></script>
 <script src="../extension/deinflect.js"></script>
 <script src="../extension/lookup.js"></script>
 <script src="preview-words.js"></script>
@@ -62,7 +73,7 @@ let settings = {};
 // Mining from a video, without a video. The real thing records the line, which
 // needs YouTube; what matters here is that mine() takes the same path, since
 // that path is where a card once vanished into a spinning dot.
-window.LLLSubtitles = {
+window.TorvalSubtitles = {
   enable() {},
   suspend() {},
   // Standing in for three consecutive captions, so the line on screen can be
@@ -75,7 +86,7 @@ window.LLLSubtitles = {
   allText() { return ""; },
   count() { return 1; }
 };
-window.LLLVideo = {
+window.TorvalVideo = {
   async capture(sentence, cue) {
     window.__captured = { sentence, cue };
     await new Promise((r) => setTimeout(r, 50));
@@ -119,8 +130,8 @@ window.browser = {
         return { ok: true, result: { word: msg.word, on: msg.ignored, total: ignored.size } };
       }
       if (msg.type === 'comprehension') {
-        const tokens = await LLLLookup.locateTokens(msg.text, db);
-        return { ok: true, result: LLLLookup.coverage(tokens, known, ignored) };
+        const tokens = await TorvalLookup.locateTokens(msg.text, db);
+        return { ok: true, result: TorvalLookup.coverage(tokens, known, ignored) };
       }
       if (msg.type === 'wordPlaces') {
         // The real background script says how far through it is as it goes.
@@ -139,24 +150,24 @@ window.browser = {
         const lead = String(msg.before || '').slice(-CONTEXT);
         const trail = String(msg.after || '').slice(0, CONTEXT);
         const whole = lead + msg.text + trail;
-        const tokens = LLLLookup.within(
-          await LLLLookup.locateTokens(whole, db), lead.length, msg.text.length);
+        const tokens = TorvalLookup.within(
+          await TorvalLookup.locateTokens(whole, db), lead.length, msg.text.length);
         const places = {};
         const unmarked = [];
         tokens.forEach((t, i) => {
           if (!places[t.word]) {
             places[t.word] = [];
-            if (ignored.has(t.word) || LLLLookup.isKnown(t, known)) unmarked.push(t.word);
+            if (ignored.has(t.word) || TorvalLookup.isKnown(t, known)) unmarked.push(t.word);
           }
           places[t.word].push(t.start, t.length, i % 2);
         });
-        const score = LLLLookup.coverage(tokens, known, ignored);
+        const score = TorvalLookup.coverage(tokens, known, ignored);
         return { ok: true, result: { ...score, places, unmarked } };
       }
       if (msg.type === 'lookup') {
         const found = typeof msg.point === 'number'
-          ? await LLLLookup.hover(msg.text, msg.point, db)
-          : { start: 0, groups: await LLLLookup.search(msg.text, db) };
+          ? await TorvalLookup.hover(msg.text, msg.point, db)
+          : { start: 0, groups: await TorvalLookup.search(msg.text, db) };
         const start = found.start;
         const groups = found.groups;
         // The real background script attaches the accent from the pitch data;
@@ -164,9 +175,9 @@ window.browser = {
         const ACCENTS = { 日本語: 0, 勉強: 0, 新しい: 4, 図書館: 2, 読む: 1, 食べる: 2, 本: 1, 人: 0, 車: 0, 買う: 0 };
         for (const g of groups) for (const h of g.hits) {
           if (h.word in ACCENTS) h.pitch = ACCENTS[h.word];
-          h.band = LLLLookup.frequencyBand(h.q);
-          h.shared = LLLLookup.sharedTags(h.entry);
-          h.sharedPos = LLLLookup.sharedPos(h.entry);
+          h.band = TorvalLookup.frequencyBand(h.q);
+          h.shared = TorvalLookup.sharedTags(h.entry);
+          h.sharedPos = TorvalLookup.sharedPos(h.entry);
           h.known = known.has(h.word);
           h.ignored = ignored.has(h.word);
         }

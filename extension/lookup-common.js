@@ -1,10 +1,10 @@
 /*
- * LLL, dictionary-lookup logic shared across languages
+ * Torval, dictionary-lookup logic shared across languages
  *
- * Segmenting text into words is different for every language LLL supports:
+ * Segmenting text into words is different for every language Torval supports:
  * Japanese has no spaces and needs the Viterbi-style run solver in
  * lookup.js, Italian just needs to split on whitespace and punctuation (see
- * lookup-it.js). But once a word has been found, working out how it ranks,
+ * lookup-latin.js). But once a word has been found, working out how it ranks,
  * whether it counts as "known", and how much of a passage is understood is
  * exactly the same problem either way: these functions all operate on
  * whatever shape `db.getEntries` hands back (`{ k, r, s, f, q, qm }`, the
@@ -15,11 +15,11 @@
  * Where a function needs a piece of language-specific behaviour, that piece
  * is passed in rather than hardcoded, `search` for decomposeKnown and
  * `segment` for locateTokens/extractTokens/extractWords, so this file has no
- * dependency on either lookup.js or lookup-it.js and can be required by
+ * dependency on either lookup.js or lookup-latin.js and can be required by
  * both.
  */
 
-var LLLLookupCommon = (function () {
+var TorvalLookupCommon = (function () {
   'use strict';
 
   // -------------------------------------------------------------------------
@@ -275,4 +275,4 @@ var LLLLookupCommon = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLLookupCommon;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalLookupCommon;

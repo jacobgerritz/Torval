@@ -1,5 +1,5 @@
 /*
- * LLL, Italian deinflection
+ * Torval, Italian deinflection
  *
  * An Italian dictionary only lists the infinitive ("parlare") and the
  * singular ("libro"). Before a conjugated or inflected word on a page can be
@@ -8,10 +8,11 @@
  *     parlavamo  ->  parlare
  *     libri      ->  libro
  *
- * This mirrors deinflect.js's own engine exactly: a table of small reversible
- * suffix rules, indexed by ending, walked with the same breadth-first chain
- * solver. What differs is entirely the rule *content*, because Italian
- * grammar is not Japanese grammar.
+ * This is a table of small reversible suffix rules, walked by the solver in
+ * deinflect-latin.js, which is deinflect.js's own engine with the Japanese
+ * taken out of it. What lives here is entirely rule *content*, because
+ * Italian grammar is not Japanese grammar and is not Spanish grammar
+ * either.
  *
  * Two things make the Italian table simpler than the Japanese one:
  *
@@ -41,13 +42,12 @@
  * match, the same as any word outside deinflect.js's own coverage.
  */
 
-var LLLDeinflectIt = (function () {
-  'use strict';
+if (typeof TorvalDeinflectLatin === 'undefined' && typeof require !== 'undefined') {
+  var TorvalDeinflectLatin = require('./deinflect-latin.js');
+}
 
-  var rules = [];
-  function rule(from, to, tin, tout, name) {
-    rules.push({ from: from, to: to, tin: tin, tout: tout, name: name });
-  }
+var TorvalDeinflectIt = TorvalDeinflectLatin.build(function (rule) {
+  'use strict';
 
   // ---------------------------------------------------------------------
   // Regular conjugation, one stem-ending table per class. `stem` is dropped
@@ -222,7 +222,7 @@ var LLLDeinflectIt = (function () {
   // adjective and was missing entirely: a dictionary lists intero, and the
   // text says intera, intere, interi depending on what it is describing.
   // The plural rules above reached interi and nothing else, so stessa and
-  // intere were words LLL could not find at all.
+  // intere were words Torval could not find at all.
   //
   // These are a fallback rather than the main route: the dictionary itself
   // now carries every inflected form Wiktionary lists, pointed at the word
@@ -232,75 +232,12 @@ var LLLDeinflectIt = (function () {
   rule('a', 'o', [], NA, 'feminine');
   rule('e', 'o', [], NA, 'feminine plural');
 
-  // Index the rules by their ending so lookups stay fast, same as deinflect.js.
-  var byEnding = new Map();
-  rules.forEach(function (r) {
-    r.tkey = ' ' + r.tout.join(',');
-    var list = byEnding.get(r.from);
-    if (!list) { list = []; byEnding.set(r.from, list); }
-    list.push(r);
-  });
-  var maxEndingLength = 0;
-  byEnding.forEach(function (_, k) { if (k.length > maxEndingLength) maxEndingLength = k.length; });
-
-  var MAX_DEPTH = 4;
-  var MAX_RESULTS = 200;
-
-  /**
-   * Given a word as it appears in text, return every plausible dictionary
-   * form. The first result is always the word itself, untouched. Shape
-   * matches deinflect.js's own `deinflect` exactly: { term, types, reasons }.
-   */
-  function deinflect(word) {
-    var results = [{ term: word, types: null, reasons: [] }];
-    var seen = new Set([word + ' *']);
-
-    for (var i = 0; i < results.length && results.length < MAX_RESULTS; i++) {
-      var cur = results[i];
-      if (cur.reasons.length >= MAX_DEPTH) continue;
-
-      var candidates = [];
-      var limit = Math.min(maxEndingLength, cur.term.length);
-      for (var len = 1; len <= limit; len++) {
-        var list = byEnding.get(cur.term.slice(cur.term.length - len));
-        if (list) candidates = candidates.concat(list);
-      }
-
-      for (var j = 0; j < candidates.length; j++) {
-        var r = candidates[j];
-        if (cur.types !== null && !matches(r.tin, cur.types)) continue;
-
-        var next = cur.term.slice(0, cur.term.length - r.from.length) + r.to;
-        if (next.length === 0 || next.length > 40 || next === cur.term) continue;
-
-        var key = next + r.tkey;
-        if (seen.has(key)) continue;
-        seen.add(key);
-
-        results.push({
-          term: next,
-          types: r.tout,
-          reasons: r.name ? [r.name].concat(cur.reasons) : cur.reasons.slice()
-        });
-      }
-    }
-    return results;
-  }
-
   // An empty `tin`, like deinflect.js's, means "only applies to the word
-  // exactly as it appeared" (cur.types === null, checked by the caller
-  // before this is even reached) — never as a second step chained onto an
-  // already-typed intermediate result. Every rule in this file uses an empty
-  // `tin` on purpose: Italian's core tenses are each one step from the
-  // surface form, so nothing here needs to chain.
-  function matches(tin, types) {
-    for (var i = 0; i < tin.length; i++) {
-      if (types.indexOf(tin[i]) !== -1) return true;
-    }
-    return false;
-  }
+  // exactly as it appeared" — never as a second step chained onto an
+  // already-typed intermediate result. Every rule in this file uses one on
+  // purpose: Italian's core tenses are each one step from the surface form,
+  // so nothing here needs to chain. See deinflect-latin.js, which does the
+  // walking.
+});
 
-  return { deinflect: deinflect, rules: rules, matches: matches };
-})();
-
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLDeinflectIt;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalDeinflectIt;

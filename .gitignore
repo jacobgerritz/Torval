@@ -9,9 +9,17 @@ extension/data/
 #   node tools/build-dict-it.mjs
 extension/data-it/
 
+# Built Spanish dictionary data, regenerate with:
+#   node tools/build-dict-es.mjs
+extension/data-es/
+
 node_modules/
 *.log
 
 # A third-party extension's source, kept locally for reference only, never
 # to be committed or redistributed as part of this repository.
 Seek Subtitles for YouTube/
+
+# Release packages, built with:
+#   node tools/package.mjs
+dist/

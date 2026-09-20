@@ -1,5 +1,5 @@
 /*
- * LLL, how far a word can run
+ * Torval, how far a word can run
  *
  * The longest span of text worth trying as a single word: long enough to
  * cover an ordinary conjugated verb or compound, short enough to keep scanning
@@ -11,9 +11,9 @@
  * try to match, a long word could be cut short at the edge of what was sent,
  * and nothing would say so, it would just quietly answer with the wrong,
  * shorter word. Written down once, here, for the same reason japanese.js is
- * its own file: more than one part of LLL has to give the same answer.
+ * its own file: more than one part of Torval has to give the same answer.
  */
 
-var LLLMaxScan = 16;
+var TorvalMaxScan = 16;
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLMaxScan;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalMaxScan;

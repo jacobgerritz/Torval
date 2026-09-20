@@ -1,5 +1,5 @@
 /*
- * LLL, how far an Italian word can run
+ * Torval, how far an Italian word can run
  *
  * scan.js's counterpart for Italian. Japanese needs a scan window because it
  * has to try every possible word boundary in an unbroken stream of script;
@@ -13,6 +13,6 @@
  * "word" by mistake.
  */
 
-var LLLItalianMaxScan = 28;
+var TorvalItalianMaxScan = 28;
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLItalianMaxScan;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalItalianMaxScan;

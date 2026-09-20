@@ -49,14 +49,14 @@ window.browser = {
     async sendMessage(msg) {
       if (msg.type === "status") return { status: { state: "ready", progress: 1 } };
       if (msg.type === "wordPlaces" || msg.type === "comprehension") {
-        const tokens = await LLLLookup.locateTokens(msg.text, db);
-        const score = LLLLookup.coverage(tokens, known, ignored);
+        const tokens = await TorvalLookup.locateTokens(msg.text, db);
+        const score = TorvalLookup.coverage(tokens, known, ignored);
         if (msg.type === "comprehension") return { ok: true, result: score };
         const places = {}; const unmarked = [];
         tokens.forEach((t, i) => {
           if (!places[t.word]) {
             places[t.word] = [];
-            if (ignored.has(t.word) || LLLLookup.isKnown(t, known)) unmarked.push(t.word);
+            if (ignored.has(t.word) || TorvalLookup.isKnown(t, known)) unmarked.push(t.word);
           }
           places[t.word].push(t.start, t.length, i % 2);
         });

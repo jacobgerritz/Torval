@@ -1,5 +1,5 @@
 /*
- * LLL, timing YouTube's subtitles
+ * Torval, timing YouTube's subtitles
  *
  * The point of this file is not to show subtitles. YouTube already does that, 
  * it is to know exactly when each line starts and ends, which YouTube's own
@@ -32,21 +32,29 @@
  *      is known ahead of watching it. D cannot jump to an unseen line, and
  *      nothing here can tell you the whole video's vocabulary in advance.
  *
- * LLL never touches YouTube's own captions. The CC button is YouTube's, it
- * means what it says, and LLL draws its own line from the track it fetched
- * itself: either can be on without the other, and both at once is a choice
- * rather than an accident. Only the last of the four ways below reads what is
- * on screen, and that one does need YouTube's captions running, since reading
- * them is the whole of how it works.
+ * Nothing here asks the viewer to set anything up. Which track to fetch is
+ * decided from the language being read, against the list of tracks the video
+ * actually has, not from whatever the player happens to be showing; a
+ * transcript in the wrong language is refused rather than used. The caption
+ * language picked in the player is therefore beside the point, except in the
+ * last case below.
+ *
+ * Torval leaves the CC button alone. It is YouTube's, it means what it says, and
+ * Torval draws its own line from the track it fetched itself: either can be on
+ * without the other, and both at once is a choice rather than an accident.
+ * The single exception is the third way above, which works by reading what is
+ * on screen and so cannot work with nothing on screen: there, and only once
+ * everything else has failed, Torval turns the player's own captions on, in the
+ * language being read, and never off again.
  */
 
 // Loaded first in the extension and already a global; under Node (the test
 // suite) it is pulled in here.
-if (typeof LLLJapanese === 'undefined' && typeof require !== 'undefined') {
-  var LLLJapanese = require('./japanese.js');
+if (typeof TorvalJapanese === 'undefined' && typeof require !== 'undefined') {
+  var TorvalJapanese = require('./japanese.js');
 }
 
-var LLLSubtitles = (function () {
+var TorvalSubtitles = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
@@ -56,7 +64,7 @@ var LLLSubtitles = (function () {
   // it offered, and fell all the way back to reading the captions off the
   // screen.
   function languages() {
-    var profile = typeof LLLLang !== 'undefined' ? LLLLang.profile() : null;
+    var profile = typeof TorvalLang !== 'undefined' ? TorvalLang.profile() : null;
     return (profile && profile.subtitles) || ['ja', 'ja-JP'];
   }
   var MAX_LOOKUP_ATTEMPTS = 12;    // ~12s of retrying before giving up on the player existing
@@ -94,12 +102,12 @@ var LLLSubtitles = (function () {
    * Everything else, the timing, the overlay, hovering, mining, A and D, is
    * the same work wherever the video is playing. Only four questions have a
    * different answer per site: is this one of them, which video is playing,
-   * where the player draws its own caption text, and where LLL should hang
+   * where the player draws its own caption text, and where Torval should hang
    * its own line.
    *
    * There are two ways of getting a transcript, and a site uses one or the
    * other. YouTube is asked for one. Netflix is not asked at all: its
-   * player is handed a subtitle file of its own, and LLL takes a copy as
+   * player is handed a subtitle file of its own, and Torval takes a copy as
    * it goes past, which is what `catches` means. Either way, a site that
    * comes up empty reads the lines off the screen instead.
    */
@@ -111,7 +119,10 @@ var LLLSubtitles = (function () {
       id: function () { return new URLSearchParams(location.search).get('v'); },
       captions: '.ytp-caption-window-container, .captions-text',
       player: '.html5-video-player',
-      seek: null            // moving the video element is enough here
+      seek: null,           // moving the video element is enough here
+      // Only ever called once every way of getting the file has failed and
+      // the screen is the last thing left to read. See ytCaptionsOn.
+      captionsOn: ytCaptionsOn
     },
     netflix: {
       host: /(^|[.])netflix[.]com$/,
@@ -127,10 +138,11 @@ var LLLSubtitles = (function () {
       // video element under it ends the session with error F7375 and an
       // error page. Its player has a seek of its own; that is the one.
       seek: function (seconds) {
-        var reader = typeof LLLNetflix !== 'undefined' ? LLLNetflix
-          : (typeof window !== 'undefined' ? window.LLLNetflix : null);
+        var reader = typeof TorvalNetflix !== 'undefined' ? TorvalNetflix
+          : (typeof window !== 'undefined' ? window.TorvalNetflix : null);
         if (reader) reader.seek(seconds);
-      }
+      },
+      captionsOn: null      // Netflix's player has no such handle to pull
     }
   };
   var site = null;
@@ -157,34 +169,65 @@ var LLLSubtitles = (function () {
    * Let the line be dragged up and down, for when it sits over something
    * worth seeing.
    *
-   * The words in it still have to be hoverable and clickable, so this cannot
-   * simply swallow the pointer: a press becomes a drag only once it has moved
-   * a few pixels, and only then is the click that follows it thrown away. A
-   * press that does not move is left alone entirely and opens the dictionary
-   * as usual.
+   * The words in it still have to be hoverable, clickable and selectable, so
+   * this cannot simply swallow the pointer. Two things share one gesture and
+   * have to be told apart: dragging the line, and dragging across the words
+   * to select them for copying.
+   *
+   * The direction tells them apart, because they never really point the same
+   * way. A line of text is wide and one line tall: selecting it means going
+   * along it, and moving it out of the way means going up or down the
+   * picture. So the first few pixels of a press decide which gesture it is,
+   * and it stays that gesture until the button comes back up: clearly
+   * downward or upward and the line moves, anything else and the press is
+   * left entirely alone, to select as it would on any other text. Moving is
+   * still one press and a pull, with nothing to aim at first; it just has to
+   * be a pull in the direction moving actually means.
+   *
+   * A press that goes nowhere is left alone too, and opens the dictionary as
+   * usual.
    */
+  var DRAG_SLOP = 5;        // pixels before a press is any gesture at all
+  var DRAG_STEEPNESS = 1.6; // how much more vertical than horizontal it must be
+
   function dragging(line) {
     var from = null;
     var moved = false;
+    var selecting = false;   // this press was judged to be a selection
 
     line.addEventListener('pointerdown', function (e) {
       if (e.button !== 0) return;
-      from = { y: e.clientY, bottom: bottom };
+      from = { x: e.clientX, y: e.clientY, bottom: bottom };
       moved = false;
+      selecting = false;
     });
 
     window.addEventListener('pointermove', function (e) {
-      if (!from || !overlay) return;
+      if (!from || !overlay || selecting) return;
       var shift = from.y - e.clientY;
-      if (!moved && Math.abs(shift) < 4) return;
-      moved = true;
+      var sideways = Math.abs(e.clientX - from.x);
+      if (!moved) {
+        // Still deciding. Nothing happens until the pointer has gone far
+        // enough to mean anything, and then the steeper of the two wins.
+        if (Math.max(Math.abs(shift), sideways) < DRAG_SLOP) return;
+        if (Math.abs(shift) < sideways * DRAG_STEEPNESS) { selecting = true; return; }
+        moved = true;
+      }
       // Dragging up moves it up the picture, so the gap below it grows.
       var height = overlay.parentElement ? overlay.parentElement.clientHeight : 0;
       if (!height) return;
       bottom = Math.max(0, Math.min(88, from.bottom + (shift / height) * 100));
       overlay.style.bottom = bottom + '%';
-      // Dragging a box around should not also select the words in it.
+      // Dragging the box around should not also select the words in it. The
+      // browser extends the selection from the mouse event underneath this
+      // one and preventDefault here does not reach that, including the few
+      // pixels selected while which gesture this was had not been decided,
+      // so what it did select is simply dropped again, every frame.
       e.preventDefault();
+      try {
+        var selection = window.getSelection();
+        if (selection && !selection.isCollapsed) selection.removeAllRanges();
+      } catch (err) { /* nothing to clear */ }
     });
 
     window.addEventListener('pointerup', function () {
@@ -192,6 +235,7 @@ var LLLSubtitles = (function () {
       var dragged = moved;
       from = null;
       moved = false;
+      selecting = false;
       if (!dragged) return;
       // The click that ends a drag is not a click on a word.
       window.addEventListener('click', function (e) {
@@ -220,7 +264,7 @@ var LLLSubtitles = (function () {
     setInterval(renderCue, 200);
     if (api.runtime.onMessage) api.runtime.onMessage.addListener(onBackgroundMessage);
     watch();
-    console.log('LLL: watching for subtitles');
+    console.log('Torval: watching for subtitles');
   }
 
   /**
@@ -237,23 +281,49 @@ var LLLSubtitles = (function () {
   function onBackgroundMessage(message) {
     if (!message || message.type !== 'timedtextSeen') return;
     if (!videoId || message.url.indexOf('v=' + videoId) === -1) return;   // an ad, or a different tab's video
+    // The player asks for whatever track is switched on in the player, which
+    // is very often not the language being read: on a video watched with
+    // English captions this used to arrive and quietly overwrite a correct
+    // Italian transcript with the English one. The address says which
+    // language it is for, so it can simply be read.
+    if (!wantedTimedtext(message.url)) return;
     loadSeenTrack(message.url);
+  }
+
+  /**
+   * Is this caption address for the language being read?
+   *
+   * `lang` is the track's own language; `tlang` is YouTube translating that
+   * track into something else on the fly, so when it is present it, and not
+   * `lang`, is the language of the text that comes back. An address with
+   * neither is not one this can vouch for, and is left alone.
+   */
+  function wantedTimedtext(url) {
+    var params;
+    try {
+      params = new URL(url).searchParams;
+    } catch (err) {
+      return false;
+    }
+    var lang = params.get('tlang') || params.get('lang');
+    if (!lang) return false;
+    return languages().indexOf(lang) !== -1;
   }
 
   async function loadSeenTrack(url) {
     var id = videoId;
-    console.log('LLL: caught YouTube’s own subtitle request, trying it directly');
-    // Tagged so the background script's own listener recognises this as LLL's
+    console.log('Torval: caught YouTube’s own subtitle request, trying it directly');
+    // Tagged so the background script's own listener recognises this as Torval's
     // re-fetch of the address rather than a second genuine request, and does
     // not forward it straight back here again.
-    var loaded = await fetchTrack({ baseUrl: url + '&lll=1', languageCode: 'seen' });
+    var loaded = await fetchTrack({ baseUrl: url + '&torval=1', languageCode: 'seen' });
     if (videoId !== id) return;   // moved to a different video while fetching
     if (loaded && loaded.length) {
       cues = loaded;
       state = 'ready';
-      console.log('LLL:', cues.length, 'subtitle lines ready. YouTube’s own request, reused directly');
+      console.log('Torval:', cues.length, 'subtitle lines ready. YouTube’s own request, reused directly');
     } else {
-      console.warn('LLL: YouTube’s own subtitle address did not answer either, something deeper is blocking it.');
+      console.warn('Torval: YouTube’s own subtitle address did not answer either, something deeper is blocking it.');
     }
   }
 
@@ -362,7 +432,7 @@ var LLLSubtitles = (function () {
       attempts = 0;
       caughtFile = '';
       caughtWrong = '';
-      console.log('LLL: video is now', id || '(none, not a watch page)');
+      console.log('Torval: video is now', id || '(none, not a watch page)');
     }
 
     // A site that hands its subtitles over does so whenever it pleases, so
@@ -404,8 +474,8 @@ var LLLSubtitles = (function () {
    * sitting there when the next one starts.
    */
   function takeCaughtFile(id) {
-    var reader = typeof LLLNetflix !== 'undefined' ? LLLNetflix
-      : (typeof window !== 'undefined' ? window.LLLNetflix : null);
+    var reader = typeof TorvalNetflix !== 'undefined' ? TorvalNetflix
+      : (typeof window !== 'undefined' ? window.TorvalNetflix : null);
     var caught = reader ? reader.track() : null;
     if (!caught || (caught.text || caught.vtt) === caughtFile) return;
     if (caught.movie && String(caught.movie) !== String(id)) {
@@ -413,7 +483,7 @@ var LLLSubtitles = (function () {
       // episode.
       if (caughtWrong !== (caught.text || caught.vtt)) {
         caughtWrong = caught.text || caught.vtt;
-        console.log('LLL: Netflix handed over subtitles for', caught.movie,
+        console.log('Torval: Netflix handed over subtitles for', caught.movie,
           'but', id, 'is playing, so they are being left alone.');
       }
       return;
@@ -426,7 +496,7 @@ var LLLSubtitles = (function () {
     index = 0;
     openCue = null;
     state = 'ready';
-    console.log('LLL:', cues.length, 'subtitle lines ready, from the file Netflix',
+    console.log('Torval:', cues.length, 'subtitle lines ready, from the file Netflix',
       'gave its own player');
   }
 
@@ -597,62 +667,78 @@ var LLLSubtitles = (function () {
   // Plan 1, on YouTube: ask for the file
   // -------------------------------------------------------------------------
 
+  /**
+   * The track list comes first, and not only for the addresses in it.
+   *
+   * It is the one place on the page that says, as data, which languages this
+   * video actually has and what YouTube calls each of them. The transcript
+   * panel below has no such field: it answers in whichever language the panel
+   * happens to open on, which is the caption track the viewer last switched
+   * on. Asked blind, it therefore returned the English transcript of an
+   * Italian video for anyone who had not first picked Italian in the player
+   * by hand, and Torval, having asked for a transcript and been given one, was
+   * perfectly happy with it. That is what made choosing the language by hand
+   * feel compulsory. With the track list read first, the panel can be asked
+   * for a named language and its answer checked against the name, and every
+   * path from here on either gets the language being read or gets nothing.
+   */
   async function load(id) {
     state = 'loading';
-
-    var panel = null;
-    try {
-      panel = await fetchViaTranscriptPanel(id);
-    } catch (err) {
-      console.warn('LLL: could not read the transcript panel:', err && err.message);
-    }
-    if (videoId !== id) return;         // navigated away while fetching
-    if (panel && panel.length) {
-      cues = panel;
-      state = 'ready';
-      console.log('LLL:', cues.length, 'subtitle lines ready, via the transcript panel');
-      return;
-    }
 
     var tracks = null;
     try {
       tracks = await captionTracks(id);
     } catch (err) {
-      console.warn('LLL: could not read the track list:', err && err.message);
+      console.warn('Torval: could not read the track list:', err && err.message);
     }
+    if (videoId !== id) return;         // navigated away while fetching
 
+    var track = null;
     if (!tracks || !tracks.length) {
       // Likely just early, the player has not finished setting itself up yet.
-      // Only worth waiting for on the very first pass, before the transcript
-      // panel has had a real chance, if that already answered with nothing,
-      // retrying this on its own would just repeat the same silence.
-      if (!panel && attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
-      console.warn('LLL: gave up looking for subtitle tracks in this page’s player data.');
-      return fallBackToWatching();
+      // Worth waiting out: this script starts before the player exists.
+      if (attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
+      console.warn('Torval: gave up looking for subtitle tracks in this page’s player data. ' +
+        'Trying the transcript panel blind, in whatever language it opens on.');
+    } else {
+      track = pickTrack(tracks);
+      if (!track) {
+        console.warn('Torval: this video has no ' + TorvalLang.profile().name +
+          ' subtitle track. Tracks offered:',
+          tracks.map(function (t) { return t.languageCode; }).join(', '));
+        return fallBackToWatching();
+      }
     }
 
-    var track = pickTrack(tracks);
-    if (!track) {
-      console.warn('LLL: this video has no ' + LLLLang.profile().name +
-        ' subtitle track. Tracks offered:',
-        tracks.map(function (t) { return t.languageCode; }).join(', '));
-      return fallBackToWatching();
+    var panel = null;
+    try {
+      panel = await fetchViaTranscriptPanel(id, track, tracks);
+    } catch (err) {
+      console.warn('Torval: could not read the transcript panel:', err && err.message);
     }
+    if (videoId !== id) return;         // navigated away while fetching
+    if (panel && panel.length) {
+      cues = panel;
+      state = 'ready';
+      console.log('Torval:', cues.length, 'subtitle lines ready, via the transcript panel');
+      return;
+    }
+    if (!track) return fallBackToWatching();
 
     try {
-      console.log('LLL: fetching the', track.languageCode, 'subtitle track');
+      console.log('Torval: fetching the', track.languageCode, 'subtitle track');
       var loaded = await fetchTrack(track);
       if (videoId !== id) return;         // navigated away while fetching
       if (loaded && loaded.length) {
         cues = loaded;
         state = 'ready';
-        console.log('LLL:', cues.length, 'subtitle lines ready, direct from YouTube');
+        console.log('Torval:', cues.length, 'subtitle lines ready, direct from YouTube');
         return;
       }
-      console.warn('LLL: YouTube would not hand over subtitle data for this video, ' +
+      console.warn('Torval: YouTube would not hand over subtitle data for this video, ' +
         'in any format this tried.');
     } catch (err) {
-      console.warn('LLL: could not load subtitles:', err && err.message);
+      console.warn('Torval: could not load subtitles:', err && err.message);
     }
     fallBackToWatching();
   }
@@ -674,7 +760,7 @@ var LLLSubtitles = (function () {
    * it answering reliably than an old download link almost nobody uses by
    * hand.
    */
-  async function fetchViaTranscriptPanel(id) {
+  async function fetchViaTranscriptPanel(id, track, tracks) {
     var cfg = ytConfig();
     if (!cfg) return null;
     var context = cfg.context || { client: { clientName: 'WEB', clientVersion: '2.20240101.00.00' } };
@@ -685,16 +771,26 @@ var LLLSubtitles = (function () {
     var params = findKey(page, 'getTranscriptEndpoint');
     params = params && params.params;
     if (!params) {
-      console.log('LLL: this video offers no transcript panel.');
+      console.log('Torval: this video offers no transcript panel.');
       return null;
     }
 
     var data = await ytPost('get_transcript', cfg.key, context, { params: params });
     if (!data) return null;
 
+    // Which language this came back in, and how to ask for another.
+    var wanted = wantedLanguage(data, track, tracks);
+    if (wanted === REJECT) return null;      // let the caption file settle it
+    if (wanted) {
+      var again = await ytPost('get_transcript', cfg.key, context, { params: wanted.params });
+      if (!again) return null;
+      console.log('Torval: asked the transcript panel for', wanted.title, 'instead');
+      data = again;
+    }
+
     var segments = findAllKey(data, 'transcriptSegmentRenderer');
     if (!segments.length) {
-      console.warn('LLL: the transcript panel answered with no lines in it.');
+      console.warn('Torval: the transcript panel answered with no lines in it.');
       return null;
     }
 
@@ -708,6 +804,116 @@ var LLLSubtitles = (function () {
     return out;
   }
 
+  /*
+   * Picking the transcript's language.
+   *
+   * The panel carries its own language menu, the dropdown at the bottom of
+   * it, and every item in that menu is a fresh token for the same endpoint.
+   * So the language is not read off the answer, it is asked for again: find
+   * the item whose name is the name of the track wanted, spend its token,
+   * and what comes back is that language.
+   *
+   * The names are YouTube's own ("Italian", "Italian (auto-generated)"),
+   * localised to the viewer's interface language; the track list and the menu
+   * are two views of the same thing in the same response language, so
+   * matching one against the other is matching like with like, and nothing
+   * here has to know what Italian is called in any particular interface.
+   *
+   * Three answers:
+   *   null    the panel is already showing what was asked for, use it as is
+   *   an item ask again with this item's token
+   *   REJECT  this cannot be shown to be the right language, so do not use
+   *           it at all. The caption file is fetched next and that one names
+   *           its language outright, so refusing here costs one request and
+   *           never costs correctness.
+   */
+  var REJECT = { reject: true };
+
+  function wantedLanguage(data, track, tracks) {
+    if (!track) return null;              // no track list to check against
+    var items = languageMenu(data);
+    if (!items.length) {
+      // No menu at all means the panel offers exactly one language. When the
+      // video only has one track, that is necessarily the one already
+      // matched; otherwise there is no telling which it is.
+      if (tracks && tracks.length === 1) return null;
+      console.warn('Torval: the transcript panel has no language menu on it, ' +
+        'so there is no telling which language it answered in.');
+      return REJECT;
+    }
+
+    var match = matchItem(items, track);
+    if (!match) {
+      console.warn('Torval: the transcript panel does not offer ' +
+        (track.name || track.languageCode) + '. Offered:',
+        items.map(function (i) { return i.title; }).join(', '));
+      return REJECT;
+    }
+    if (match.selected) return null;      // already the one showing
+    if (!match.params) return REJECT;     // named it, but gave no way to ask for it
+    return match;
+  }
+
+  /** The menu item for this track, by the name YouTube gives both of them. */
+  function matchItem(items, track) {
+    var name = squash(track.name || '').toLowerCase();
+    if (!name) return null;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].title.toLowerCase() === name) return items[i];
+    }
+    // A near miss, for the one case where the two spellings differ: YouTube
+    // sometimes appends the "(auto-generated)" note on one side only.
+    for (var j = 0; j < items.length; j++) {
+      var title = items[j].title.toLowerCase();
+      if (title.indexOf(name) === 0 || name.indexOf(title) === 0) return items[j];
+    }
+    return null;
+  }
+
+  /** The transcript panel's language dropdown, flattened to {title, params, selected}. */
+  function languageMenu(data) {
+    var menus = findAllKey(data, 'sortFilterSubMenuRenderer');
+    var out = [];
+    for (var i = 0; i < menus.length; i++) {
+      var items = menus[i] && menus[i].subMenuItems;
+      if (!items || !items.length) continue;
+      for (var j = 0; j < items.length; j++) {
+        var title = squash(readText(items[j].title));
+        if (!title) continue;
+        out.push({ title: title, params: itemParams(items[j]), selected: !!items[j].selected });
+      }
+      if (out.length) return out;   // the first real menu is the language one
+    }
+    return out;
+  }
+
+  /**
+   * The token that asks for this menu item's language. Two shapes have been
+   * seen, an endpoint carrying params and a reload continuation; the endpoint
+   * takes either in the same field.
+   */
+  function itemParams(item) {
+    var endpoint = item && (item.serviceEndpoint || item.continuation);
+    if (!endpoint) return null;
+    var transcript = findKey(endpoint, 'getTranscriptEndpoint');
+    if (transcript && transcript.params) return String(transcript.params);
+    var reload = findKey(endpoint, 'reloadContinuationData');
+    if (reload && reload.continuation) return String(reload.continuation);
+    var plain = findKey(endpoint, 'continuation');
+    return typeof plain === 'string' ? plain : null;
+  }
+
+  /** A YouTube text field, which is a plain string, a simpleText, or runs. */
+  function readText(value) {
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return '';
+    if (value.simpleText) return String(value.simpleText);
+    if (value.runs) {
+      return value.runs.map(function (r) { return r.text || ''; }).join('');
+    }
+    return '';
+  }
+
   async function ytPost(endpoint, key, context, body) {
     var res;
     try {
@@ -718,17 +924,17 @@ var LLLSubtitles = (function () {
         body: JSON.stringify(Object.assign({ context: context }, body))
       });
     } catch (err) {
-      console.warn('LLL:', endpoint, 'request failed:', err && err.message);
+      console.warn('Torval:', endpoint, 'request failed:', err && err.message);
       return null;
     }
     if (!res.ok) {
-      console.warn('LLL:', endpoint, 'request came back', res.status);
+      console.warn('Torval:', endpoint, 'request came back', res.status);
       return null;
     }
     try {
       return await res.json();
     } catch (err) {
-      console.warn('LLL:', endpoint, 'response was not valid JSON:', err && err.message);
+      console.warn('Torval:', endpoint, 'response was not valid JSON:', err && err.message);
       return null;
     }
   }
@@ -783,18 +989,18 @@ var LLLSubtitles = (function () {
     ];
     for (var i = 0; i < formats.length; i++) {
       var a = formats[i];
-      console.log('LLL: trying the', a.label, 'format');
+      console.log('Torval: trying the', a.label, 'format');
       var text = await request(a.url);
       if (!text) continue;
       try {
         var cues = a.parse(text);
         if (cues.length) {
-          console.log('LLL: the', a.label, 'format answered:', cues.length, 'lines');
+          console.log('Torval: the', a.label, 'format answered:', cues.length, 'lines');
           return cues;
         }
-        console.warn('LLL: the', a.label, 'format answered but had no lines in it.');
+        console.warn('Torval: the', a.label, 'format answered but had no lines in it.');
       } catch (err) {
-        console.warn('LLL: could not read the', a.label, 'response:', err && err.message);
+        console.warn('Torval: could not read the', a.label, 'response:', err && err.message);
       }
     }
     return null;
@@ -832,20 +1038,20 @@ var LLLSubtitles = (function () {
     try {
       res = await fetch(url);
     } catch (err) {
-      console.warn('LLL: subtitle request failed:', err && err.message);
+      console.warn('Torval: subtitle request failed:', err && err.message);
       return '';
     }
     if (!res.ok) {
-      console.warn('LLL: subtitle request came back', res.status);
+      console.warn('Torval: subtitle request came back', res.status);
       return '';
     }
     var text = await res.text();
     if (!text) {
       if (res.redirected || res.url !== url) {
-        console.warn('LLL: the request was redirected to', res.url,
+        console.warn('Torval: the request was redirected to', res.url,
           ',  something on this machine is very likely intercepting it, not YouTube.');
       } else {
-        console.warn('LLL: subtitle request succeeded but the body was empty',
+        console.warn('Torval: subtitle request succeeded but the body was empty',
           '(no redirect, this is YouTube itself, not a blocker).');
       }
     }
@@ -912,9 +1118,14 @@ var LLLSubtitles = (function () {
     try {
       var raw = JSON.parse(match[1]);   // JSON.parse handles the escapes itself
       var fromHtml = raw.map(function (t) {
-        return { languageCode: String(t.languageCode), baseUrl: String(t.baseUrl), auto: t.kind === 'asr' };
+        return {
+          languageCode: String(t.languageCode),
+          baseUrl: String(t.baseUrl),
+          name: readText(t.name),
+          auto: t.kind === 'asr'
+        };
       });
-      console.log('LLL: found', fromHtml.length, 'subtitle tracks in the page source');
+      console.log('Torval: found', fromHtml.length, 'subtitle tracks in the page source');
       return fromHtml;
     } catch (err) {
       return null;
@@ -952,7 +1163,7 @@ var LLLSubtitles = (function () {
         if (key) return { key: key, context: cfg.get('INNERTUBE_CONTEXT') };
       }
     } catch (err) {
-      console.warn('LLL: could not read ytcfg:', err && err.message);
+      console.warn('Torval: could not read ytcfg:', err && err.message);
     }
 
     // ytcfg was not reachable as a live object, or did not have a key on it.
@@ -961,7 +1172,7 @@ var LLLSubtitles = (function () {
     var match = document.documentElement.innerHTML.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
     if (match) return { key: match[1], context: null };
 
-    console.warn('LLL: could not find an API key anywhere on this page, cannot make a fresh request.');
+    console.warn('Torval: could not find an API key anywhere on this page, cannot make a fresh request.');
     return null;
   }
 
@@ -976,10 +1187,14 @@ var LLLSubtitles = (function () {
         out.push({
           languageCode: String(list[i].languageCode),
           baseUrl: String(list[i].baseUrl),
+          // What YouTube calls this track in the viewer's own interface
+          // language, which is the name the transcript panel's language menu
+          // uses too. See wantedLanguage.
+          name: readText(list[i].name),
           auto: list[i].kind === 'asr'
         });
       }
-      console.log('LLL: found', out.length, 'subtitle tracks via', from);
+      console.log('Torval: found', out.length, 'subtitle tracks via', from);
       return out;
     } catch (err) {
       return null;
@@ -1071,8 +1286,7 @@ var LLLSubtitles = (function () {
 
   function fallBackToWatching() {
     state = 'watching';
-    console.log('LLL: reading captions off the screen instead of asking for the file, ' +
-      'make sure Japanese is the caption language turned on in the player.');
+    console.log('Torval: reading captions off the screen instead of asking for the file.');
     startObserving();
   }
 
@@ -1082,6 +1296,81 @@ var LLLSubtitles = (function () {
     setInterval(attachObserver, 1000);   // YouTube periodically replaces this element
     setInterval(checkCaption, 250);      // a plain safety net alongside the observer
     attachObserver();
+    askForCaptions();
+  }
+
+  /*
+   * Turning the site's own captions on, when reading them is the only way
+   * left.
+   *
+   * Everywhere else Torval leaves the CC button alone, and the note further
+   * down about why still stands: the button is the viewer's, and an
+   * extension quietly overruling it makes a page feel haunted. This is the
+   * one case where leaving it alone is not neutrality but failure. Reading
+   * the screen IS reading the site's captions; with them off there is
+   * nothing on the screen to read, and Torval sat there showing nothing while
+   * the real instruction, "go and switch the captions on yourself, in the
+   * right language", lived only in a console message nobody sees.
+   *
+   * So: only after every way of fetching the file has failed, only on to
+   * never off, and only ever to the language being read. A viewer who had
+   * the right captions on already is untouched.
+   */
+  var captionsAsked = 0;
+  var CAPTION_ATTEMPTS = 15;
+
+  function askForCaptions() {
+    if (!site || typeof site.captionsOn !== 'function') return;
+    if (site.captionsOn(languages())) return;
+    if (++captionsAsked >= CAPTION_ATTEMPTS) return;
+    // The player builds its caption module a moment after the video starts,
+    // so the first ask is usually too early. A handful of retries, then it
+    // is left alone: this video plainly has nothing to turn on.
+    setTimeout(askForCaptions, 1000);
+  }
+
+  /**
+   * YouTube's player object takes the same instructions its own settings
+   * menu does: `tracklist` is every caption track it knows about and
+   * `setOption('captions', 'track', …)` is what the menu itself calls when
+   * a language is picked. `wrappedJSObject` is how a Firefox content script
+   * reaches it, the same way playerResponse() already does; the track
+   * objects handed back are the page's own, so handing one straight back in
+   * needs no cloning across the boundary.
+   *
+   * Answers true once the right captions are showing, false while there is
+   * still reason to try again.
+   */
+  function ytCaptionsOn(wanted) {
+    var el = document.getElementById('movie_player');
+    var player = el && el.wrappedJSObject;
+    if (!player || typeof player.getOption !== 'function') return false;
+    try {
+      if (typeof player.loadModule === 'function') player.loadModule('captions');
+      var list = player.getOption('captions', 'tracklist');
+      if (!list || !list.length) return false;
+
+      var pick = null;
+      for (var i = 0; i < list.length && !pick; i++) {
+        if (wanted.indexOf(String(list[i].languageCode)) !== -1) pick = list[i];
+      }
+      if (!pick) {
+        console.log('Torval: the player offers no ' + TorvalLang.profile().name +
+          ' captions to turn on either, so there is nothing on screen to read.');
+        return true;   // nothing to wait for; asking again would say the same
+      }
+
+      var now = player.getOption('captions', 'track');
+      if (now && String(now.languageCode) === String(pick.languageCode)) return true;
+      player.setOption('captions', 'track', pick);
+      console.log('Torval: turned the player\u2019s own', pick.languageCode,
+        'captions on, since reading them off the screen is the only way left ' +
+        'to time this video.');
+      return true;
+    } catch (err) {
+      console.warn('Torval: could not turn the player\u2019s captions on:', err && err.message);
+      return false;
+    }
   }
 
   function attachObserver() {
@@ -1182,25 +1471,29 @@ var LLLSubtitles = (function () {
   }
 
   // -------------------------------------------------------------------------
-  // Drawing them, in LLL's own look
+  // Drawing them, in Torval's own look
   // -------------------------------------------------------------------------
 
   // Same palette as the popup: a dark card, one bright text colour, one border
   // colour, the same font stack. Whatever supplied the timing, the fetched
   // file or the screen itself, the line you actually see is always drawn by
-  // LLL, so it never gets mistaken for YouTube's own plain caption box.
+  // Torval, so it never gets mistaken for YouTube's own plain caption box.
   var overlay = null;
   var overlayLine = null;
 
   /*
-   * LLL does not touch YouTube's own captions, and never has anything to say
+   * Torval does not hide YouTube's own captions, and never has anything to say
    * about them. It used to hide them, so that the same line was not showing
    * twice, and that was a mistake in kind rather than degree: the CC button
    * is YouTube's, it means what it says, and an extension quietly overruling
-   * it is exactly the sort of thing that makes a page feel haunted. LLL draws
+   * it is exactly the sort of thing that makes a page feel haunted. The one
+   * thing Torval will do to them is turn them on when reading them off the
+   * screen is the only way left to time a video, which is not overruling the
+   * button so much as the only way to answer at all; see askForCaptions.
+   * Torval draws
    * its own line from the Japanese track it fetched itself, and the two have
    * nothing to do with each other. Both on at once is a choice, made with the
-   * CC button and LLL's own switch.
+   * CC button and Torval's own switch.
    */
 
   function ensureOverlay() {
@@ -1208,7 +1501,7 @@ var LLLSubtitles = (function () {
 
     var player = document.querySelector(site.player) || document.body;
     overlay = document.createElement('div');
-    overlay.setAttribute('data-lll-subtitle', '');
+    overlay.setAttribute('data-torval-subtitle', '');
     overlay.style.cssText = [
       'position:absolute', 'left:0', 'right:0', 'bottom:4%', 'display:none',
       'z-index:60', 'justify-content:center', 'pointer-events:none', 'padding:0 6%'
@@ -1260,7 +1553,7 @@ var LLLSubtitles = (function () {
   }
 
   /**
-   * Whatever line is playing right now, drawn in LLL's own style.
+   * Whatever line is playing right now, drawn in Torval's own style.
    *
    * In the on-screen fallback, a line only enters `cues` once it has ended, 
    * its end time is not known until the next one begins. Without checking
@@ -1366,7 +1659,7 @@ var LLLSubtitles = (function () {
   // the line, and it arrives in the text as an ordinary space. Left in, it cuts
   // the sentence in two for reading: 繋がるわけじゃ ないのかも came out as じゃ
   // and ない, two words that are one, and 皆 さん as two more.
-  var WRAPPED = new RegExp('(' + LLLJapanese.source + ')\\s+(?=' + LLLJapanese.source + ')', 'g');
+  var WRAPPED = new RegExp('(' + TorvalJapanese.source + ')\\s+(?=' + TorvalJapanese.source + ')', 'g');
 
   // Characters that take up no room and mean nothing, which subtitle tracks
   // are full of: zero-width spaces and joiners, the word joiner, the byte
@@ -1476,6 +1769,10 @@ var LLLSubtitles = (function () {
     segmentText: segmentText,
     step: step,
     pickTrack: pickTrack,
+    wantedLanguage: wantedLanguage,
+    languageMenu: languageMenu,
+    wantedTimedtext: wantedTimedtext,
+    REJECT: REJECT,
     insertObserved: insertObserved,
     isContinuation: isContinuation,
     wholeLine: wholeLine,
@@ -1490,4 +1787,4 @@ var LLLSubtitles = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLSubtitles;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalSubtitles;

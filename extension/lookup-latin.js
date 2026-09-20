@@ -1,42 +1,60 @@
 /*
- * LLL, Italian lookup
+ * Torval, lookup for the languages written with spaces in them
  *
- * lookup.js's counterpart for Italian, and much simpler, because Italian
- * already puts spaces between words. There is no run of unspaced script to
- * segment with a Viterbi solver: text is split on whitespace and punctuation,
- * each token is deinflected and looked up, and that is the whole of it.
+ * lookup.js's counterpart for Italian and Spanish, and much simpler than it,
+ * because both already put spaces between words. There is no run of unspaced
+ * script to segment with a Viterbi solver: text is split on whitespace and
+ * punctuation, each token is deinflected and looked up, and that is the
+ * whole of it.
  *
- * The one wrinkle spaces do not solve is elision: l'amico is two words,
- * l' and amico, glued together with no space between them, so a plain
- * whitespace split would hand the dictionary "l'amico" and never find
+ * One file for both, because nothing below is about either language in
+ * particular. What a language brings is three things, and it brings them
+ * through its profile in lang.js rather than being named here: which
+ * characters are part of a word, how long a word can run, and its
+ * deinflector. Everything else, the batching, the phrase search, the
+ * ranking, the elision split, is the same work whichever of them is being
+ * read, and was the same work before Spanish existed.
+ *
+ * The one wrinkle spaces do not solve is elision: Italian's l'amico is two
+ * words, l' and amico, glued together with no space between them, so a
+ * plain whitespace split would hand the dictionary "l'amico" and never find
  * either word in it. Elided tokens are split on the apostrophe before
- * anything else happens.
+ * anything else happens. Spanish never elides, and its character class has
+ * no apostrophe in it, so the split simply never fires there.
  *
  * Same `db` contract as lookup.js: anything with an async
  * getEntries(terms) returning Map<term, entry[]>, and the same entry shape
  * ({ k, r, s, f, q, qm }), which is what lets lookup-common.js's ranking and
- * known/ignored bookkeeping work unchanged for both languages.
+ * known/ignored bookkeeping work unchanged for every language.
  */
 
-if (typeof LLLDeinflectIt === 'undefined' && typeof require !== 'undefined') {
-  var LLLDeinflectIt = require('./deinflect-it.js');
+if (typeof TorvalLang === 'undefined' && typeof require !== 'undefined') {
+  var TorvalLang = require('./lang.js');
 }
-if (typeof LLLItalian === 'undefined' && typeof require !== 'undefined') {
-  var LLLItalian = require('./italian.js');
-}
-if (typeof LLLItalianMaxScan === 'undefined' && typeof require !== 'undefined') {
-  var LLLItalianMaxScan = require('./italian-scan.js');
-}
-if (typeof LLLLookupCommon === 'undefined' && typeof require !== 'undefined') {
-  var LLLLookupCommon = require('./lookup-common.js');
+if (typeof TorvalLookupCommon === 'undefined' && typeof require !== 'undefined') {
+  var TorvalLookupCommon = require('./lookup-common.js');
 }
 
-var LLLLookupIt = (function () {
+var TorvalLookupLatin = (function () {
   'use strict';
 
-  var MAX_SCAN = LLLItalianMaxScan;
   var MAX_GROUPS = 6;
   var MAX_PER_GROUP = 4;
+
+  /*
+   * The active language's three pieces, asked for fresh every time rather
+   * than read once into a constant.
+   *
+   * A language switch has to be picked up by the very next lookup, the same
+   * way background.js asks which engine to use on every call instead of
+   * holding onto one. Read once at load, these would be whichever language
+   * happened to be active when the background script started, and switching
+   * from Italian to Spanish would go on deinflecting in Italian until the
+   * extension was reloaded.
+   */
+  function letters() { return TorvalLang.profile().charClass; }
+  function maxScan() { return TorvalLang.profile().scanWindow; }
+  function deinflector() { return TorvalLang.profile().deinflector(); }
 
   // A word never starts on an apostrophe: it always closes off whatever came
   // before it (l', dell', un', po'). Splitting a run of word-characters here
@@ -75,9 +93,9 @@ var LLLLookupIt = (function () {
     var runs = [];
     var i = 0;
     while (i < text.length && runs.length < limit) {
-      if (!LLLItalian.test(text.charAt(i))) { i++; continue; }
+      if (!letters().test(text.charAt(i))) { i++; continue; }
       var start = i;
-      while (i < text.length && LLLItalian.test(text.charAt(i))) i++;
+      while (i < text.length && letters().test(text.charAt(i))) i++;
       runs.push({ start: start, length: i - start });
     }
     return runs;
@@ -127,7 +145,7 @@ var LLLLookupIt = (function () {
    * Every dictionary form worth asking about for one token.
    *
    * The dictionary is written in lowercase throughout, the way Wiktionary
-   * itself is, but ordinary Italian text is not: every sentence starts with
+   * itself is, but ordinary text is not: every sentence starts with
    * a capital letter. Deinflecting only the word exactly as capitalized
    * would leave the untouched, zero-step candidate ("Ieri" itself) never
    * matching anything, and fall through to whatever multi-step guess the
@@ -139,9 +157,9 @@ var LLLLookupIt = (function () {
    */
   function termsFor(word) {
     var byTerm = new Map();
-    addCandidates(byTerm, LLLDeinflectIt.deinflect(word));
+    addCandidates(byTerm, deinflector().deinflect(word));
     var lower = word.toLowerCase();
-    if (lower !== word) addCandidates(byTerm, LLLDeinflectIt.deinflect(lower));
+    if (lower !== word) addCandidates(byTerm, deinflector().deinflect(lower));
     return byTerm;
   }
 
@@ -170,13 +188,13 @@ var LLLLookupIt = (function () {
         var entry = entries[a];
         for (var b = 0; b < infos.length; b++) {
           var info = infos[b];
-          if (!LLLLookupCommon.typesAllow(entry, info.types)) continue;
+          if (!TorvalLookupCommon.typesAllow(entry, info.types)) continue;
 
           var existing = byId.get(entry.id);
           if (!existing || info.reasons.length < existing.reasons.length) {
             byId.set(entry.id, {
               entry: entry, reasons: info.reasons, matched: term,
-              q: LLLLookupCommon.rankOf(entry, term),
+              q: TorvalLookupCommon.rankOf(entry, term),
               word: displayForm(entry), reading: '',
               expression: false
             });
@@ -187,7 +205,7 @@ var LLLLookupIt = (function () {
     return Array.from(byId.values()).sort(byRelevance).slice(0, MAX_PER_GROUP);
   }
 
-  /** Every entry carries exactly one spelling for Italian; that is the display form. */
+  /** A Wiktextract entry carries exactly one spelling; that is the display form. */
   function displayForm(entry) {
     return entry.k[0];
   }
@@ -243,11 +261,12 @@ var LLLLookupIt = (function () {
     return groups;
   }
 
-  /** The run of Italian word-characters starting at the beginning of `text`. */
+  /** The run of word-characters starting at the beginning of `text`. */
   function leadingSpan(text) {
-    if (!text || !LLLItalian.test(text.charAt(0))) return '';
+    if (!text || !letters().test(text.charAt(0))) return '';
     var i = 1;
-    while (i < text.length && i < MAX_SCAN && LLLItalian.test(text.charAt(i))) i++;
+    var limit = maxScan();
+    while (i < text.length && i < limit && letters().test(text.charAt(i))) i++;
     return text.slice(0, i);
   }
 
@@ -261,9 +280,9 @@ var LLLLookupIt = (function () {
     var spans = [];    // { start, length, word }[]
     var i = 0;
     while (i < text.length) {
-      if (!LLLItalian.test(text.charAt(i))) { i++; continue; }
+      if (!letters().test(text.charAt(i))) { i++; continue; }
       var start = i;
-      while (i < text.length && LLLItalian.test(text.charAt(i))) i++;
+      while (i < text.length && letters().test(text.charAt(i))) i++;
       var pieces = splitElision(text.slice(start, i));
       var at = start;
       for (var p = 0; p < pieces.length; p++) {
@@ -303,7 +322,7 @@ var LLLLookupIt = (function () {
       pending = [];
       asking = new Set();
       if (say) say(reached, text.length);
-      await LLLLookupCommon.pause();
+      await TorvalLookupCommon.pause();
     };
 
     var add = function (term) { asking.add(term); };
@@ -346,11 +365,11 @@ var LLLLookupIt = (function () {
 
   /** Which word covers one particular character, and where it begins. */
   async function tokenAt(text, at, db) {
-    if (!LLLItalian.test(text.charAt(at))) return { start: at, length: 0 };
+    if (!letters().test(text.charAt(at))) return { start: at, length: 0 };
     var start = at;
-    while (start > 0 && LLLItalian.test(text.charAt(start - 1))) start--;
+    while (start > 0 && letters().test(text.charAt(start - 1))) start--;
     var end = at;
-    while (end < text.length && LLLItalian.test(text.charAt(end))) end++;
+    while (end < text.length && letters().test(text.charAt(end))) end++;
 
     var pieces = splitElision(text.slice(start, end));
     var cursor = start;
@@ -377,27 +396,27 @@ var LLLLookupIt = (function () {
     return (await tokenAt(text, at, db)).start;
   }
 
-  // Italian dictionary entries carry no exp/id-style tag, so nothing is ever
+  // Wiktextract entries carry no exp/id-style tag, so nothing is ever
   // treated as a decomposable expression: decomposeKnown simply never has
-  // anything to do for this language, which is the correct behaviour, not a
-  // workaround, until Italian multi-word entries get a reason to need it.
+  // anything to do for these languages, which is the correct behaviour, not
+  // a workaround, until their multi-word entries get a reason to need it.
   function isDecomposable() { return false; }
   function isIdiom() { return false; }
 
   function decomposeKnown(text, start, length, db, known) {
-    return LLLLookupCommon.decomposeKnown(text, start, length, db, known, search, isIdiom);
+    return TorvalLookupCommon.decomposeKnown(text, start, length, db, known, search, isIdiom);
   }
 
   function extractTokens(text, db) {
-    return LLLLookupCommon.extractTokens(text, db, segment, isDecomposable);
+    return TorvalLookupCommon.extractTokens(text, db, segment, isDecomposable);
   }
 
   function locateTokens(text, db, say) {
-    return LLLLookupCommon.locateTokens(text, db, segment, isDecomposable, say);
+    return TorvalLookupCommon.locateTokens(text, db, segment, isDecomposable, say);
   }
 
   function extractWords(text, db) {
-    return LLLLookupCommon.extractWords(text, db, segment, isDecomposable);
+    return TorvalLookupCommon.extractWords(text, db, segment, isDecomposable);
   }
 
   return {
@@ -407,18 +426,20 @@ var LLLLookupIt = (function () {
     hover: hover,
     segment: segment,
     displayForm: function (entry) { return { word: displayForm(entry), reading: '' }; },
-    frequencyBand: LLLLookupCommon.frequencyBand,
-    sharedTags: LLLLookupCommon.sharedTags,
-    sharedPos: LLLLookupCommon.sharedPos,
+    frequencyBand: TorvalLookupCommon.frequencyBand,
+    sharedTags: TorvalLookupCommon.sharedTags,
+    sharedPos: TorvalLookupCommon.sharedPos,
     extractWords: extractWords,
     extractTokens: extractTokens,
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
-    coverage: LLLLookupCommon.coverage,
-    within: LLLLookupCommon.within,
-    isKnown: LLLLookupCommon.isKnown,
-    MAX_SCAN: MAX_SCAN
+    coverage: TorvalLookupCommon.coverage,
+    within: TorvalLookupCommon.within,
+    isKnown: TorvalLookupCommon.isKnown,
+    // A property rather than a number, since it is a different number in
+    // each language and callers hold onto this object across a switch.
+    get MAX_SCAN() { return maxScan(); }
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLLookupIt;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalLookupLatin;

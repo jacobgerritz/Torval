@@ -65,8 +65,8 @@
 (function () {
   'use strict';
 
-  if (window.__lllNetflix) return;   // registered twice; once is enough
-  window.__lllNetflix = true;
+  if (window.__torvalNetflix) return;   // registered twice; once is enough
+  window.__torvalNetflix = true;
 
   var WEBVTT = 'webvtt-lssdh-ios8';   // the one format Netflix hands over plainly
   var MANIFEST = /manifest/i;
@@ -85,7 +85,7 @@
   }
 
   function say() {
-    var parts = ['LLL (Netflix):'];
+    var parts = ['Torval (Netflix):'];
     for (var i = 0; i < arguments.length; i++) parts.push(arguments[i]);
     console.log.apply(console, parts);
   }
@@ -185,7 +185,7 @@
         names.join(', ') || '(nothing)');
       return;
     }
-    // Which language is being read is LLL's question, not this file's: this
+    // Which language is being read is Torval's question, not this file's: this
     // is page code and knows nothing about the extension's settings. So every
     // usable track goes over the wall and the content script, which does know,
     // asks for the one it wants back.
@@ -194,7 +194,7 @@
     say('this title offers', offered.length, 'subtitle tracks as plain files:',
       offered.map(function (o) { return o.language; }).join(', '));
     window.postMessage({
-      lll: 'lll-netflix-tracks', movie: String(movie || ''), tracks: offered
+      torval: 'torval-netflix-tracks', movie: String(movie || ''), tracks: offered
     }, '*');
   }
 
@@ -209,7 +209,7 @@
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     var data = e.data;
-    if (!data || data.lll !== 'lll-netflix-fetch' || typeof data.url !== 'string') return;
+    if (!data || data.torval !== 'torval-netflix-fetch' || typeof data.url !== 'string') return;
     if (!Object.prototype.hasOwnProperty.call(offering, data.url)) return;
     load(offering[data.url], { url: data.url });
   });
@@ -254,37 +254,37 @@
   if (typeof XMLHttpRequest !== 'undefined') {
     var realOpen = XMLHttpRequest.prototype.open;
     XMLHttpRequest.prototype.open = function (method, url) {
-      try { this.__lllUrl = String(url || ''); } catch (err) { /* no matter */ }
+      try { this.__torvalUrl = String(url || ''); } catch (err) { /* no matter */ }
       return realOpen.apply(this, arguments);
     };
 
     var realSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.send = function () {
       try {
-        noteRequest(this.__lllUrl);
+        noteRequest(this.__torvalUrl);
         this.addEventListener('load', function () {
           try {
             // The subtitle file, if this was it. Read whichever way the
             // player asked for the body: it takes some of them as text and
             // some as bytes, and a subtitle file is small either way.
-            if (couldBeFile(this.__lllUrl)) {
+            if (couldBeFile(this.__torvalUrl)) {
               var body = '';
               if (!this.responseType || this.responseType === 'text') body = this.responseText;
               else if (this.responseType === 'arraybuffer' && this.response &&
                 this.response.byteLength < BIGGEST) {
                 body = new TextDecoder('utf-8').decode(new Uint8Array(this.response));
               }
-              if (body && caught(body, this.__lllUrl)) return;
+              if (body && caught(body, this.__torvalUrl)) return;
             }
             if (this.responseType && this.responseType !== 'text') {
-              if (this.responseType === 'json') fromReply(this.response, this.__lllUrl);
+              if (this.responseType === 'json') fromReply(this.response, this.__torvalUrl);
               return;
             }
             // A string search that nearly always fails, which is cheaper
             // than parsing a reply that was already parsed once.
             var text = this.responseText;
             if (text && text.indexOf('timedtexttracks') !== -1) {
-              fromReply(parse(text), this.__lllUrl);
+              fromReply(parse(text), this.__torvalUrl);
             }
           } catch (err) { /* not ours to read */ }
         });
@@ -435,7 +435,7 @@
       if (!vtt) { say('the subtitle file came back empty'); return; }
       say('got the subtitle file,', vtt.length, 'characters');
       window.postMessage({
-        lll: 'lll-netflix-subtitles', movie: movie, format: 'vtt', text: vtt, vtt: vtt
+        torval: 'torval-netflix-subtitles', movie: movie, format: 'vtt', text: vtt, vtt: vtt
       }, '*');
     }).catch(function (err) {
       fetched = '';                       // let a later attempt try again
@@ -478,7 +478,7 @@
       'characters of ' + format.toUpperCase() + ', from',
       String(where || 'somewhere').slice(0, 90));
     window.postMessage({
-      lll: 'lll-netflix-subtitles', movie: movieId(), format: format, text: text,
+      torval: 'torval-netflix-subtitles', movie: movieId(), format: format, text: text,
       // Kept under its old name as well, so nothing that was reading `vtt`
       // has to know that a file can now arrive in two formats.
       vtt: format === 'vtt' ? text : ''
@@ -533,11 +533,11 @@
   /*
    * The file is only downloaded when the player is going to show something,
    * which meant the viewer had to go into Netflix's own menu and turn on the
-   * language LLL reads, and then watch two sets of subtitles at once.
+   * language Torval reads, and then watch two sets of subtitles at once.
    *
    * The player will do it when asked. It keeps a list of its timed text
    * tracks and a method to choose one, the same pair its own menu is built
-   * on, so LLL selects the track it wants, waits for the file that selecting
+   * on, so Torval selects the track it wants, waits for the file that selecting
    * it causes to be fetched, and puts the viewer's own choice straight back.
    * What is left behind is the player exactly as it was and the whole
    * subtitle file in hand.
@@ -557,7 +557,7 @@
   window.addEventListener('message', function (e) {
     if (e.source !== window) return;
     var data = e.data;
-    if (!data || data.lll !== 'lll-netflix-want' || !Array.isArray(data.languages)) return;
+    if (!data || data.torval !== 'torval-netflix-want' || !Array.isArray(data.languages)) return;
     want = data.languages.map(String);
     arrangedFor = '';        // a language change is a reason to look again
     arrange();

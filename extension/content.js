@@ -1,5 +1,5 @@
 /*
- * LLL, the part that runs on the page
+ * Torval, the part that runs on the page
  *
  * Three jobs:
  *   1. Work out which text the mouse is actually pointing at.
@@ -30,16 +30,16 @@
   // The page's own DOM is the one thing they genuinely share, so ownership is
   // claimed there. Whoever loaded last wins; the older copies notice they no
   // longer hold the claim, clear up after themselves and fall silent.
-  const OWNER = 'data-lll-owner';
+  const OWNER = 'data-torval-owner';
   const instance = String(Date.now()) + Math.random();
-  for (const orphan of document.querySelectorAll('[data-lll-popup]')) orphan.remove();
+  for (const orphan of document.querySelectorAll('[data-torval-popup]')) orphan.remove();
   document.documentElement.setAttribute(OWNER, instance);
 
   /**
-   * Is LLL supposed to be doing anything here?
+   * Is Torval supposed to be doing anything here?
    *
    * Two questions in one, because they have the same answer everywhere it
-   * is asked: is this frame still the one that owns the page, and is LLL
+   * is asked: is this frame still the one that owns the page, and is Torval
    * switched on at all. The switch lives on the toolbar button, and every
    * page watches it, so turning it off quietens pages that are already open
    * rather than only the next one.
@@ -57,8 +57,8 @@
   // the marking of a page all have to agree on what counts. Kept as `let`,
   // not `const`, and refreshed below whenever the active language changes,
   // the same way `off` already is.
-  let JAPANESE = LLLLang.profile().charClass;
-  let MAX_SCAN = LLLLang.profile().scanWindow;
+  let JAPANESE = TorvalLang.profile().charClass;
+  let MAX_SCAN = TorvalLang.profile().scanWindow;
   const SENTENCE_END = /[。．.！!？?…\n\r\t]/;
   const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'SELECT', 'TEXTAREA', 'OPTION']);
   const INLINE_DISPLAY = new Set(['inline', 'inline-block', 'inline-flex', 'contents', 'ruby', 'ruby-base', 'ruby-text']);
@@ -136,26 +136,26 @@
   // marked or shown (an Italian popup left open while switching to Japanese
   // would otherwise sit there answering to the wrong dictionary), pick up
   // the new word-boundary rule, and let the page settle back in.
-  LLLLang.onChange(() => {
-    JAPANESE = LLLLang.profile().charClass;
-    MAX_SCAN = LLLLang.profile().scanWindow;
+  TorvalLang.onChange(() => {
+    JAPANESE = TorvalLang.profile().charClass;
+    MAX_SCAN = TorvalLang.profile().scanWindow;
     putAway();
     if (!off) bringBack();
   });
 
-  /** Everything LLL had put on this page, taken off it again. */
+  /** Everything Torval had put on this page, taken off it again. */
   function putAway() {
     hide();
     clearHover();
-    if (typeof LLLHighlight !== 'undefined') LLLHighlight.clear();
-    if (typeof LLLBar !== 'undefined') LLLBar.visible(false);
-    if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.suspend(true);
+    if (typeof TorvalHighlight !== 'undefined') TorvalHighlight.clear();
+    if (typeof TorvalBar !== 'undefined') TorvalBar.visible(false);
+    if (typeof TorvalSubtitles !== 'undefined') TorvalSubtitles.suspend(true);
   }
 
   /** And put back, without making anybody reload the page. */
   function bringBack() {
-    if (typeof LLLBar !== 'undefined') LLLBar.visible(true);
-    if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.suspend(false);
+    if (typeof TorvalBar !== 'undefined') TorvalBar.visible(true);
+    if (typeof TorvalSubtitles !== 'undefined') TorvalSubtitles.suspend(false);
     lastTranscript = '';
     readPage();
   }
@@ -164,16 +164,16 @@
 
   // Recording ahead of the user costs something, so ask first whether any card
   // field is pointed at a video frame or the line's audio.
-  // LLL draws its own subtitles, so it knows exactly when each line runs from
+  // Torval draws its own subtitles, so it knows exactly when each line runs from
   // and to, which is what lets it record the line itself rather than an
   // approximation of it. They are meant to replace YouTube's, so they are drawn
   // whether or not anything is being mined. Recording only happens on demand.
-  if (typeof LLLSubtitles !== 'undefined') LLLSubtitles.enable();
+  if (typeof TorvalSubtitles !== 'undefined') TorvalSubtitles.enable();
 
   // Only the page itself gets a bar. This script runs in every frame, and an
   // advert in an iframe reporting its own comprehension across the top of
   // somebody else's article is not a thing anyone asked for.
-  if (window === window.top && typeof LLLBar !== 'undefined') watchComprehension();
+  if (window === window.top && typeof TorvalBar !== 'undefined') watchComprehension();
 
   // Fetched now rather than linked from the shadow root, because a <link> loads
   // asynchronously: the first popup would be measured and positioned while it
@@ -264,7 +264,7 @@
    * you have selected if you have selected something.
    *
    * The same search the popup uses to say a word is already in your
-   * collection, so what Anki shows is what LLL meant by that. Unlike 1, 2
+   * collection, so what Anki shows is what Torval meant by that. Unlike 1, 2
    * and 3 it only takes the key when there is something to look up, since a
    * letter is a letter and plenty of sites have their own use for it.
    */
@@ -315,14 +315,14 @@
 
     return api.runtime.sendMessage(message).then((reply) => {
       if (!reply || !reply.ok) return false;
-      if (typeof LLLBar !== 'undefined') LLLBar.restate(word, before, after);
-      if (typeof LLLHighlight !== 'undefined') {
-        LLLHighlight.setMarked(word, after === 'unknown');
+      if (typeof TorvalBar !== 'undefined') TorvalBar.restate(word, before, after);
+      if (typeof TorvalHighlight !== 'undefined') {
+        TorvalHighlight.setMarked(word, after === 'unknown');
         // The subtitle showing now is drawn from ranges of its own, made
         // when the line arrived. Asking for them again is one short message
         // and it cannot be wrong, whereas repainting the ranges already
         // held is only right while the player has left them alone.
-        LLLHighlight.refreshLine();
+        TorvalHighlight.refreshLine();
       }
       syncState(word, after);
       return true;
@@ -455,7 +455,7 @@
   // -------------------------------------------------------------------------
   // Plain hovering: a light mark on whatever word the cursor sits over, with
   // no popup and no Shift needed. It exists so that a page reads as "here is
-  // where LLL can help" at a glance, and so that clicking or pressing 3 has
+  // where Torval can help" at a glance, and so that clicking or pressing 3 has
   // something to act on immediately.
   // -------------------------------------------------------------------------
 
@@ -486,11 +486,11 @@
   function askFor(found) {
     const plain = { text: found.text, point: found.point, origin: found.base };
     if (typeof found.at !== 'number' || !found.whole) return plain;
-    if (typeof LLLSubtitles === 'undefined' || !LLLSubtitles.around) return plain;
+    if (typeof TorvalSubtitles === 'undefined' || !TorvalSubtitles.around) return plain;
     const block = found.block;
-    if (!block || !block.closest || !block.closest('[data-lll-subtitle]')) return plain;
+    if (!block || !block.closest || !block.closest('[data-torval-subtitle]')) return plain;
 
-    const beside = LLLSubtitles.around(found.whole);
+    const beside = TorvalSubtitles.around(found.whole);
     const before = beside.before || '';
     const after = beside.after || '';
     if (!before && !after) return plain;
@@ -566,7 +566,7 @@
     return typeof CSS !== 'undefined' && !!CSS.highlights && typeof Highlight === 'function';
   }
 
-  const HOVER_HIGHLIGHT = 'lll-hover';
+  const HOVER_HIGHLIGHT = 'torval-hover';
   let hoverStyleAdded = false;
 
   /**
@@ -826,7 +826,7 @@
 
     let start = index;
     let end = index;
-    if (block.closest && block.closest('[data-lll-subtitle]')) {
+    if (block.closest && block.closest('[data-torval-subtitle]')) {
       // A subtitle is one thing said, and the whole of it is the context
       // worth keeping. Cutting it at the nearest full stop is right for an
       // article, where the paragraph around a sentence is somebody else's
@@ -884,14 +884,14 @@
   }
 
   function isSubtitle(block) {
-    return !!(block && block.closest && block.closest('[data-lll-subtitle]'));
+    return !!(block && block.closest && block.closest('[data-torval-subtitle]'));
   }
 
   function besideLine(block, text) {
-    if (typeof LLLSubtitles === 'undefined' || !LLLSubtitles.around) {
+    if (typeof TorvalSubtitles === 'undefined' || !TorvalSubtitles.around) {
       return { before: '', after: '' };
     }
-    const beside = LLLSubtitles.around(text) || { before: '', after: '' };
+    const beside = TorvalSubtitles.around(text) || { before: '', after: '' };
     return { before: tidy(beside.before || ''), after: tidy(beside.after || '') };
   }
 
@@ -951,26 +951,26 @@
   let readingPage = false;
 
   async function watchComprehension() {
-    if (typeof LLLHighlight !== 'undefined') await LLLHighlight.start();
+    if (typeof TorvalHighlight !== 'undefined') await TorvalHighlight.start();
 
-    LLLBar.onRefresh(() => { lastTranscript = ''; readPage(); });
+    TorvalBar.onRefresh(() => { lastTranscript = ''; readPage(); });
 
     // A page that replaces its own text can say so, and the reader does
     // every time it turns to a new chapter. Watching every page for changes
     // instead would mean an observer on the whole document of every site
     // open in the browser, to catch a case that almost none of them have.
-    document.addEventListener('lll-reread', () => { lastTranscript = ''; readPage(); });
+    document.addEventListener('torval-reread', () => { lastTranscript = ''; readPage(); });
     await waitForDictionary();
     setTimeout(readPage, 1500);   // let the page finish putting itself together
     watchAddress();
 
     // Subtitles arrive well after the page does, and replace it as the thing
     // worth measuring the moment they do.
-    if (typeof LLLSubtitles !== 'undefined') {
+    if (typeof TorvalSubtitles !== 'undefined') {
       let seen = -1;
       let last = 0;
       setInterval(() => {
-        const now = LLLSubtitles.count();
+        const now = TorvalSubtitles.count();
         if (!now || now === seen) return;
         // Lines arrive one at a time, and a whole transcript takes real
         // work to read. Doing it again for every line kept the background
@@ -987,7 +987,7 @@
   /**
    * Wait for the dictionary to be ready, saying so on the way.
    *
-   * The first time LLL runs it copies 218,000 entries into the browser's own
+   * The first time Torval runs it copies 218,000 entries into the browser's own
    * database, which takes about a minute; every start after that still needs
    * a moment to open it. None of that used to show anywhere on the page, so
    * the only thing to conclude from hovering a word and getting nothing was
@@ -1005,10 +1005,10 @@
       const state = reply && reply.status;
       if (!state || state.state === 'ready') return;
       if (state.state === 'error') {
-        LLLBar.busy('LLL could not load its dictionary');
+        TorvalBar.busy('Torval could not load its dictionary');
         return;
       }
-      LLLBar.busy('Building the dictionary, one time only…', state.progress || 0);
+      TorvalBar.busy('Building the dictionary, one time only…', state.progress || 0);
       await new Promise((resolve) => setTimeout(resolve, 700));
     }
   }
@@ -1041,8 +1041,8 @@
     // stuck true, this page would never read itself again for as long as it
     // stayed open, and nothing would say why.
     try {
-      LLLBar.busy('Reading this page…');
-      const transcript = typeof LLLSubtitles !== 'undefined' ? LLLSubtitles.allText() : '';
+      TorvalBar.busy('Reading this page…');
+      const transcript = typeof TorvalSubtitles !== 'undefined' ? TorvalSubtitles.allText() : '';
 
       if (transcript && transcript !== lastTranscript) {
         lastTranscript = transcript;
@@ -1051,7 +1051,7 @@
           // `skipped` is a transcript in some other language, an English
           // video on an Italian channel, say. Not a score of zero: there is
           // no number to show at all.
-          if (reply && reply.ok && !reply.result.skipped) { LLLBar.show(reply.result); scored = true; }
+          if (reply && reply.ok && !reply.result.skipped) { TorvalBar.show(reply.result); scored = true; }
           else lastTranscript = '';
         } catch (err) {
           lastTranscript = '';   // the dictionary was still loading; the next try may do better
@@ -1060,19 +1060,19 @@
 
       // More of a video's transcript arriving changes the number and
       // nothing else. The page around the player is the page it already was.
-      if (typeof LLLHighlight !== 'undefined' && !(options && options.scoreOnly)) {
+      if (typeof TorvalHighlight !== 'undefined' && !(options && options.scoreOnly)) {
         try {
-          const score = await LLLHighlight.read({ nearby: !!transcript });
-          if (!transcript && score && !scored) { LLLBar.show(score); scored = true; }
+          const score = await TorvalHighlight.read({ nearby: !!transcript });
+          if (!transcript && score && !scored) { TorvalBar.show(score); scored = true; }
         } catch (err) {
-          console.warn('LLL: could not colour this page:', err && err.message);
+          console.warn('Torval: could not colour this page:', err && err.message);
         }
       }
     } finally {
       // Nothing to say about this page: no Japanese on it, or none that could
       // be read. Saying so is what stops an English page keeping a handle in
       // the corner that reads "still working on it" for ever.
-      if (!scored) LLLBar.quiet();
+      if (!scored) TorvalBar.quiet();
       readingPage = false;
       reading = false;
     }
@@ -1084,7 +1084,7 @@
    * A site that never reloads still changes what it says. Netflix is one
    * page from the moment you open it: its home page fills itself in some
    * seconds after loading, and going from there to an episode and from one
-   * episode to the next never loads anything. LLL read once, a second and a
+   * episode to the next never loads anything. Torval read once, a second and a
    * half in, found an empty shell, said there was no Japanese here and never
    * looked again, which is why the handle was missing on a page plainly full
    * of it. YouTube is the same shape.
@@ -1112,7 +1112,7 @@
   if (api.runtime.onMessage) {
     api.runtime.onMessage.addListener((message) => {
       if (!message || message.type !== 'reading' || !reading) return;
-      LLLBar.busy('Reading this page…', message.done / message.total);
+      TorvalBar.busy('Reading this page…', message.done / message.total);
     });
   }
 
@@ -1211,7 +1211,7 @@
     if (ui) return ui;
 
     const host = document.createElement('div');
-    host.setAttribute('data-lll-popup', '');
+    host.setAttribute('data-torval-popup', '');
     host.style.display = 'none';
     const root = host.attachShadow({ mode: 'open' });
 
@@ -1382,7 +1382,7 @@
     const word = document.createElement('span');
     word.className = 'word';
     // Italian: mark the stressed vowel inline, built from safe DOM pieces
-    // rather than the HTML string stress-it.js hands to Anki, so nothing
+    // rather than the HTML string stress.js hands to Anki, so nothing
     // about the word text ever passes through innerHTML.
     if (typeof hit.stress === 'number' && hit.stress >= 0 && hit.stress < hit.word.length) {
       word.append(
@@ -1446,7 +1446,7 @@
     const meta = [];
     if (hit.band) {
       meta.push([hit.band, 'ranked #' + hit.q.toLocaleString('en-US') +
-        ' in a corpus of ' + (LLLLang.active() === 'it' ? 'Italian' : 'Japanese') + ' media']);
+        ' in a corpus of ' + TorvalLang.profile().name + ' media']);
     }
     if (typeof hit.pitch === 'number') {
       meta.push(['[' + hit.pitch + ']', hit.pitch === 0
@@ -1470,6 +1470,9 @@
       why.textContent = hit.reasons.join(' → ');
       el.appendChild(why);
     }
+
+    const built = builtFrom(entry);
+    if (built) el.appendChild(built);
 
     entry.s.forEach((sense) => {
       const li = document.createElement('li');
@@ -1520,6 +1523,65 @@
 
     el.appendChild(list);
     return el;
+  }
+
+  /**
+   * "built from fare", under a word that is a word with something stuck on
+   * it.
+   *
+   * farci is fare plus ci, and Wiktionary files it under both facts: that it
+   * is fare with a clitic on the end, and that regionally it also means to
+   * simulate, to act, to pretend. The popup showed only the second, which is
+   * a true sentence about farci and almost never the one a reader who has
+   * just met the word needs. The verb it is made of is the thing that
+   * unlocks the line, and it was nowhere on the card.
+   *
+   * So it is named, and it is pressable: the word Torval is built around is the
+   * word you are looking at, and going to fare should cost no more than
+   * going to anything else. Pressing it looks fare up and shows it in the
+   * same popup, in place, the way following it in a paper dictionary would
+   * be turning one page.
+   *
+   * Which word to name is decided at build time, not here; see lemmaIn in
+   * tools/build-dict-it.mjs. Entries whose lemma is not itself in the
+   * dictionary carry no pointer at all, so this never offers a dead end.
+   */
+  function builtFrom(entry) {
+    if (!entry || !entry.b) return null;
+
+    const row = document.createElement('div');
+    row.className = 'built';
+    row.appendChild(document.createTextNode('built from '));
+
+    const link = document.createElement('button');
+    link.textContent = entry.b;
+    link.title = 'Look up ' + entry.b;
+    link.addEventListener('click', () => { showWord(entry.b); });
+    row.appendChild(link);
+    return row;
+  }
+
+  /**
+   * Replace what the popup is showing with one particular word, looked up by
+   * name rather than found under the cursor.
+   *
+   * The popup stays exactly where it is: it is answering a question asked
+   * from inside itself, and moving it to somewhere else on the screen while
+   * the reader's eyes are on it would be the one thing worse than not
+   * answering.
+   */
+  async function showWord(word) {
+    const at = placed && placed.at;
+    if (!at) return;
+    const token = ++queryToken;
+    let reply;
+    try {
+      reply = await api.runtime.sendMessage({ type: 'lookup', text: word, point: 0 });
+    } catch (err) {
+      return;   // background restarting
+    }
+    if (token !== queryToken || !reply) return;
+    if (reply.groups && reply.groups.length) showResults(reply.groups, at);
   }
 
   const STATES = {
@@ -1644,7 +1706,7 @@
   /**
    * Turn one entry into a card. The four pieces go off to the background
    * script, which is the only part that may reach your local Anki; which field
-   * each piece lands in is set once in LLL's options.
+   * each piece lands in is set once in Torval's options.
    */
   /**
    * A line of plain text under an entry, while something is going on.
@@ -1674,7 +1736,7 @@
     const old = entryEl.querySelector('.error');
     if (old) old.remove();
 
-    // The line's exact timing comes from LLL's own subtitles; the video is sent
+    // The line's exact timing comes from Torval's own subtitles; the video is sent
     // back over it to record it, so this takes as long as the line does. That
     // wait is the one part of mining that looks like nothing happening, so it
     // says what it is doing: anything that goes wrong afterwards is then
@@ -1688,16 +1750,16 @@
     // a subtitle and nonsense about anything else, and the frame was grabbed
     // whenever there was a video on the page at all.
     const fromVideo = !!(context && context.subtitle);
-    const cue = fromVideo && typeof LLLSubtitles !== 'undefined'
-      ? LLLSubtitles.cueFor(sentence)
+    const cue = fromVideo && typeof TorvalSubtitles !== 'undefined'
+      ? TorvalSubtitles.cueFor(sentence)
       : null;
-    const ankiConfigKey = 'ankiConfig' + LLLLang.profile().storageSuffix;
+    const ankiConfigKey = 'ankiConfig' + TorvalLang.profile().storageSuffix;
     const settings = await api.storage.local.get(ankiConfigKey).catch(() => ({}));
     let media = {};
-    if (fromVideo && typeof LLLVideo !== 'undefined') {
+    if (fromVideo && typeof TorvalVideo !== 'undefined') {
       const doing = cue ? saying(entryEl, 'Recording the line…') : null;
       try {
-        media = await LLLVideo.capture(sentence, cue, { lead: (settings[ankiConfigKey] || {}).lead });
+        media = await TorvalVideo.capture(sentence, cue, { lead: (settings[ankiConfigKey] || {}).lead });
       } finally {
         if (doing) doing.remove();
       }
@@ -1726,7 +1788,7 @@
       // the stress index lives right on the dictionary entry, which is
       // already in hand at this point and does not need a second trip.
       // Harmless no-op for Japanese entries, which never carry `st`.
-      stress: typeof LLLStressIt !== 'undefined' ? LLLStressIt.graphFor(word, entry) : ''
+      stress: typeof TorvalStress !== 'undefined' ? TorvalStress.graphFor(word, entry) : ''
     };
 
     let reply;

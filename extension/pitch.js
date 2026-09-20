@@ -1,5 +1,5 @@
 /*
- * LLL, pitch accent
+ * Torval, pitch accent
  *
  * Japanese words carry a pitch pattern, and the whole pattern follows from one
  * number: where the pitch drops. 0 means it never does.
@@ -18,7 +18,7 @@
  * 日本語 (stays up).
  */
 
-var LLLPitch = (function () {
+var TorvalPitch = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
@@ -143,4 +143,4 @@ var LLLPitch = (function () {
   };
 })();
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLPitch;
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalPitch;

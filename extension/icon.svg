@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!--
+    Torval's mark. The same four colours as the popup, because the button in
+    the toolbar and the card under the cursor are the same program.
+
+    A T over a rule: the letter is the name, and the rule is the quiet
+    underline Torval draws beneath the word you are pointing at, which is the
+    thing you actually see it do all day. It has to survive being 16 pixels
+    wide, so it is one letterform and one bar and nothing else; anything
+    finer turns to mush at that size.
+  -->
+  <rect width="64" height="64" rx="14" fill="#16171a"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none"
+        stroke="#292b30" stroke-width="1.5"/>
+  <path d="M15 19h34" stroke="#f4f5f7" stroke-width="7" stroke-linecap="round"/>
+  <path d="M32 19v20" stroke="#f4f5f7" stroke-width="7" stroke-linecap="round"/>
+  <path d="M15 50h34" stroke="#93b4c6" stroke-width="5" stroke-linecap="round"/>
+</svg>

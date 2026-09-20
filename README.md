@@ -1,20 +1,21 @@
-# LLL
+# Torval
 
-A pop-up dictionary for Firefox, for Japanese and Italian. Hold **Shift** and
-point at a word; its meaning appears next to the cursor. Everything is on your
-own machine, the whole dictionary lives in the browser. It works with the
-network off.
+A pop-up dictionary for Firefox, for Japanese, Italian and Spanish. Hold
+**Shift** and point at a word; its meaning appears next to the cursor.
+Everything is on your own machine, the whole dictionary lives in the browser.
+It works with the network off, and it collects nothing: see
+[PRIVACY.md](PRIVACY.md).
 
-Japanese uses JMdict, the dictionary Jisho is built from. Italian uses
-Wiktextract, Wiktionary's own entries machine-extracted by kaikki.org, with
-every inflected form Wiktionary lists indexed onto the word it belongs to, so
-*intere* finds *intero* and *capirne* finds *capire*. The two
-languages are otherwise built the same way and behave the same way: pick one
-from the toolbar popup and its own dictionary, deinflector, known/ignored word
-lists and Anki settings load, independently of whatever the other language has.
-Japanese also gets pitch accent, from Kanjium; Italian gets word stress marked
-inline instead, since it has no lexical pitch accent to speak of. Only one
-language is active at a time.
+Japanese uses JMdict, the dictionary Jisho is built from. Italian and Spanish
+use Wiktextract, Wiktionary's own entries machine-extracted by kaikki.org,
+with every inflected form Wiktionary lists indexed onto the word it belongs
+to, so *intere* finds *intero*, *capirne* finds *capire*, and *diciéndoselo*
+finds *decir*. The languages are otherwise built the same way and behave the
+same way: pick one from the toolbar popup and its own dictionary,
+deinflector, known/ignored word lists and Anki settings load, independently
+of whatever the others have. Japanese also gets pitch accent, from Kanjium;
+the other two get word stress marked inline instead, since neither has
+lexical pitch accent to speak of. Only one language is active at a time.
 
 ---
 
@@ -22,8 +23,9 @@ language is active at a time.
 
 Two steps, once.
 
-**1. Build a dictionary**, for whichever language you want first (both can be
-built; only the language picked in the toolbar popup is actually loaded).
+**1. Build a dictionary**, for whichever language you want first (all three
+can be built; only the language picked in the toolbar popup is actually
+loaded).
 
 Japanese: downloads JMdict (about 10 MB) and the JPDB/BCCWJ frequency lists,
 and converts them into a form the extension can read quickly.
@@ -47,6 +49,15 @@ pronunciation, so there is no separate build for those.
 node tools/build-dict-it.mjs
 ```
 
+Spanish: the same source and the same step, about 90 MB of Wiktextract and a
+frequency list. Its stress marks are not read off a pronunciation but worked
+out from the spelling, which in Spanish says outright where the stress is;
+see below.
+
+```bash
+node tools/build-dict-es.mjs
+```
+
 **2. Load it into Firefox.** Go to `about:debugging` → *This Firefox* → *Load
 Temporary Add-on…* and pick `extension/manifest.json`. The toolbar popup leads
 with a language picker the first time; pick one to get started, or switch
@@ -55,8 +66,9 @@ built the dictionary for yet just means that language's popup waits, the same
 way the very first run does for whichever language you built.
 
 The first time it runs, the extension spends a minute or so copying the
-dictionary into the browser's own storage, 218,000 entries and 465,000
-searchable forms. A percentage shows on the toolbar button while it does, and
+dictionary into the browser's own storage: 218,000 entries and 465,000
+searchable forms for Japanese, 129,000 and 586,000 for Italian, 117,000 and
+764,000 for Spanish. A percentage shows on the toolbar button while it does, and
 until it reaches the end, hovering a word says so rather than answering.
 
 This happens once, not once per session. It happens again only when the
@@ -64,20 +76,21 @@ dictionary format changes, which the version number in `meta.json` decides.
 Progress is written down as it goes, so if it is interrupted it carries on from
 where it stopped rather than starting over.
 
-Temporary add-ons are removed when Firefox restarts, so you will need to load it
-again each time until it is packaged and signed. That is a step for later.
+Temporary add-ons are removed when Firefox restarts, so you will need to load
+it again each time until it is signed. See Releasing below for what that
+takes; `node tools/package.mjs` builds the file to be signed today.
 
 ---
 
 ## Using it
 
 Just hovering a Japanese word gives it a quiet highlight, so a page shows at a
-glance what LLL can help with. Click that word, or hold Shift and point at it,
+glance what Torval can help with. Click that word, or hold Shift and point at it,
 to actually open the dictionary.
 
 Wherever the cursor lands inside a word finds the whole word, not just
 whatever happens to start under it. Point at フェ in the middle of ネカフェ
-and the dictionary still shows ネカフェ, not フェ on its own: LLL tries every
+and the dictionary still shows ネカフェ, not フェ on its own: Torval tries every
 plausible starting point behind the cursor and keeps the longest real word
 that actually reaches it.
 
@@ -95,6 +108,7 @@ that actually reaches it.
 | **3** | ignore it instead: never mention this one again |
 | **B** | look this word up in Anki |
 | **click a sense** | put only that meaning on the card |
+| **built from** *fare* | the word this one is made of; press it to look that one up here |
 | **+** | add the word to Anki |
 | **✓** | mark as known, or unmark it |
 | **⊘** | ignore, or stop ignoring |
@@ -127,6 +141,27 @@ transitive する verb for one sense and intransitive for another and just a pla
 noun for a third, so only "noun", what every sense actually agrees on, sits
 beside the word; each sense's own line carries whatever it adds beyond that.
 
+### The word a word is made of
+
+Some words are another word with something stuck on it, and are still filed
+under a meaning of their own. Italian *farci* is *fare* plus *ci*; Wiktionary
+records both that and the regional sense "to simulate; to act; to pretend",
+and the popup used to show only the second. That is a true sentence about
+*farci* and almost never the one you need: what unlocks the line is *fare*,
+and it was nowhere on the card.
+
+So a word like that now says **built from *fare***, on its own line under the
+word and above its definitions, and the verb is pressable: it looks *fare* up and shows it in the same popup,
+in place, the way turning one page of a paper dictionary would. Which word to
+name is decided when the dictionary is built, from the link Wiktionary itself
+puts on the "compound of" sense, so it is data rather than a guess at the
+prose; a word whose lemma is not itself in the dictionary carries no link at
+all, so pressing one never lands on nothing.
+
+This is also what already sends *capirne* to *capire*. The difference is only
+that *capirne* has no meaning of its own, so the whole word is redirected,
+where *farci* has one and keeps its own entry with a pointer on it.
+
 Two small numbers follow the reading. The one in brackets is the **pitch
 accent**: 0 means the pitch never drops, otherwise it is the mora it drops
 after; the diagram of it goes on the card rather than in the popup. The other
@@ -154,7 +189,7 @@ Longest is not always right, and there is one well-known trap for it: a common
 word followed by a single particle can spell the same characters as a real,
 much rarer dictionary entry. 今日 ("today") plus は spells 今日は, a dated way
 to write こんにちは ("hello"), and JMdict really does list it. Rather than
-always trusting length, LLL checks whether trimming off a trailing particle
+always trusting length, Torval checks whether trimming off a trailing particle
 lands on a dramatically more common word, and if so shows that instead. The
 rare reading has not gone anywhere. It sits right there under "other matches"
 for the rare case that is genuinely what was meant. That list is labelled
@@ -186,9 +221,9 @@ Cards go straight into Anki through **AnkiConnect**, the Anki add-on that opens
 a small server on your own machine. Anki has to be open; nothing leaves your
 computer.
 
-Open the settings from LLL's toolbar button and choose a deck and a note type.
+Open the settings from Torval's toolbar button and choose a deck and a note type.
 Both lists are read from Anki itself, so a name can never be slightly wrong.
-LLL then fills in the field mapping by guessing from the field names, a note
+Torval then fills in the field mapping by guessing from the field names, a note
 type with fields called *Target Word*, *Reading*, *Sentence* and *Definitions*
 needs no setting up at all. Anything it guesses wrongly is one dropdown away,
 and anything left blank stays empty on the card.
@@ -206,13 +241,13 @@ Four things can be put on a card:
 | **Video frame** | the frame on screen when you pressed + |
 | **Sentence before** | what was said just before, for a note type that has somewhere to put it. Off unless a field asks for it |
 | **Sentence after** | and what was said just after |
-| **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says roughly how much sound to keep from before the line, a tenth of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said. Roughly, because a recorder swallows an unpredictable moment when it starts, measured at anything from 0.05 to 0.4 seconds, so LLL starts it early and lets it |
+| **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says roughly how much sound to keep from before the line, a tenth of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said. Roughly, because a recorder swallows an unpredictable moment when it starts, measured at anything from 0.05 to 0.4 seconds, so Torval starts it early and lets it |
 
 Audio comes from JapanesePod101's dictionary. It answers every request with an
 mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
-recording instead, so LLL hashes what comes back and discards that one, leaving
+recording instead, so Torval hashes what comes back and discards that one, leaving
 the field empty rather than filling your collection with identical clips. Anki
-downloads and stores nothing itself; LLL passes it the file.
+downloads and stores nothing itself; Torval passes it the file.
 
 Pitch accents come from **Kanjium**, which derives from the NHK accent
 dictionary and 大辞林, the same data Yomitan and AJT Pitch Accent use. A word's
@@ -311,7 +346,7 @@ real work: roughly a second for a long article. An article is worth it, since
 the number at the top is about the whole article.
 
 A video page is not an article. Its number comes from the transcript, which
-LLL fetches separately, and the page around the player is comments and menus
+Torval fetches separately, and the page around the player is comments and menus
 running to tens of thousands of characters, all of it read, almost none of it
 visible. So where the number comes from somewhere else, only what is on
 screen gets read, and a screen either side of it. Scrolling reads what you
@@ -336,7 +371,7 @@ The proportion is the evidence, not the presence. Running Italian is very
 nearly all Italian words, around nine in ten; English prose scores a quarter
 of that, from the handful of short words the two languages happen to share.
 So a page has to be more than half recognised, over at least a few words,
-before LLL says anything about it. A subtitle line is exempt: the video's
+before Torval says anything about it. A subtitle line is exempt: the video's
 transcript already settled the question, and ten words are too few to settle
 it again.
 
@@ -347,19 +382,92 @@ nothing moving is indistinguishable from nothing happening.
 
 ---
 
+## Spanish
+
+Spanish was added by giving the parts that were already general a language to
+be general about, rather than by writing a second Italian. It shares the
+lookup engine, the popup, the reader, the subtitle timing, the Anki side and
+the word lists; what is its own is a character class, a deinflector and a
+stress rule. Italian's files were rearranged to make that true, and they
+answer exactly as they did before, which the tests check on purpose.
+
+**The deinflector** is a longer table than Italian's, because Spanish uses
+more of its verb system in ordinary speech. Italian's passato remoto is
+literary and `deinflect-it.js` leaves it out; Spanish's pretérito is how
+anybody says what happened yesterday, so *comiste* has to reach *comer*. Both
+subjunctives are in for the same reason: *quiero que hables* and *si hablara*
+are everyday Spanish, not a register a reader can skip.
+
+**Pronouns stuck on the end of a verb** are in too, which Italian's table
+does not attempt. *Dármelo*, *hablarle*, *diciéndoselo* are each written as
+one word, so a reader hovering one is hovering something no dictionary lists.
+Attaching a pronoun also moves a written accent onto the verb (*dar* →
+*dármelo*), and the rules undo both at once, since the two always happen
+together.
+
+**What it does not do** is reach inside a word. *Pienso* is *pensar* and
+*duermo* is *dormir*, and no suffix rule can get from one to the other. Those
+come from the dictionary instead, which carries every form Wiktionary
+actually lists pointed at the word it belongs to, 657,000 of them for
+Spanish. The rules are for the forms Wiktionary never wrote down; between the
+two, very little is missed.
+
+### Where the stress is
+
+Italian has to be told where its stress falls, and the build reads it off a
+pronunciation or guesses. Spanish says so in the spelling, every time, in
+three rules with no exceptions in them:
+
+- a written accent wins outright: *canción*, *árbol*, *reír*
+- otherwise a word ending in a vowel, *n* or *s* is stressed on the
+  next-to-last syllable: *casa*, *joven*, *hablas*
+- otherwise on the last: *hablar*, *ciudad*, *feliz*
+
+That is a definition rather than a heuristic, because the accent is written
+exactly when the first two rules would disagree. So the bold vowel in a
+Spanish popup is not a best guess the way the Italian one sometimes is.
+
+The work that is left is counting syllables, which the spelling also settles:
+two vowels are one syllable when at least one is an unaccented *i* or *u*
+(*bue-no*, *ciu-dad*, *vein-te*), and two otherwise (*ca-er*, *le-al*). Two
+letters are not vowels although they look like them: the *u* of *que*, *qui*,
+*gue* and *gui* is written but not said, which is exactly what *ü* exists to
+say otherwise, and *y* is a consonant except at the end of a word, where it
+closes a diphthong (*rey*, *muy*).
+
+---
+
 ## Subtitles, and mining from video
 
-LLL times YouTube's subtitles, in whichever language is selected, so it knows
+Torval times YouTube's subtitles, in whichever language is selected, so it knows
 exactly when each line starts and ends, that timing is what lets a line be replayed and recorded
 precisely, and what lets **A** and **D** jump between lines. What you see is
-drawn by LLL itself, in the same look as the popup.
+drawn by Torval itself, in the same look as the popup.
 
-LLL never touches YouTube's own captions. The CC button is YouTube's and means
-what it says, LLL's line comes from the track it fetched itself, in the
-language being read, and either can be on without the other. Both at once is then a choice rather than
-an accident. The one exception is the last of the four ways of getting the
-timing below, which works by reading YouTube's captions off the screen, and so
-needs them running.
+**Nothing has to be selected first.** Which track to fetch is decided from the
+language being read, against the list of tracks the video actually has, and
+never from whatever the player happens to be showing. That last part is the
+fix for a real bug: the transcript panel (way 2 below) has no language field
+on it, it simply answers in whichever language the panel opens on, which is
+the caption track you last switched on by hand. Asked blind, it handed back
+the English transcript of an Italian video, and Torval, having asked for a
+transcript and been given one, used it. It is now asked for a named language,
+through the panel's own language menu, and a transcript that cannot be shown
+to be in the right language is refused rather than used, which costs one
+request and never costs correctness. The address caught in way 1 is checked
+the same way, against the `lang` in it, so an English track the player fetched
+for its own reasons no longer overwrites a correct transcript.
+
+Torval leaves the CC button alone. It is YouTube's and means what it says, Torval's
+line comes from the track it fetched itself, and either can be on without the
+other. Both at once is then a choice rather than an accident. The one
+exception is the last of the four ways of getting the timing below, which
+works by reading YouTube's captions off the screen and so cannot work with
+nothing on the screen to read: there, once everything else has failed, Torval
+turns the player's own captions on, in the language being read, using the same
+call the player's own settings menu makes. Only on, never off, and only to
+that one language. Before, this case left nothing on screen and said so only
+in the console.
 
 ### Netflix
 
@@ -369,7 +477,7 @@ that works.
 **What works: taking a copy of the file as it goes past.** Netflix's subtitles
 are not part of what the DRM protects. The player downloads them from
 `oca.nflxvideo.net` as an opaque `?o=` address with no file extension and TTML
-inside it, in the clear, like any other file on any other site. So LLL watches
+inside it, in the clear, like any other file on any other site. So Torval watches
 what the page fetches, and anything whose body turns out to be WebVTT or TTML
 is the subtitle file, caught whole, with every timing in it. No manifest, no
 injected format, nothing to guess.
@@ -378,7 +486,7 @@ The file is only downloaded when the player is going to show something, which
 would mean going into Netflix's own menu, turning on the language you are
 reading, and then watching two sets of subtitles at once. The player will do
 it when asked, though: it keeps a list of its tracks and a method to choose
-one, the same pair its own menu is built on. So LLL turns the track on itself,
+one, the same pair its own menu is built on. So Torval turns the track on itself,
 waits for the file that fetches, and puts your own choice straight back. What
 is left behind is the player exactly as it was and the whole subtitle file in
 hand. A moment of Netflix's own subtitles may flash up in between, once per
@@ -401,10 +509,10 @@ nothing to find afterwards however hard you look. Add that one format to the
 request on its way out and the very same answer comes back with a plain,
 unencrypted address for every subtitle track in it, Japanese included.
 
-So LLL adds it. `JSON.stringify` is where the request becomes text, which is
+So Torval adds it. `JSON.stringify` is where the request becomes text, which is
 the last moment before it is sent, so that is where the format goes in. The
 track list that comes back is offered to the extension rather than filtered on
-the page: page code knows nothing about which language LLL is set to read, so
+the page: page code knows nothing about which language Torval is set to read, so
 it hands over every track the title has and is told which one to fetch back.
 
 On the account this was written against, the request goes out and its answer
@@ -443,14 +551,14 @@ first, and they are worth writing down:
 
 What works is registering the file from the background script through the
 `scripting` API, with the same `world: "MAIN"` the manifest would not take.
-It follows the switch on the toolbar button, so turning LLL off takes it off
+It follows the switch on the toolbar button, so turning Torval off takes it off
 Netflix altogether: after the third attempt above, a way out that is not
 "uninstall the extension" seemed worth having.
 
 #### When there is no file
 
 For a title whose file never turns up, or an extension loaded halfway through
-an episode, LLL reads the lines off the screen as it does on YouTube, and the
+an episode, Torval reads the lines off the screen as it does on YouTube, and the
 language being read has to be the subtitle language turned on in the player. It is a poor
 second: the percentage can only describe the lines already watched, and **D**
 has nowhere to go, because the next line has not been said yet. The console
@@ -479,25 +587,25 @@ address in the first place.
    published in the page's own data is not, evidently, the one YouTube's own
    player actually requests when it genuinely fetches a caption track, so no
    amount of asking more carefully for *that* address was ever going to work.
-   LLL watches the page's own network traffic for the real request instead,
+   Torval watches the page's own network traffic for the real request instead,
    which happens the moment a caption track is genuinely active in the native
    player, and reuses that exact address. This needs a real caption track
-   active at least once, which is exactly why YouTube's own captions should
-   stay on.
+   active at least once. The address says which language it is for, and one
+   in any other language is ignored.
 
    Catching the right address turned out not to be enough on its own. Even
    that address, provably the one YouTube's own player had just used
    successfully, still came back with a 200 and nothing in it when refetched
    from the content script, the same "blocked by OpaqueResponseBlocking"
    symptom from the very first attempt, which meant it was never really about
-   which address was being asked for. Both fixes are needed together: LLL
+   which address was being asked for. Both fixes are needed together: Torval
    also adds the CORS permission the response never carries, using the same
    `webRequest` technique CORS-unblocking extensions use generally, scoped
    only to this one address.
 2. **Ask for the transcript the way "Show transcript" does.** Not the
    closed-caption file, the separate panel YouTube's own player offers,
    reached through a one-time token buried in the page's own data.
-3. **Ask YouTube for the closed-caption file directly.** The address LLL
+3. **Ask YouTube for the closed-caption file directly.** The address Torval
    builds itself from the page's published data, tried as a fallback in case
    a future change makes it work again.
 4. **Read the captions off the screen as they play**, timing each line by
@@ -515,25 +623,30 @@ currently in charge, including the on-screen fallback, since a genuine
 transcript beats one assembled a line at a time regardless of when it turns
 up.
 
+**The line can be moved up or down** the picture, when it sits over something
+worth seeing: press on it and pull. Where you leave it is remembered, so a
+video watched tomorrow puts it back there.
+
+Moving it and selecting the words in it are one gesture and had to be told
+apart, and the direction does it, because the two never really point the same
+way. A subtitle is wide and one line tall: selecting it means going along it,
+moving it out of the way means going up or down. So the first few pixels of a
+press decide which one it is, and it stays that until you let go, a clear pull
+up or down moves the line, anything else selects as it would on any other text
+and the line does not budge. Before, any press that moved at all moved the
+line, so copying a word out of a subtitle shoved it up the screen.
+
 Whichever way found the timing, **A** steps back a line and **D** forward.
 Part-way through a line, A restarts it; pressing it again goes to the line
 before, which is how you rewatch something you did not catch.
 
-**A small panel appears once per video**, listing every subtitle track it
-offers with a button to try each one directly. Automatic fetching has too many
-ways to land on an empty response, or to pick an auto-generated track over a
-manual one that would have worked better, for that choice to always be made
-silently, this is the same request the automatic pass makes, just handed to
-you instead of guessed at. Closing it does not bring it back until the next
-video loads. Whichever track LLL picked automatically is reported at the
-bottom of the list, so you can see at a glance whether it is worth trying
-another. A **manually authored track is always preferred automatically** when
-one exists, since auto-generated captions are also where the word-by-word
-reveal mentioned below comes from.
+A **manually authored track is always preferred** when one exists, since
+auto-generated captions are also where the word-by-word reveal mentioned below
+comes from.
 
 In the on-screen fallback specifically, auto-generated captions are often
 revealed a few words at a time as recognition catches up rather than appearing
-whole. LLL treats a growing or slightly revised line as the same line still
+whole. Torval treats a growing or slightly revised line as the same line still
 being written, not a new one each time, otherwise both the audio and the
 timing would start wherever the last fragment happened to begin, not at the
 sentence's true start.
@@ -612,7 +725,7 @@ worked around. Where capture is refused the card is still made, without media.
 
 ## Known words
 
-The list of words you already know, kept under **Words** in LLL's settings,
+The list of words you already know, kept under **Words** in Torval's settings,
 alongside the ignored list: they are the same decision with different answers,
 and a word moves between them, so they sit on one page. Words get on the known
 list two ways.
@@ -650,14 +763,14 @@ per word for the ones added by mistake.
 
 ## Reading a book
 
-**Open your books**, at the foot of LLL's settings, opens a page that takes an **epub** or a **txt**
+**Open your books**, at the foot of Torval's settings, opens a page that takes an **epub** or a **txt**
 file and shows it as an ordinary web page. That is the whole trick: the reader
-loads the same scripts LLL puts on any website, so hovering, the popup, the
+loads the same scripts Torval puts on any website, so hovering, the popup, the
 marking and the comprehension bar work on a book exactly as they do on a page,
 with no second copy of anything.
 
 An epub is a zip of XHTML files plus a list saying what order to read them in.
-LLL reads that list, takes the text out of each file, and shows one chapter at
+Torval reads that list, takes the text out of each file, and shows one chapter at
 a time, named by the book's own table of contents. Most books do not repeat
 the chapter name inside the chapter, so without reading the contents a book
 opens as Section 1, Section 2, Section 3, which is no way to find your place.
@@ -694,11 +807,11 @@ since a chapter is several screens.
 
 A slim bar across the top of any page says how much of what is in front of you
 is made of words you already know. By default it stays out of the way: a
-small "LLL" handle sits in the top right corner, and clicking it slides the
+small "Torval" handle sits in the top right corner, and clicking it slides the
 bar down.
 
 ```
-LLL   87%   1,204 of 1,383 words known                    ⟳  ⚙  📌  ×
+Torval   87%   1,204 of 1,383 words known                    ⟳  ⚙  📌  ×
 ```
 
 Left unpinned, it is a hover panel: moving the mouse away tucks it back up
@@ -724,9 +837,9 @@ hides itself while a video is full screen, and never appears at all on a page
 with no Japanese on it.
 
 While the dictionary is still being built, or a page is still being read, the
-handle says so rather than sitting there silently: "LLL 42%" the first time,
+handle says so rather than sitting there silently: "Torval 42%" the first time,
 when 218,000 entries are being copied into the browser's own database, and
-"LLL ·" for the moment a page takes to read.
+"Torval ·" for the moment a page takes to read.
 
 A grammatical pattern JMdict happens to file as one entry, お元気ですか
 ("how are you") is nothing more than the honorific お, 元気, the copula です
@@ -753,7 +866,7 @@ than it is; counting them known would say the opposite; neither is true.
 
 Known and ignored are the same kind of decision with different answers, so a
 word is one or the other or neither, never both: putting it on one list takes
-it off the other. Both are browsable under LLL's settings, and either can be
+it off the other. Both are browsable under Torval's settings, and either can be
 taken back.
 
 ### Does counting words this way actually make sense?
@@ -777,12 +890,12 @@ reason; the difference is that this happens without being asked.
 
 ## Keeping a copy of your words
 
-At the end of the **Words** page in LLL's settings, **Save to a file** writes both
+At the end of the **Words** page in Torval's settings, **Save to a file** writes both
 lists, known and ignored, into a single JSON file with the date in its name.
 
-This is the one part of LLL that cannot be rebuilt. The dictionary downloads
+This is the one part of Torval that cannot be rebuilt. The dictionary downloads
 again in a minute and the Anki settings are a minute of typing, but a known
-list is however many months of reading. LLL keeps a copy for you as well, once
+list is however many months of reading. Torval keeps a copy for you as well, once
 a day, described below; this is the button for when you want one now, or want
 it somewhere of your own choosing.
 
@@ -794,20 +907,26 @@ file between two machines works in either direction. If a word is known on one
 side and ignored on the other, known wins, since the two lists still cannot
 both hold it.
 
-A file that is not one LLL wrote is refused rather than half-read.
+A file that is not one Torval wrote is refused rather than half-read. Files
+written before this was called Torval say `lll-words` inside and are read
+too: a word list is the one thing here that cannot be rebuilt, and refusing
+last month's copy of it because the program has since been given a different
+name would be the worst possible reason to lose one. They were saved to
+**Downloads/LLL**; new ones go to **Downloads/Torval**, and both load back
+the same way.
 
 ### A copy is kept for you as well
 
-Once a day, the first time LLL starts, it writes both lists to
-**Downloads/LLL** with the date in the name. Nothing is asked and nothing is
+Once a day, the first time Torval starts, it writes both lists to
+**Downloads/Torval** with the date in the name. Nothing is asked and nothing is
 shown; the newest file is always the one to load back.
 
-This is not caution for its own sake. Everything LLL keeps lives inside the
+This is not caution for its own sake. Everything Torval keeps lives inside the
 extension: the word lists, the deck settings, the dictionary. When that goes,
 it goes all at once, and an add-on loaded from `about:debugging` is removed by
 Firefox every time the browser closes. Reload it and you have a fresh
 extension: the dictionary rebuilds, the deck settings are blank, and the word
-lists are empty. Nothing LLL can do from inside will save it, which is why the
+lists are empty. Nothing Torval can do from inside will save it, which is why the
 copy goes outside.
 
 **The real fix is not to install it that way.** Either run it in Firefox
@@ -883,7 +1002,7 @@ rather than with whatever happens to be longest.
 ### The copula is a word
 
 です, だ, である and their negatives are words in their own right, not endings a
-noun grows, and LLL now reads them that way: 猫です is 猫 and です, 静かである is
+noun grows, and Torval now reads them that way: 猫です is 猫 and です, 静かである is
 静か and である. Treating them as endings meant any noun could swallow whatever
 followed it, which produced 科である read as 科, さです as 差 and とです as と,
 two of which are not things anyone would say. The copula does still conjugate as
@@ -947,7 +1066,7 @@ removed: with it left in, 繋がるわけじゃないのかも was read as 繋�
 and ない, three of which are not what is written there. A space between anything
 else, Latin words included, is left exactly as it is.
 
-When the transcript could not be fetched and LLL is reading captions off the
+When the transcript could not be fetched and Torval is reading captions off the
 screen, a line is only known once it has ended, so the line showing has no
 line after it yet: only what came before it can be used. The last word of a
 line stays cut until the next line arrives, and is whole from then on.
@@ -957,7 +1076,7 @@ line stays cut until the next line arrives, and is whole from then on.
 
 Names. ちえこ is not in any dictionary, and neither ちえ nor こさん being real
 words is something the pricing can see through. A person's name in the middle of
-a kana run is the case where a human uses さん as the clue and LLL does not. The
+a kana run is the case where a human uses さん as the clue and Torval does not. The
 ignore list, and the **3** key, exist partly for this.
 
 ---
@@ -986,7 +1105,7 @@ handler bound to a node that no longer exists silently stops working.
 The browser has a way to paint text without owning it. A `Range` describes a
 stretch of characters without being part of the document, a `Highlight` is a
 set of them, and `::highlight()` styles the lot. One `<style>` element is
-added and that is the whole of LLL's footprint on the page, so there is
+added and that is the whole of Torval's footprint on the page, so there is
 nothing for a site to trip over.
 
 Firefox has had this since **version 140**. On anything older, the marking is
@@ -1032,6 +1151,10 @@ looks the same everywhere.
 
 **`extension/pitch.js`**: pitch accents, and drawing them.
 
+**`extension/stress.js`**: the stress mark that stands in for them in
+Italian and Spanish. Where the stressed vowel is was decided at build time
+and is a number on the entry; this only puts it in bold.
+
 **`extension/subtitles.js`**: timing YouTube's subtitles, direct or off the screen.
 
 **`extension/video.js`**: replaying a line to record it, and grabbing the frame.
@@ -1042,7 +1165,33 @@ looks the same everywhere.
 page's own DOM.
 
 **`extension/japanese.js`**: what counts as a Japanese character. One line, in
-a file of its own, because four separate parts of LLL have to agree on it.
+a file of its own, because four separate parts of Torval have to agree on it.
+`italian.js` and `spanish.js` are its counterparts, and `scan.js`,
+`italian-scan.js` and `spanish-scan.js` say how far one word can run in each.
+
+**`extension/lang.js`**: which language is active, and what each one is made
+of. Every language is one registration at the bottom of this file naming its
+character class, its scan window, its deinflector, its lookup engine, whether
+it shows a pitch accent or a stress mark, which subtitle tracks to fetch and
+where its data lives. Nothing else in the extension has a list of languages
+in it, which is the point: adding one is adding a registration, not editing
+a dozen `=== 'it'` checks.
+
+**`extension/deinflect-latin.js`**: the rule-walking solver Italian and
+Spanish share, which is `deinflect.js`'s engine with the Japanese taken out.
+`deinflect-it.js` and `deinflect-es.js` are rule tables and nothing else.
+
+**`extension/lookup-latin.js`**: `lookup.js`'s counterpart for the languages
+written with spaces in them, and one file for both of them, since splitting
+on spaces and looking each token up is not a thing either language does
+differently. It takes its character class, its scan window and its
+deinflector from whichever language is active, fresh on every call, so a
+switch is picked up by the very next lookup.
+
+**`tools/wiktextract.mjs`**: the shared half of the Italian and Spanish
+dictionary builds. Each language's own `build-dict-*.mjs` is a dozen lines
+of configuration plus its answer to the one genuinely language-specific
+question: where the stress falls.
 
 **`extension/options.js`**: the settings page, and switching between its
 sections, listed down the left rather than across the top so which section you
@@ -1051,6 +1200,12 @@ are in and how to get to the other one live in the same place.
 **`extension/known.js`**: the known-words tab: adding, browsing, forgetting.
 
 **`extension/popup.css`**: how it looks. The only file that decides that.
+
+**`extension/icon.svg`**: the mark on the toolbar button. One letterform and
+one rule, because it has to survive being drawn sixteen pixels wide.
+
+**`tools/package.mjs`**: the release package, and the checks that refuse to
+build one that is short of something. See Releasing below.
 
 ### Working on the appearance
 
@@ -1096,6 +1251,13 @@ Runs the real search code against the real dictionary, every godan verb ending,
 the irregular verbs, adjectives, the copula, and the cases where the deinflector
 would otherwise invent words that do not exist.
 
+Spanish is checked the same way: its stress rule word by word, its
+deinflection from the form as written back to the dictionary word, and, when
+`extension/data-es/` has been built, the whole path through the real Spanish
+dictionary. The Japanese dictionary is required; the Spanish one is used if
+it is there and those checks are skipped with a note if it is not, since a
+fresh clone has neither until the build scripts have run.
+
 ---
 
 ## Not yet
@@ -1103,11 +1265,83 @@ would otherwise invent words that do not exist.
 In rough order of intent:
 
 - **Reaching words the dictionary does not know at all.** Ignoring covers the
-  case where JMdict has an entry LLL read wrongly, but a name or coined word
+  case where JMdict has an entry Torval read wrongly, but a name or coined word
   with no entry at all never becomes a word in the first place, so there is
   nothing to press ⊘ on. It is silently left out of the count either way,
   which is the right answer often enough not to be urgent.
-- **Packaging.** Sign it, so it survives a Firefox restart.
+- **Signing.** Everything a release needs is ready except the one step that
+  needs credentials; see Releasing below.
+
+---
+
+## Releasing
+
+Everything below the signature is done and checked in. What is left is an
+account and an upload.
+
+**1. Build all three dictionaries**, since the package carries them:
+
+```bash
+node tools/build-dict.mjs && node tools/build-pitch.mjs
+node tools/build-dict-it.mjs
+node tools/build-dict-es.mjs
+```
+
+**2. Check it.** The test suite, and then the add-on store's own validator,
+which catches a different class of thing entirely (files too large for it to
+parse, permissions that do not match what the code does, manifest keys the
+minimum Firefox version cannot read):
+
+```bash
+node --max-old-space-size=4096 tools/test.mjs
+npx web-ext lint --source-dir extension --self-hosted
+```
+
+The linter should report no errors. It reports two warnings on purpose, both
+saying that `strict_min_version` 128 predates `data_collection_permissions`:
+older Firefox ignores that key rather than choking on it, and dropping twelve
+versions of Firefox to silence a warning about a field they cannot read would
+be a poor trade. The manifest says so where the version is set.
+
+**3. Package it:**
+
+```bash
+node tools/package.mjs
+```
+
+This writes `dist/torval-<version>.zip`, about 28 MB, and refuses to write
+anything if a dictionary was never built, a file the manifest names is
+missing, or a page asks for a script that is not there. Those are the three
+ways a release has actually been broken, and each of them looks, to whoever
+installed it, like the program being broken rather than the package being
+short.
+
+**4. Upload it** to addons.mozilla.org. Two ways, and the choice is about who
+you want to be able to find it:
+
+- **Unlisted** gives you back a signed `.xpi` that installs permanently in
+  ordinary Firefox and updates from wherever you host it. Nobody finds it by
+  searching; you hand people the file. Review is usually automatic.
+- **Listed** puts it on the store. Slower, since a human reads the source,
+  and they will ask for the source of anything generated: point them at this
+  repository and at `tools/`, which is where every file in `extension/data*/`
+  comes from.
+
+The submission asks for a privacy policy; [PRIVACY.md](PRIVACY.md) is written
+to be pasted into that box. It asks what data the add-on collects; the answer
+is none, and the manifest already declares it. Signing needs an API key,
+which does not belong in this repository:
+
+```bash
+npx web-ext sign --source-dir extension --channel unlisted \
+  --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
+```
+
+**What the package contains** is `extension/` exactly as it is installed,
+dictionaries included, and nothing else: `tools/`, the previews, the raw
+downloads in `data/` and this README stay behind. The licences of the
+dictionary data travel with it, which is what the **About** page in the
+settings is for.
 
 ---
 
@@ -1125,8 +1359,25 @@ decide which of two equally good matches goes first, which JMdict's own
 priority markers did poorly: those are coarse bands covering only the
 commonest 24,000 words.
 
-The dictionary is **JMdict**, from the [Electronic Dictionary Research and
-Development Group](https://www.edrdg.org/), used under
+Italian and Spanish are **Wiktextract**, [kaikki.org](https://kaikki.org/)'s
+machine extraction of English Wiktionary, used under
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with word
+frequency from
+[hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords)
+(OpenSubtitles), MIT.
+
+That source has one limit worth knowing about, because it looks like a bug
+and is not. These are entries from *English* Wiktionary, so a word English
+Wiktionary has no page for is not in the dictionary and cannot be found, no
+matter how ordinary it is in the language itself. Italian *biffatura* is a
+real word and neither it nor *biffare* is in the dump, so hovering it answers
+nothing. Nothing in Torval can fix that; what fixes it is the word getting an
+entry on English Wiktionary, or Torval one day reading the Italian and Spanish
+Wiktionaries as well, which define far more of their own languages but define
+them in themselves rather than in English.
+
+The Japanese dictionary is **JMdict**, from the [Electronic Dictionary
+Research and Development Group](https://www.edrdg.org/), used under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). It is the same
 data Jisho.org is built on. It is downloaded by the build script and is not
 stored in this repository; if you ever distribute a packaged copy of this

@@ -1,10 +1,10 @@
 /*
- * LLL, which language is active
+ * Torval, which language is active
  *
- * LLL supports more than one language, but only ever reads in one of them at
+ * Torval supports more than one language, but only ever reads in one of them at
  * a time: one dictionary, one deinflector, one word-boundary rule. Everything
- * that used to reach for `LLLJapanese`/`LLLMaxScan` directly now reaches for
- * `LLLLang.profile()` instead, which is whichever language is currently
+ * that used to reach for `TorvalJapanese`/`TorvalMaxScan` directly now reaches for
+ * `TorvalLang.profile()` instead, which is whichever language is currently
  * selected.
  *
  * The active language lives in `storage.local` under `activeLanguage`, read
@@ -15,19 +15,21 @@
  * Registration happens once each language's own file has defined its pieces
  * (the char-class regex, the scan window), at the bottom of this file, so
  * `lang.js` has to load after `japanese.js`/`scan.js`/`italian.js` and before
- * anything that calls `LLLLang.profile()`. It does NOT need the deinflector,
+ * anything that calls `TorvalLang.profile()`. It does NOT need the deinflector,
  * the dictionary lookup module or the stress/pitch renderer to exist yet:
  * background.js, the only place that touches those, picks between them
- * itself with a plain check against `LLLLang.active()`, so their scripts can
+ * itself with a plain check against `TorvalLang.active()`, so their scripts can
  * load in any order relative to this one.
  */
 
-var LLLLang = (function () {
+var TorvalLang = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
 
-  var registry = {};   // code -> { code, name, charClass, scanWindow, dbSuffix, dataPath }
+  // code -> a profile; see the registrations at the bottom of this file for
+  // what is in one.
+  var registry = {};
   var order = [];
   var current = 'ja';  // the language every existing install already has, unasked
   var listeners = [];
@@ -118,29 +120,73 @@ var LLLLang = (function () {
   };
 })();
 
-if (typeof LLLJapanese === 'undefined' && typeof require !== 'undefined') {
-  var LLLJapanese = require('./japanese.js');
+if (typeof TorvalJapanese === 'undefined' && typeof require !== 'undefined') {
+  var TorvalJapanese = require('./japanese.js');
 }
-if (typeof LLLMaxScan === 'undefined' && typeof require !== 'undefined') {
-  var LLLMaxScan = require('./scan.js');
+if (typeof TorvalMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var TorvalMaxScan = require('./scan.js');
 }
-if (typeof LLLItalian === 'undefined' && typeof require !== 'undefined') {
-  var LLLItalian = require('./italian.js');
+if (typeof TorvalItalian === 'undefined' && typeof require !== 'undefined') {
+  var TorvalItalian = require('./italian.js');
 }
-if (typeof LLLItalianMaxScan === 'undefined' && typeof require !== 'undefined') {
-  var LLLItalianMaxScan = require('./italian-scan.js');
+if (typeof TorvalItalianMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var TorvalItalianMaxScan = require('./italian-scan.js');
 }
+if (typeof TorvalSpanish === 'undefined' && typeof require !== 'undefined') {
+  var TorvalSpanish = require('./spanish.js');
+}
+if (typeof TorvalSpanishMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var TorvalSpanishMaxScan = require('./spanish-scan.js');
+}
+
+/*
+ * A language's deinflector and lookup engine, fetched when they are wanted
+ * rather than held on the profile.
+ *
+ * lang.js has to load before anything that asks which language is active,
+ * which means before the deinflectors and the lookup engines exist; the
+ * comment at the top of this file says so, and the load order in
+ * manifest.json depends on it. A profile therefore cannot hold a reference
+ * to TorvalDeinflectEs, there is no such thing yet when this file runs. It
+ * holds a function that goes and finds it, called from the background
+ * script, by which time everything is loaded.
+ *
+ * They are also genuinely absent in the content scripts, which load the
+ * profiles but none of the lookup machinery, so asking for one there
+ * answers null rather than throwing: nothing in a page ever asks.
+ */
+function lazy(name) {
+  return function () {
+    var scope = typeof globalThis !== 'undefined' ? globalThis : null;
+    if (scope && scope[name]) return scope[name];
+    if (typeof require !== 'undefined') {
+      try { return require('./' + FILES[name]); } catch (err) { /* not here */ }
+    }
+    return null;
+  };
+}
+
+// Only for the test suite and any other Node caller, where a global is not
+// how a module arrives.
+var FILES = {
+  TorvalDeinflect: 'deinflect.js',
+  TorvalDeinflectIt: 'deinflect-it.js',
+  TorvalDeinflectEs: 'deinflect-es.js',
+  TorvalLookup: 'lookup.js',
+  TorvalLookupLatin: 'lookup-latin.js'
+};
 
 /*
  * Is this page actually written in the language being read?
  *
  * Japanese never has to ask: its alphabet is its own, so text either has
  * Japanese characters in it or it does not, and the character class settles
- * it before anything else looks. Italian shares the Latin alphabet with the
- * page around it, and an ordinary English page does have Italian words on
- * it, because "in", "a", "no", "e" and "ago" (a needle) are all real entries
- * in an Italian dictionary. Finding one word is therefore no evidence at
- * all, and the bar used to appear on every English page in the browser.
+ * it before anything else looks. Italian and Spanish share the Latin
+ * alphabet with the page around it, and an ordinary English page does have
+ * Italian words on it, because "in", "a", "no", "e" and "ago" (a needle)
+ * are all real entries in an Italian dictionary. Finding one word is
+ * therefore no evidence at all, and the bar used to appear on every English
+ * page in the browser.
  *
  * What separates the two is the proportion, not the presence. Running Italian
  * prose is very nearly all Italian words, eight or nine in ten even before
@@ -150,23 +196,33 @@ if (typeof LLLItalianMaxScan === 'undefined' && typeof require !== 'undefined') 
  * floor under how long the passage has to be before the proportion means
  * anything: three words out of four is a sentence, not a language.
  */
-var ITALIAN_WORD = /[A-Za-zÀ-ÖØ-öø-ÿ'\u2019]+/g;
-var ITALIAN_ENOUGH = 0.55;
-var ITALIAN_MINIMUM = 8;   // recognised words, below which the ratio is noise
+var LATIN_WORD = /[A-Za-zÀ-ÖØ-öø-ÿ'\u2019]+/g;
+var LATIN_ENOUGH = 0.55;
+var LATIN_MINIMUM = 8;   // recognised words, below which the ratio is noise
 
-function italianPlausible(text, matched) {
-  if (!(matched >= ITALIAN_MINIMUM)) return false;
-  var words = String(text || '').match(ITALIAN_WORD);
+function latinPlausible(text, matched) {
+  if (!(matched >= LATIN_MINIMUM)) return false;
+  var words = String(text || '').match(LATIN_WORD);
   if (!words || !words.length) return false;
-  return matched / words.length >= ITALIAN_ENOUGH;
+  return matched / words.length >= LATIN_ENOUGH;
 }
 
-LLLLang.register({
+TorvalLang.register({
   code: 'ja',
   name: 'Japanese',
-  charClass: LLLJapanese,
-  scanWindow: LLLMaxScan,
-  dbSuffix: '',        // keeps the existing 'lll-dictionary' name and 'data/' path
+  charClass: TorvalJapanese,
+  scanWindow: TorvalMaxScan,
+  // Which lookup engine reads this language, and which deinflector it uses.
+  // Both are fetched rather than held; see the note on global() above.
+  lookup: lazy('TorvalLookup'),
+  deinflector: lazy('TorvalDeinflect'),
+  // Japanese is the one language here with lexical pitch, so it is the one
+  // that shows a pitch diagram; the others mark the stressed vowel instead.
+  // The Anki settings page offers whichever of the two this is.
+  accent: 'pitch',
+  // Named in the error when the built data is missing.
+  build: 'node tools/build-dict.mjs',
+  dbSuffix: '',        // keeps the existing 'torval-dictionary' name and 'data/' path
   dataPath: 'data',
   storageSuffix: '',   // keeps the existing unsuffixed storage keys
   // Japanese runs two words together with nothing between them, so the
@@ -182,20 +238,23 @@ LLLLang.register({
   // further to decide here.
   plausible: function () { return true; },
   // What a word is written with, in that language's own script, for the
-  // examples on the Words page.
+  // placeholders on the Words page.
   examples: {
-    inflected: 'たべました', lemma: '食べる',
     paste: '日本語のテキストをここに貼り付けてください…',
     known: '食べる', ignored: 'ネカフェ',
     ignoredKinds: 'Names, English, misreadings'
   }
 });
 
-LLLLang.register({
+TorvalLang.register({
   code: 'it',
   name: 'Italian',
-  charClass: LLLItalian,
-  scanWindow: LLLItalianMaxScan,
+  charClass: TorvalItalian,
+  scanWindow: TorvalItalianMaxScan,
+  lookup: lazy('TorvalLookupLatin'),
+  deinflector: lazy('TorvalDeinflectIt'),
+  accent: 'stress',
+  build: 'node tools/build-dict-it.mjs',
   dbSuffix: '-it',
   dataPath: 'data-it',
   storageSuffix: '_it',
@@ -203,13 +262,56 @@ LLLLang.register({
   // seam to show and the dashed underline would only be noise.
   seams: false,
   subtitles: ['it', 'it-IT'],
-  plausible: italianPlausible,
+  plausible: latinPlausible,
   examples: {
-    inflected: 'parlavamo', lemma: 'parlare',
     paste: 'Incolla qui un testo italiano…',
     known: 'parlare', ignored: 'Giuseppe',
     ignoredKinds: 'Names, foreign words, misreadings'
   }
 });
 
-if (typeof module !== 'undefined' && module.exports) module.exports = LLLLang;
+/*
+ * Is this page actually written in Spanish?
+ *
+ * The same problem Italian has, and the same answer, for the same reason:
+ * Spanish shares the Latin alphabet with the page around it, and "no", "a",
+ * "son", "van", "la" and "sin" are all real Spanish words that turn up in
+ * ordinary English text. One word is no evidence; the proportion is. The
+ * two languages use one function between them, since what it measures, how
+ * much of the passage the dictionary recognised, is not specific to either.
+ *
+ * Spanish and Italian are also each other's worst case here: they share a
+ * great deal of vocabulary, so an Italian page will score respectably
+ * against a Spanish dictionary and the other way round. That is a real
+ * limit and not one a ratio can fix. It costs nothing worse than the bar
+ * appearing on a page in the wrong Romance language, which the reader can
+ * see at a glance and Torval cannot.
+ */
+TorvalLang.register({
+  code: 'es',
+  name: 'Spanish',
+  charClass: TorvalSpanish,
+  scanWindow: TorvalSpanishMaxScan,
+  lookup: lazy('TorvalLookupLatin'),
+  deinflector: lazy('TorvalDeinflectEs'),
+  accent: 'stress',
+  build: 'node tools/build-dict-es.mjs',
+  dbSuffix: '-es',
+  dataPath: 'data-es',
+  storageSuffix: '_es',
+  // Spanish puts a space between every pair of words, so there is never a
+  // seam to show and the dashed underline would only be noise.
+  seams: false,
+  // Latin America and Spain label the same track differently, and a video
+  // may offer either or both. es-419 is Wikipedia-style "Latin American
+  // Spanish", which is what most streaming sites actually ship.
+  subtitles: ['es', 'es-ES', 'es-419', 'es-MX', 'es-US'],
+  plausible: latinPlausible,
+  examples: {
+    paste: 'Pega aquí un texto en español…',
+    known: 'hablar', ignored: 'Guillermo',
+    ignoredKinds: 'Names, foreign words, misreadings'
+  }
+});
+
+if (typeof module !== 'undefined' && module.exports) module.exports = TorvalLang;
