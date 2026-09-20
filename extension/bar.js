@@ -30,7 +30,7 @@ var TorvalBar = (function () {
   var read = null;        // that reading's occurrences, for recounting
   var onRefresh = null;
 
-  var BAR_HEIGHT = 40;   // the bar itself, and the room the page gives it
+  var BAR_HEIGHT = 54;   // the bar itself, and the room the page gives it
   var expanded = false;
   var pinned = false;
   var always = false;   // this page keeps the bar down, whatever the setting
@@ -61,6 +61,12 @@ var TorvalBar = (function () {
   function alwaysDown() {
     always = true;
     pinned = true;
+    // A page that keeps the bar down has to start below it, and the reader
+    // is such a page. It used to hold the number in its own stylesheet,
+    // which was right until the bar grew and then silently was not: the
+    // bar says how tall it is instead, and reader.css reads that.
+    var root = document.documentElement;
+    if (root && root.style) root.style.setProperty('--torval-bar', BAR_HEIGHT + 'px');
     // Built at once rather than waiting for something to measure. The reader
     // asks for this, and its shelf has no Japanese on it at all: without the
     // bar there from the start, the room the page leaves for it would just be
@@ -517,16 +523,22 @@ var TorvalBar = (function () {
   }
 
   // Same palette as the popup and the subtitles: one dark card colour, one
-  // border, one bright text colour, everything else muted. Sized to be read
-  // at a glance rather than squinted at, the first version of this bar was
-  // built to take up as little room as possible, which mostly meant it was
-  // too small to actually see.
+  // border, one bright text colour, everything else muted.
+  //
+  // Sized to be read at a glance rather than squinted at. This is the third
+  // time it has grown and the reason is the same each time: the bar was
+  // first built to take up as little room as possible, which is the wrong
+  // thing to optimise for something whose entire job is to be read in
+  // passing, from across a desk, while you are looking at something else.
+  // The percentage is the one number anybody comes here for, so it is the
+  // size of a heading rather than of body text, and the three controls are
+  // finger-sized rather than pointer-sized.
   var CSS = [
     ':host { all: initial; }',
     '.handle {',
     '  position: fixed; top: 0; right: 14px; z-index: 2147483645;',
-    '  padding: 3px 10px; margin: 0; border: 1px solid #292b30; border-top: 0; border-radius: 0 0 7px 7px;',
-    '  background: #16171a; font: 11px/1 -apple-system, "Segoe UI", sans-serif;',
+    '  padding: 5px 14px; margin: 0; border: 1px solid #292b30; border-top: 0; border-radius: 0 0 8px 8px;',
+    '  background: #16171a; font: 13px/1 -apple-system, "Segoe UI", sans-serif;',
     '  letter-spacing: 0.06em; color: #6b7079; cursor: pointer;',
     '}',
     '.handle:hover { color: #dfe1e5; }',
@@ -536,26 +548,26 @@ var TorvalBar = (function () {
     '.note { color: #c7ab72; }',
     '.bar {',
     '  position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;',
-    '  box-sizing: border-box; height: ' + BAR_HEIGHT + 'px; display: flex; align-items: center; gap: 14px;',
-    '  padding: 0 14px;',
+    '  box-sizing: border-box; height: ' + BAR_HEIGHT + 'px; display: flex; align-items: center; gap: 18px;',
+    '  padding: 0 18px;',
     '  background: #16171a; border-bottom: 1px solid #292b30;',
-    '  font: 14px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
+    '  font: 16px/1 -apple-system, "Segoe UI", sans-serif; color: #dfe1e5;',
     // Tucked above the top edge by default, the handle above is what stays
     // visible in that state, since it sits at the same coordinates but one
     // step behind the bar in the stacking order.
     '  transform: translateY(-100%); transition: transform .22s ease;',
     '}',
     '.bar.expanded { transform: translateY(0); }',
-    '.mark { font-size: 12px; letter-spacing: 0.08em; color: #5a5f67; }',
-    '.score { font-size: 17px; font-weight: 600; color: #f4f5f7; }',
+    '.mark { font-size: 14px; letter-spacing: 0.08em; color: #5a5f67; }',
+    '.score { font-size: 24px; font-weight: 600; color: #f4f5f7; }',
     '.detail { color: #767b84; }',
     '.spacer { flex: 1; }',
     'button {',
-    '  padding: 4px 8px; background: none; border: 0; border-radius: 4px;',
-    '  font: inherit; font-size: 16px; line-height: 1; color: #6b7079; cursor: pointer;',
+    '  padding: 6px 11px; background: none; border: 0; border-radius: 6px;',
+    '  font: inherit; font-size: 22px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
     'button:hover { background: #24262b; color: #dfe1e5; }',
-    '.pin { font-size: 12px; }',
+    '.pin { font-size: 16px; }',
     // Unmistakably switched on, not just a shade different: a pin you
     // cannot tell the state of is a pin you press twice.
     '.pin.on { color: #16171a; background: #dba35f; }',

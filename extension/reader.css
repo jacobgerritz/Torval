@@ -18,8 +18,10 @@ body {
 .chrome {
   position: sticky;
   /* The comprehension bar sits across the very top of every page and stays
-     down on this one, so everything else starts below it. */
-  top: 40px;
+     down on this one, so everything else starts below it. How tall it is
+     comes from the bar itself, see alwaysDown in bar.js; the number here is
+     only what to do before it has said. */
+  top: var(--torval-bar, 54px);
   z-index: 5;
   display: flex;
   align-items: center;
