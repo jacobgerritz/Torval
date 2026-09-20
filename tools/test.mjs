@@ -2601,6 +2601,17 @@ const run = async () => {
     !DeinflectIt.deinflect('hablábamos').map((r) => r.term).includes('hablar') &&
     !DeinflectEs.deinflect('parlavamo').map((r) => r.term).includes('parlare'));
 
+  // A possessive agrees in gender and number like an adjective, but
+  // Wiktionary files it as a pronoun, so the agreement rules have to be
+  // allowed to reach one. "sue" is the case that showed it: unlike sua,
+  // mie and tue, Wiktionary never wrote it down as a page of its own, so
+  // with the rules stopping at nouns and adjectives it was a word with no
+  // answer at all.
+  check('an Italian possessive is reached by the agreement rules',
+    DeinflectIt.deinflect('sue').map((r) => r.term).includes('suo'));
+  check('and a Spanish one is too',
+    DeinflectEs.deinflect('suyas').map((r) => r.term).includes('suyo'));
+
   // The lookup engine reads whichever language is active, and has to change
   // its mind the moment that changes rather than at the next reload.
   Lang._setActive('it');

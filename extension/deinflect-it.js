@@ -213,7 +213,13 @@ var TorvalDeinflectIt = TorvalDeinflectLatin.build(function (rule) {
   // dictionary entry is the answer, and this table does not have to know
   // which in advance.
   // ---------------------------------------------------------------------
-  var NA = ['n', 'adj'];
+  // Pronouns are in here because a possessive is one. Wiktionary files
+  // Italian suo, mio, tuo as pronouns, and they agree in gender and number
+  // exactly as an adjective does: sua, suoi, sue. Left out, the rules below
+  // could not reach them, and "sue" was a word Torval found nothing at all
+  // for, since it is the one form Wiktionary never wrote down as a page of
+  // its own. sua, mie and tue only ever worked by being listed.
+  var NA = ['n', 'adj', 'pron'];
   rule('i', 'o', [], NA, 'plural');
   rule('i', 'e', [], NA, 'plural');
   rule('e', 'a', [], NA, 'plural');
