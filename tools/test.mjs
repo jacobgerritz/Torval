@@ -631,7 +631,8 @@ const run = async () => {
   // A rank is rounded to a band, because the gap between #100 and #400 is real
   // and the gap between #7,261 and #7,800 is not.
   for (const [rank, band] of [[1, 'top 1k'], [1000, 'top 1k'], [1001, 'top 2k'],
-    [4705, 'top 5k'], [7261, 'top 10k'], [20000, 'top 20k'], [50001, 'rare'], [140824, 'rare']]) {
+    [4705, 'top 5k'], [7261, 'top 10k'], [20000, 'top 20k'], [50001, 'top 100k'],
+    [100000, 'top 100k'], [100001, 'rare'], [140824, 'rare']]) {
     check(`#${rank} reads as "${band}"`, Lookup.frequencyBand(rank) === band,
       'got ' + Lookup.frequencyBand(rank));
   }

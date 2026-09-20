@@ -87,9 +87,19 @@ var TorvalLookupCommon = (function () {
   // How common a word is, rounded to the precision the number deserves. A
   // bare rank asks you to know the scale already; a round band says "this is
   // ordinary" or "this is rare" without needing a legend to read it.
+  //
+  // The tail is split because "rare" was covering far too much ground. In
+  // the Italian list the top 50k is 97.8% of everything said, so everything
+  // past it shares the last 2.2%: rank 60,000 and rank 600,000 were both
+  // "rare", though the first is a word like sbadigliare, which everyone
+  // knows and nobody writes down, and the second is genuinely obscure. A
+  // learner reading "rare" against an ordinary word learns to distrust the
+  // label. Past 100k the word really is rare, about thirty uses in a corpus
+  // of 247 million, so that is where the word is kept.
   var BANDS = [
     [1000, 'top 1k'], [2000, 'top 2k'], [5000, 'top 5k'],
-    [10000, 'top 10k'], [20000, 'top 20k'], [50000, 'top 50k']
+    [10000, 'top 10k'], [20000, 'top 20k'], [50000, 'top 50k'],
+    [100000, 'top 100k']
   ];
 
   function frequencyBand(rank) {
