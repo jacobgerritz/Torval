@@ -954,6 +954,9 @@
   // which is what makes its first lines jump the throttle below.
   let seenLines = -1;
   let readLines = 0;
+  // Somebody asked to read the page while a read was already going. See
+  // readPage.
+  let readAgain = false;
 
   // What the bar says while a video's transcript is still on its way. Not
   // "reading this page": the page is read, it is the video that is not.
@@ -1049,7 +1052,14 @@
    * got the chance.
    */
   async function readPage(options) {
-    if (readingPage || !isCurrent()) return;
+    if (!isCurrent()) return;
+    // A read already running is not a reason to drop this one. Reading a
+    // long page takes seconds, and the commonest moment to ask for another
+    // is a second after the address changed, which is very often still
+    // inside the last one. Dropped, nothing read the new page at all, and
+    // the bar sat on "Reading this page…" until some unrelated reason to
+    // read came along.
+    if (readingPage) { readAgain = true; return; }
     readingPage = true;
     let scored = false;
     reading = true;
@@ -1097,6 +1107,11 @@
       else if (!scored) TorvalBar.quiet();
       readingPage = false;
       reading = false;
+    }
+
+    if (readAgain) {
+      readAgain = false;
+      readPage();
     }
   }
 

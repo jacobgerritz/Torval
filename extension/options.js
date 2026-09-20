@@ -64,10 +64,16 @@ const SOURCE_LABELS_BASE = [
 ];
 
 function sourceLabels() {
-  const extra = TorvalLang.profile().accent === 'stress'
+  const profile = TorvalLang.profile();
+  const extra = profile.accent === 'stress'
     ? [['stress', 'Word stress']]
     : [['pitch', 'Pitch accent']];
-  return SOURCE_LABELS_BASE.concat(extra);
+  // Word audio only where there is a recording to be had. See the note on
+  // `audio` in lang.js.
+  const base = profile.audio
+    ? SOURCE_LABELS_BASE
+    : SOURCE_LABELS_BASE.filter(([source]) => source !== 'audio');
+  return base.concat(extra);
 }
 
 // -------------------------------------------------------------------------

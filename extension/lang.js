@@ -220,6 +220,12 @@ TorvalLang.register({
   // that shows a pitch diagram; the others mark the stressed vowel instead.
   // The Anki settings page offers whichever of the two this is.
   accent: 'pitch',
+  // A card can carry a recording of the word. The one source Torval has for
+  // that, JapanesePod101's dictionary, only has Japanese in it, so this is
+  // the only language where the option means anything; see fetchAudio in
+  // anki.js. Offered anywhere else, it is a checkbox that silently does
+  // nothing and a request to a service that has nothing to answer with.
+  audio: true,
   // Named in the error when the built data is missing.
   build: 'node tools/build-dict.mjs',
   dbSuffix: '',        // keeps the existing 'torval-dictionary' name and 'data/' path

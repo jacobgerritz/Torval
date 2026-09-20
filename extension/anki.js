@@ -167,6 +167,13 @@ var TorvalAnki = (function () {
     return 'torval-' + (word + '-' + (reading || '')).replace(/[^\p{L}\p{N}-]/gu, '') + '.mp3';
   }
 
+  /** Is there a pronunciation to be had in the language being read? */
+  function hasAudio() {
+    if (typeof TorvalLang === 'undefined') return true;
+    var profile = TorvalLang.profile();
+    return !profile || !!profile.audio;
+  }
+
   /** Does the card have a field pointed at this? */
   function wants(config, source) {
     var fields = (config && config.fields) || {};
@@ -183,7 +190,10 @@ var TorvalAnki = (function () {
     }
 
     // Only go looking for audio if somewhere on the card wants it.
-    if (wants(config, 'audio') && note.word) {
+    // Not offered outside Japanese, but a mapping saved before that was true
+    // would still ask, and the answer would be one more copy of the
+    // "unavailable" clip. See the note on `audio` in lang.js.
+    if (wants(config, 'audio') && note.word && hasAudio()) {
       var data = await fetchAudio(note.word, note.reading);
       if (data) {
         var filename = audioFilename(note.word, note.reading);
