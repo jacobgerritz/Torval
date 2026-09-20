@@ -1868,7 +1868,23 @@ var TorvalSubtitles = (function () {
     say(skipping
       ? 'Skipping the quiet parts at ' + skipSpeed + '×'
       : 'Playing everything again');
+    paintSkip();
     return skipping;
+  }
+
+  /**
+   * Tell the bar what the switch is doing. Called whenever it changes, so
+   * pressing the key lights the button up at once rather than at whatever
+   * moment something else happens to look.
+   */
+  function paintSkip() {
+    if (typeof TorvalBar === 'undefined' || !TorvalBar.skipButton) return;
+    TorvalBar.skipButton(canSkip(), skipping, skipSpeed);
+  }
+
+  /** Is there anything to skip: a video, and the whole of its transcript? */
+  function canSkip() {
+    return !!(enabled && !suspended && video && state === 'ready' && cues.length);
   }
 
   /**
@@ -2097,6 +2113,8 @@ var TorvalSubtitles = (function () {
     insertObserved: insertObserved,
     talkingAt: talkingAt,
     skipping: function () { return skipping; },
+    canSkip: canSkip,
+    paintSkip: paintSkip,
     setSkipping: setSkipping,
     isContinuation: isContinuation,
     wholeLine: wholeLine,

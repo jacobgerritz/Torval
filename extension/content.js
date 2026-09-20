@@ -987,7 +987,13 @@
     // Subtitles arrive well after the page does, and replace it as the thing
     // worth measuring the moment they do.
     if (typeof TorvalSubtitles !== 'undefined') {
+      // The bar's skip button appears when a transcript arrives and goes
+      // when the video does. Outside the early return below, since the
+      // question is whether there is a video at all, not whether more of
+      // it has been read.
+      TorvalBar.onSkip(() => TorvalSubtitles.setSkipping(!TorvalSubtitles.skipping()));
       setInterval(() => {
+        TorvalSubtitles.paintSkip();
         const now = TorvalSubtitles.count();
         if (!now || now === seenLines) return;
         // Lines arrive one at a time, and a whole transcript takes real

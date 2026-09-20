@@ -38,6 +38,10 @@ var TorvalBar = (function () {
 
   var HANDLE_TITLE = 'How much of this page you understand';
 
+  // Told to the bar by whoever knows: see skipButton.
+  var onSkip = null;
+  var skipSaid = '';
+
   // What Torval is in the middle of, and the timer waiting to say so.
   var pending = null;
   var pendingTimer = null;
@@ -318,6 +322,14 @@ var TorvalBar = (function () {
     var refresh = button('⟳', 'Read this page again', function () {
       if (onRefresh) onRefresh();
     });
+    // Only on a video, and only once the whole transcript is in hand, since
+    // that is the only case where the quiet parts are known in advance. On
+    // every other page it is not a button that does nothing, it is not
+    // there at all.
+    els.skip = button('»', '', function () { if (onSkip) onSkip(); });
+    els.skip.className = 'skip';
+    els.skip.hidden = true;
+
     var settings = button('⚙', 'Torval settings', function () {
       api.runtime.sendMessage({ type: 'openOptions' }).catch(function () {});
     });
@@ -327,7 +339,8 @@ var TorvalBar = (function () {
     els.pin = button('◉', '', function () { setPinned(!pinned); });
     els.pin.className = 'pin';
 
-    els.bar.append(mark, els.score, els.note, els.detail, spacer, refresh, settings, els.pin);
+    els.bar.append(mark, els.score, els.note, els.detail, spacer,
+      els.skip, refresh, settings, els.pin);
     root.append(style, els.handle, els.bar);
     (document.body || document.documentElement).appendChild(host);
 
@@ -507,6 +520,27 @@ var TorvalBar = (function () {
     else scheduleRetract();
   }
 
+  /**
+   * The one control here that is not about this page but about the video on
+   * it: play the stretches with nobody speaking faster.
+   *
+   * It lives on the bar rather than only in the settings because it is a
+   * thing you decide while watching, four seconds into a shot of a
+   * landscape, and a setting you have to leave the video to reach is a
+   * setting nobody uses twice. What speed is set is still a setting, in
+   * the ordinary place; this is only the switch.
+   */
+  function skipButton(visible, on, speed) {
+    if (!host || !els.skip) return;
+    els.skip.hidden = !visible;
+    if (!visible) return;
+    els.skip.classList.toggle('on', !!on);
+    var said = on
+      ? 'Playing the quiet parts at ' + speed + '×, click to stop'
+      : 'Play the quiet parts faster';
+    if (said !== skipSaid) { els.skip.title = said; skipSaid = said; }
+  }
+
   function paintPin() {
     els.pin.classList.toggle('on', pinned);
     els.pin.title = pinned
@@ -571,7 +605,12 @@ var TorvalBar = (function () {
     // Unmistakably switched on, not just a shade different: a pin you
     // cannot tell the state of is a pin you press twice.
     '.pin.on { color: #16171a; background: #dba35f; }',
-    '.pin.on:hover { color: #16171a; background: #e6b578; }'
+    '.pin.on:hover { color: #16171a; background: #e6b578; }',
+    // The same "switched on" treatment as the pin, for the same reason: a
+    // control you cannot tell the state of is a control you press twice.
+    '.skip { font-weight: 700; letter-spacing: -0.04em; }',
+    '.skip.on { color: #16171a; background: #dba35f; }',
+    '.skip.on:hover { color: #16171a; background: #e6b578; }'
   ].join('\n');
 
   return {
@@ -581,6 +620,8 @@ var TorvalBar = (function () {
     quiet: quiet,
     restate: restate,
     onRefresh: function (fn) { onRefresh = fn; },
+    onSkip: function (fn) { onSkip = fn; },
+    skipButton: skipButton,
     // Off and on again, for the switch on the toolbar button.
     visible: function (show) {
       if (!host) return;
