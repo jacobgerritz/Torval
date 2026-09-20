@@ -9,38 +9,10 @@
     "48": "icon.svg",
     "96": "icon.svg"
   },
-  "_comment_id": [
-    "Deliberately still says lll. This is not a name, it is the key Firefox",
-    "files the add-on's storage under, and the known and ignored word lists",
-    "live in that storage. Renaming it would not rename anything a reader",
-    "sees; it would hand the add-on a different, empty drawer and leave",
-    "however many months of reading in the old one, unreachable. Change it",
-    "only together with exporting the word lists first and importing them",
-    "after (Settings, Words, Keep a copy)."
-  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "lll@jacobgerritz",
-      "_comment_min_version": [
-        "128, not 140, on purpose. Marking the unknown words on a page uses",
-        "an API that arrived in 140 and is simply skipped without it, so a",
-        "reader on 128 still gets the dictionary, the reader, the subtitles",
-        "and Anki. The store's linter warns that 128 predates",
-        "data_collection_permissions below; older Firefox ignores that key",
-        "rather than choking on it, and losing twelve versions of Firefox to",
-        "silence a warning about a field they cannot read would be a poor",
-        "trade."
-      ],
       "strict_min_version": "128.0",
-      "_comment_data": [
-        "Torval collects nothing. Everything it knows stays in this browser:",
-        "the dictionaries in IndexedDB, the word lists in extension storage,",
-        "the Anki settings likewise. It talks to exactly three places, all of",
-        "them at the user's own instruction: AnkiConnect on localhost, the",
-        "video site being watched, and the audio host for a word's",
-        "pronunciation. Saying so here is what the add-on store asks for, and",
-        "it is checked against the permissions above."
-      ],
       "data_collection_permissions": {
         "required": ["none"]
       }

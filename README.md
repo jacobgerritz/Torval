@@ -1337,6 +1337,30 @@ npx web-ext sign --source-dir extension --channel unlisted \
   --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
 ```
 
+### Three things in the manifest that look wrong
+
+They were written as comments in `manifest.json` itself, which was a
+mistake: JSON has no comments, and Firefox reports every key it does not
+recognise as a warning on the add-on. So they live here instead.
+
+**The add-on id still says `lll`.** It is not a name. It is the key Firefox
+files the add-on's storage under, and the known and ignored word lists live
+in that storage. Renaming it would rename nothing a reader ever sees; it
+would hand Torval a different, empty drawer and leave however many months of
+reading in the old one, unreachable. Change it only together with exporting
+the word lists first and importing them afterwards.
+
+**`strict_min_version` is 128, not 140.** Marking the unknown words on a page
+uses an API that arrived in 140 and is skipped without it, so a reader on 128
+still gets the dictionary, the reader, the subtitles and Anki. This is what
+the linter's two warnings are about.
+
+**`data_collection_permissions` says `none`, and means it.** Everything
+Torval knows stays in this browser. It talks to exactly three places, each at
+the reader's own instruction: AnkiConnect on localhost, the video site being
+watched, and the audio host for a word's pronunciation. [PRIVACY.md](PRIVACY.md)
+is the long version.
+
 **What the package contains** is `extension/` exactly as it is installed,
 dictionaries included, and nothing else: `tools/`, the previews, the raw
 downloads in `data/` and this README stay behind. The licences of the

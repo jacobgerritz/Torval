@@ -76,6 +76,19 @@ for (const [dir, how] of DICTIONARIES) {
   }
 }
 
+// --- nothing the browser will complain about ------------------------------
+// JSON has no comments, and every key Firefox does not recognise is reported
+// to the reader as a warning on the add-on. Explanations belong in the
+// README; this is here because they were once put in the manifest and the
+// warning is the only thing that said so.
+(function unknownKeys(obj, path) {
+  for (const key of Object.keys(obj)) {
+    if (key.startsWith('_')) problems.push(`manifest has ${path}${key}, which Firefox will warn about`);
+    const value = obj[key];
+    if (value && typeof value === 'object' && !Array.isArray(value)) unknownKeys(value, path + key + '.');
+  }
+})(manifest, '');
+
 // --- nothing left lying around --------------------------------------------
 for (const f of readdirSync(EXTENSION)) {
   if (/^zz-|\.orig$|\.rej$|~$/.test(f)) problems.push(`extension/${f} looks like a leftover`);
