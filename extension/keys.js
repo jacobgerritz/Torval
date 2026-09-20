@@ -1,16 +1,16 @@
 /*
  * Torval, the keys
  *
- * Seven keys, and until now all seven were written into the code that
+ * Eight keys, and until recently every one was written into the code that
  * listens for them. That is fine until one of them is a key the page
  * underneath wants: B is a bold shortcut in every editor there is, A and D
  * move you around in more than one player, and Shift is used for all sorts
  * of things. A shortcut you cannot change is a shortcut that eventually
  * makes a page unusable.
  *
- * So the seven live here instead, in one table, and the settings page
- * renders that table rather than repeating it. Adding an eighth means
- * adding a row here and nothing else.
+ * So they live here instead, in one table, and the settings page renders
+ * that table rather than repeating it. Adding another means adding a row
+ * here and nothing else.
  *
  * What is stored is only what has been changed: an empty setting means the
  * defaults, and resetting is deleting rather than writing seven values back.
@@ -43,7 +43,8 @@ var TorvalKeys = (function () {
     { name: 'ignored', label: 'Ignore the word', fallback: '3' },
     { name: 'browse', label: 'Find it in Anki', fallback: 'b' },
     { name: 'back', label: 'Previous subtitle line', fallback: 'a' },
-    { name: 'forward', label: 'Next subtitle line', fallback: 'd' }
+    { name: 'forward', label: 'Next subtitle line', fallback: 'd' },
+    { name: 'skip', label: 'Skip the quiet parts', fallback: 's' }
   ];
 
   var chosen = {};       // only what has been changed from the default

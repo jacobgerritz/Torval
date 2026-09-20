@@ -12,6 +12,7 @@
     </label>
     <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="anki">Anki</button>
+    <button class="tab" data-panel="video">Video</button>
     <button class="tab" data-panel="keys">Keys</button>
     <button class="tab" data-panel="about">About</button>
     <span class="sidebar-spacer"></span>
@@ -139,6 +140,32 @@
       <button id="save" class="primary">Save</button>
       <span id="status" role="status"></span>
     </p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-video" hidden>
+    <section>
+      <h2>Skip the quiet parts</h2>
+      <p class="note">
+        With the whole transcript timed, the stretches where nobody is
+        speaking are known, so they can be played faster and the dialogue
+        left at normal speed. A quarter of a second either side of every
+        line is kept slow, so nothing is clipped.
+      </p>
+
+      <label>
+        <span>Speed</span>
+        <input id="skip-speed" type="number" min="1.25" max="8" step="0.25" placeholder="2">
+      </label>
+
+      <p class="note hint">
+        Press <b id="skip-key">S</b> on a video to turn it on and off. Only
+        where Torval has the whole transcript: reading the captions off the
+        screen, a line is not known until it has been shown, so there is no
+        telling a quiet stretch is coming.
+      </p>
+    </section>
   </div>
 
   <!-- ------------------------------------------------------------------ -->

@@ -2740,6 +2740,26 @@ const run = async () => {
       JSON.stringify(got));
   }
 
+  // --- skipping the quiet parts -----------------------------------------
+  // Only the question "is anybody speaking near here", which is the whole
+  // of the decision; the rest is setting playbackRate on a video element.
+  const twoLines = [
+    { start: 10, end: 12, text: 'one' },
+    { start: 20, end: 22, text: 'two' }
+  ];
+  const talking = (t) => Subs.talkingAt(twoLines, t, 0.65, 0.25);
+  check('inside a line is talking', talking(11));
+  check('the run-up to a line is talking, so it is not raced through',
+    talking(9.5) && talking(19.9));
+  check('and a moment after one, so the tail is not clipped',
+    talking(12.2) && talking(22.2));
+  check('the middle of a gap is not', !talking(15) && !talking(5));
+  check('and neither is after the last line', !talking(30));
+  check('a lead long enough reaches back to the line before it',
+    Subs.talkingAt(twoLines, 8, 2, 0.25) && !Subs.talkingAt(twoLines, 8, 1, 0.25));
+  check('with no lines at all, nothing is talking',
+    !Subs.talkingAt([], 5, 0.65, 0.25));
+
   // --- the keys ---------------------------------------------------------
   Keys._setAll({});
   check('a key nobody has changed is its default',

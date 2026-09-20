@@ -90,6 +90,48 @@ var TorvalSubtitles = (function () {
   var ROLL_CHARACTERS = 60;
   var ROLL_SECONDS = 10;
 
+  /*
+   * Skipping the quiet parts.
+   *
+   * A documentary is half establishing shots and a drama is half faces
+   * looking at each other, and none of it is language practice. With the
+   * whole transcript already timed, the stretches with nobody speaking are
+   * known exactly, so they can be played faster and the speech left alone.
+   *
+   * The padding matters more than it sounds. A line's timing is written to
+   * be comfortable to read, not to be cut on, so speech regularly begins a
+   * fraction before its cue and runs a fraction past it; dropping back to
+   * normal speed exactly on the timestamp clips the first syllable. A
+   * quarter of a second either side costs nothing and fixes it.
+   *
+   * On top of that, the check runs on a tick, so the lead has to cover a
+   * whole tick's worth of playback at whatever speed the video is going,
+   * or the slow-down lands after the speech has already started. That is
+   * what SKIP_PAD + TICK_SECONDS * rate is: never late, at any speed.
+   */
+  var TICK_SECONDS = 0.2;
+  var SKIP_PAD = 0.25;
+  var SKIP_SPEED = 2;
+  var MAX_SKIP_SPEED = 8;
+
+  var skipping = false;    // the mode is on
+  var fast = false;        // and right now we are in a quiet stretch
+  var skipSpeed = SKIP_SPEED;
+  var normalRate = 1;      // the speed the video was going before we touched it
+
+  if (api && api.storage) {
+    api.storage.local.get('skipSpeed').then(function (stored) {
+      if (typeof stored.skipSpeed === 'number') skipSpeed = stored.skipSpeed;
+    }).catch(function () {});
+    if (api.storage.onChanged) {
+      api.storage.onChanged.addListener(function (changes, area) {
+        if (area !== 'local' || !changes.skipSpeed) return;
+        skipSpeed = changes.skipSpeed.newValue || SKIP_SPEED;
+        if (fast && video) video.playbackRate = skipSpeed;
+      });
+    }
+  }
+
   var BOTTOM_DEFAULT = 4;
   var bottom = BOTTOM_DEFAULT;
   if (api && api.storage) {
@@ -124,14 +166,17 @@ var TorvalSubtitles = (function () {
       // Where the words are inside that box, best first: see captionText for
       // why the box itself is not read.
       //
-      // .captions-text used to be the last of these, and it is the box, not
-      // a line in it: it holds the track's name and the way into the caption
-      // settings as well as the words, so on a video where neither of the
-      // two above matched, the line came out as "ItalianClick for settings
-      // Poi dagli studi…" and was recorded that way. There are no words in
-      // there that are not in a segment or a visual line, so there is
-      // nothing to be had by reading it and a whole cue to be lost.
-      lines: ['.ytp-caption-segment', '.caption-visual-line'],
+      // One selector, and deliberately only one. This list used to have
+      // .captions-text and .caption-visual-line after it as fallbacks, and
+      // both of them are containers rather than lines: the caption window
+      // keeps the name of the track and the way into its settings in there
+      // beside the words, and whenever the fallback was reached the line
+      // came out as "Italian Click for settings È come rinascere…" and was
+      // recorded that way, so that one cue said it for the rest of the
+      // video. Every word YouTube shows is in a segment. If there are no
+      // segments there is nothing being said, and saying nothing is the
+      // right answer rather than a missed one.
+      lines: ['.ytp-caption-segment'],
       // Anything in the caption box that is a control rather than words,
       // left out of a line even when it sits inside one. See wordsIn.
       furniture: 'button, a, [role="button"], [role="menu"], [role="menuitem"], ' +
@@ -280,8 +325,13 @@ var TorvalSubtitles = (function () {
     if (!site) return;
     enabled = true;
     window.addEventListener('keydown', keys, true);
+    // Going fullscreen changes how big the line should be, and waiting for
+    // the next pass to notice leaves it the old size for a fifth of a
+    // second while the picture is already the new one.
+    document.addEventListener('fullscreenchange', fitLine);
+    window.addEventListener('resize', fitLine);
     setInterval(watch, 1000);
-    setInterval(renderCue, 200);
+    setInterval(renderCue, TICK_SECONDS * 1000);
     if (api.runtime.onMessage) api.runtime.onMessage.addListener(onBackgroundMessage);
     watch();
     console.log('Torval: watching for subtitles');
@@ -363,6 +413,13 @@ var TorvalSubtitles = (function () {
     var focused = document.activeElement;
     if (focused && (focused.isContentEditable ||
       /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return;
+
+    if (TorvalKeys.matches('skip', e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      setSkipping(!skipping);
+      return;
+    }
 
     var back = TorvalKeys.matches('back', e);
     if (!back && !TorvalKeys.matches('forward', e)) return;
@@ -1439,7 +1496,32 @@ var TorvalSubtitles = (function () {
       var line = squash(wordsIn(parts[i]));
       if (line && line !== lines[lines.length - 1]) lines.push(line);
     }
-    return lines.join(' ');
+    return withoutFurniture(lines.join(' '));
+  }
+
+  /*
+   * The caption window's own words, taken off the front of a line.
+   *
+   * This is a net, not the fix. The fix is reading segments and nothing
+   * else, above. The net is here because that reasoning has now been wrong
+   * once: the furniture was supposed to be unreachable after .captions-text
+   * was dropped, and it came back through the next container in the list.
+   *
+   * YouTube puts the name of the track and then "Click for settings" in
+   * front of the words, so everything up to and including that phrase is
+   * not the subtitle, whatever the track happens to be called. One
+   * indexOf, and it holds for a caption window labelled Italian, Japanese
+   * or anything else. It is English-only, because that is the English
+   * string; another interface language falls back to the structural fix,
+   * which is the one supposed to be doing the work.
+   */
+  var SETTINGS_LABEL = 'Click for settings';
+
+  function withoutFurniture(text) {
+    var at = text.indexOf(SETTINGS_LABEL);
+    if (at === -1) return text;
+    console.log('Torval: left the caption window\u2019s own furniture out of the line.');
+    return text.slice(at + SETTINGS_LABEL.length).trim();
   }
 
   /**
@@ -1599,7 +1681,6 @@ var TorvalSubtitles = (function () {
       'padding:9px 22px',
       'font:500 34px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
         '"Noto Sans JP","Yu Gothic",Meiryo,sans-serif',
-      'transition:font-size .15s ease',
       'text-align:center', 'white-space:pre-wrap',
       // A hint that the box itself can be moved, without taking the text
       // cursor away from the words inside it.
@@ -1621,6 +1702,23 @@ var TorvalSubtitles = (function () {
   var LINE_SMALLEST = 20;
   var LINE_LARGEST = 48;
 
+  /*
+   * The line is resized, not animated into its new size.
+   *
+   * It used to ease font-size over .15s, which looked fine on a window
+   * resize and terrible going fullscreen. Going fullscreen is not one
+   * change of size: the player grows through a dozen intermediate heights
+   * while the browser expands it, fitLine is called on each of them from
+   * the 200ms pass below, and every call restarts a .15s ease from
+   * wherever the last one had got to. What you saw was the line stuttering
+   * up to its new size in several visible steps and often overshooting.
+   *
+   * No player in the world animates its subtitles between sizes. They are
+   * simply the right size for the picture, and the picture is what the eye
+   * is following. So the transition is gone, and the change is taken on
+   * the fullscreen event as well as on the next pass, so it lands with the
+   * picture rather than up to a fifth of a second after it.
+   */
   function fitLine() {
     if (!overlay || !overlayLine) return;
     var box = overlay.parentElement;
@@ -1642,6 +1740,10 @@ var TorvalSubtitles = (function () {
    * would show nothing for whichever line is currently in progress.
    */
   function renderCue() {
+    // First, and outside the guard below: switching Torval off, or losing
+    // the transcript, has to hand the video back at its own speed rather
+    // than leaving it running at double for the rest of the film.
+    pace();
     if (!enabled || suspended || !video || (!cues.length && !openCue)) {
       if (overlay) overlay.style.display = 'none';
       return;
@@ -1669,6 +1771,104 @@ var TorvalSubtitles = (function () {
     while (index < cues.length - 1 && cues[index].end <= time) index++;
     var cue = cues[index];
     return cue && time >= cue.start && time < cue.end ? cue : null;
+  }
+
+  /**
+   * Is anybody speaking at this moment, allowing for the padding?
+   *
+   * Pure, and separate from everything that has to know about a video, so
+   * that what counts as a quiet stretch can be tested without one.
+   * `lead` is how far ahead to look, `pad` how long to keep going at
+   * normal speed after a line has ended.
+   */
+  function talkingAt(list, time, lead, pad) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].end + pad <= time) continue;      // already past
+      return list[i].start - lead <= time;          // the next one: near enough?
+    }
+    return false;
+  }
+
+  /**
+   * Speed up, or drop back, as the quiet parts come and go.
+   *
+   * Only with the whole transcript in hand. Read off the screen, a line is
+   * not known until it has been shown, so there is no such thing as
+   * knowing a quiet stretch is coming, and speeding up would run through
+   * speech that had not been seen yet.
+   */
+  function pace() {
+    if (!video) return;
+    if (!skipping || !enabled || suspended || state !== 'ready' ||
+        !cues.length || video.paused) {
+      return slowDown();
+    }
+    var lead = SKIP_PAD + TICK_SECONDS * skipSpeed;
+    if (talkingAt(cues, video.currentTime, lead, SKIP_PAD)) slowDown();
+    else speedUp();
+  }
+
+  function speedUp() {
+    if (fast) return;
+    normalRate = video.playbackRate;
+    fast = true;
+    video.playbackRate = skipSpeed;
+  }
+
+  function slowDown() {
+    if (!fast) return;
+    fast = false;
+    if (video) video.playbackRate = normalRate;
+  }
+
+  /*
+   * A line of text over the video for a second and a half.
+   *
+   * Skipping is toggled by a key and its effect is not always immediately
+   * visible: press it during a line of dialogue and nothing happens until
+   * the dialogue stops. A key that silently may or may not have worked is
+   * worse than no key, so it says which it did.
+   */
+  var toast = null;
+  var toastTimer = null;
+
+  function say(words) {
+    var player = document.querySelector(site.player);
+    if (!player) return;
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.setAttribute('data-torval-say', '');
+      toast.style.cssText = [
+        'position:absolute', 'top:12%', 'left:0', 'right:0', 'z-index:61',
+        'display:flex', 'justify-content:center', 'pointer-events:none'
+      ].join(';');
+      var pill = document.createElement('span');
+      pill.style.cssText = [
+        'background:#16171a', 'border:1px solid #292b30', 'border-radius:6px',
+        'box-shadow:0 8px 28px rgba(0,0,0,.5)', 'color:#f4f5f7',
+        'padding:7px 16px',
+        'font:500 15px/1.4 -apple-system,"Segoe UI",sans-serif'
+      ].join(';');
+      toast.appendChild(pill);
+      player.appendChild(toast);
+    }
+    toast.firstChild.textContent = words;
+    toast.style.display = 'flex';
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () {
+      if (toast) toast.style.display = 'none';
+    }, 1500);
+  }
+
+  /** The key, and the toolbar, turning the mode on and off. */
+  function setSkipping(on) {
+    skipping = !!on;
+    if (!skipping) slowDown();
+    else if (video) normalRate = video.playbackRate;
+    say(skipping
+      ? 'Skipping the quiet parts at ' + skipSpeed + '×'
+      : 'Playing everything again');
+    return skipping;
   }
 
   /**
@@ -1895,6 +2095,9 @@ var TorvalSubtitles = (function () {
     wantedTimedtext: wantedTimedtext,
     REJECT: REJECT,
     insertObserved: insertObserved,
+    talkingAt: talkingAt,
+    skipping: function () { return skipping; },
+    setSkipping: setSkipping,
     isContinuation: isContinuation,
     wholeLine: wholeLine,
     siteFor: siteFor,

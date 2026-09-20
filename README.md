@@ -107,6 +107,7 @@ that actually reaches it.
 | **2** | mark it as one you do, popup or not |
 | **3** | ignore it instead: never mention this one again |
 | **B** | look this word up in Anki |
+| **S** | on a video, play the stretches with nobody speaking faster |
 | **click a sense** | put only that meaning on the card |
 | **built from** *fare* | the word this one is made of; press it to look that one up here |
 | **+** | add the word to Anki |

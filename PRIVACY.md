@@ -20,6 +20,7 @@ add-on is.
 | Which language you are reading, and whether Torval is on | The add-on's own storage |
 | Where you dragged the subtitle line | The add-on's own storage |
 | Any keyboard shortcut you have changed | The add-on's own storage |
+| How fast to play the quiet parts of a video | The add-on's own storage |
 
 Once a day, Torval also writes both word lists to **Downloads/Torval** as a
 plain JSON file. That is a file on your disk like any other download; it is

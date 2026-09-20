@@ -385,3 +385,32 @@ if (resetKeys) {
 // Drawn once storage has answered, so the page never shows a default for a
 // moment and then replaces it with what was actually saved.
 if (shortcutList) TorvalKeys.ready().then(drawShortcuts);
+
+
+// ---------------------------------------------------------------------------
+// Video
+// ---------------------------------------------------------------------------
+
+/*
+ * How fast the quiet parts go. One number, saved as it is typed, because a
+ * Save button for a single field is a button you forget to press.
+ */
+const skipSpeed = document.getElementById('skip-speed');
+if (skipSpeed) {
+  api.storage.local.get('skipSpeed')
+    .then((stored) => { if (typeof stored.skipSpeed === 'number') skipSpeed.value = stored.skipSpeed; })
+    .catch(() => {});
+
+  skipSpeed.addEventListener('change', () => {
+    const asked = parseFloat(skipSpeed.value);
+    if (!isFinite(asked)) return api.storage.local.remove('skipSpeed').catch(() => {});
+    const speed = Math.max(1.25, Math.min(8, asked));
+    skipSpeed.value = speed;
+    api.storage.local.set({ skipSpeed: speed }).catch(() => {});
+  });
+}
+
+// Which key it actually is, rather than the one it shipped as, since it can
+// be changed on the Keys page next door.
+const skipKey = document.getElementById('skip-key');
+if (skipKey) TorvalKeys.ready().then(() => { skipKey.textContent = TorvalKeys.label(TorvalKeys.get('skip')); });
