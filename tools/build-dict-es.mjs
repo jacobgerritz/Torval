@@ -25,7 +25,7 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/es/es_full.txt',
   out: 'data-es',
   // Bumping this makes the extension rebuild its Spanish database on next start.
-  version: 1,
+  version: 2,
   sourceNote: 'Wiktextract (kaikki.org), from English Wiktionary, CC BY-SA 4.0; ' +
     'word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT',
   stressIndex

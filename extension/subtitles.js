@@ -120,7 +120,19 @@ var TorvalSubtitles = (function () {
       captions: '.ytp-caption-window-container, .captions-text',
       // Where the words are inside that box, best first: see captionText for
       // why the box itself is not read.
-      lines: ['.ytp-caption-segment', '.caption-visual-line', '.captions-text'],
+      //
+      // .captions-text used to be the last of these, and it is the box, not
+      // a line in it: it holds the track's name and the way into the caption
+      // settings as well as the words, so on a video where neither of the
+      // two above matched, the line came out as "ItalianClick for settings
+      // Poi dagli studi…" and was recorded that way. There are no words in
+      // there that are not in a segment or a visual line, so there is
+      // nothing to be had by reading it and a whole cue to be lost.
+      lines: ['.ytp-caption-segment', '.caption-visual-line'],
+      // Anything in the caption box that is a control rather than words,
+      // left out of a line even when it sits inside one. See wordsIn.
+      furniture: 'button, a, [role="button"], [role="menu"], [role="menuitem"], ' +
+        '.ytp-button, .ytp-caption-menu, [class*="caption-window-title"]',
       player: '.html5-video-player',
       seek: null,           // moving the video element is enough here
       // Only ever called once every way of getting the file has failed and
@@ -136,6 +148,7 @@ var TorvalSubtitles = (function () {
       },
       captions: '.player-timedtext',
       lines: ['.player-timedtext-text-container span', '.player-timedtext-text-container'],
+      furniture: 'button, a, [role="button"]',
       player: '.watch-video--player-view, .watch-video, .VideoContainer',
       catches: true,
       // Netflix streams in pieces it chose in advance, and moving the
@@ -1420,10 +1433,38 @@ var TorvalSubtitles = (function () {
 
     var lines = [];
     for (var i = 0; i < parts.length; i++) {
-      var line = squash(parts[i].textContent);
+      var line = squash(wordsIn(parts[i]));
       if (line && line !== lines[lines.length - 1]) lines.push(line);
     }
     return lines.join(' ');
+  }
+
+  /**
+   * The words inside one element, leaving the player's own controls out.
+   *
+   * A caption segment is words and nothing else, so on the usual path this
+   * is textContent and no more. It matters on the fallback path, where what
+   * matched is a container rather than a segment and the player keeps its
+   * furniture in there beside the words: YouTube's caption window carries
+   * the name of the track and a way into the caption settings, and reading
+   * the container whole put "ItalianClick for settings" on the front of the
+   * line and then recorded it, so that one cue said it for the rest of the
+   * video however many times it was seen.
+   *
+   * Written as "which text nodes count" rather than "strip these strings",
+   * so it holds in any interface language and against whatever the player
+   * renames its classes to next.
+   */
+  function wordsIn(el) {
+    if (!site.furniture || !el.querySelector(site.furniture)) return el.textContent;
+    var out = '';
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+    for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+      var parent = node.parentElement;
+      if (parent && parent.closest(site.furniture)) continue;
+      out += node.nodeValue;
+    }
+    return out;
   }
 
   /**
@@ -1804,9 +1845,36 @@ var TorvalSubtitles = (function () {
     return cues.length;
   }
 
+  /**
+   * Is a transcript still on its way?
+   *
+   * Asked by the bar, which has a number to show and needs to know whether
+   * it is the final one. The video id is read fresh rather than trusting
+   * `videoId`: on a site that never reloads, the address changes a second
+   * or so before watch() next runs, and in that gap `state` is still
+   * 'ready' about the video that was playing a moment ago. A different id
+   * means nothing is known about what is playing now, whatever the last
+   * one's state was.
+   */
+  function waiting() {
+    if (!enabled || !site) return false;
+    var id;
+    try { id = site.id(); } catch (err) { return false; }
+    if (!id) return false;                                // not a watch page
+    if (id !== videoId) return true;                      // a video not looked at yet
+    // 'ready' is the whole transcript, in hand. 'unavailable' is a definite
+    // no, and a bar that went on saying "reading the subtitles" after it
+    // would be waiting for something that is never coming. Everything else
+    // is still on its way, right down to reading them off the screen, where
+    // the lines do arrive, just one at a time.
+    if (state === 'ready' || state === 'unavailable') return false;
+    return !cues.length;
+  }
+
   return {
     allText: allText,
     count: count,
+    waiting: waiting,
     enable: enable,
     cueAt: cueAt,
     cueFor: cueFor,

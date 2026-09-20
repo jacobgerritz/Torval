@@ -63,6 +63,16 @@
   color: #f4f5f7;
 }
 
+/*
+ * The article an Italian or Spanish noun is learned with, in front of the
+ * word and a shade quieter than it: "il cane" is the thing to learn, but
+ * "cane" is still the word being looked up. The gap comes from the article
+ * itself, which is written against the word when it elides (l’amico).
+ */
+.word .article {
+  color: #8f959e;
+}
+
 .reading {
   font-size: 13px;
   color: #93b4c6;

@@ -31,7 +31,9 @@ const DeinflectEs = require(join(ROOT, 'extension', 'deinflect-es.js'));
 const DeinflectIt = require(join(ROOT, 'extension', 'deinflect-it.js'));
 const LookupLatin = require(join(ROOT, 'extension', 'lookup-latin.js'));
 const Common = require(join(ROOT, 'extension', 'lookup-common.js'));
+const Article = require(join(ROOT, 'extension', 'article.js'));
 const { stressIndex: stressEs } = await import('./stress-es.mjs');
+const { genderOf } = await import('./wiktextract.mjs');
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
 if (!existsSync(join(DATA, 'meta.json'))) {
@@ -2617,6 +2619,76 @@ const run = async () => {
   } else {
     console.log('  (no Spanish dictionary built; skipping its lookup checks. ' +
       'Run: node tools/build-dict-es.mjs)');
+  }
+
+  // --- the article a noun is learned with -------------------------------
+  //
+  // forWord rather than forEntry: the entry-shaped wrapper only reads the
+  // gender and the stress off an entry and asks the active language, and
+  // the grammar, which is all there is to get wrong, is here.
+  const ARTICLES = [
+    // Italian, masculine: il unless the word opens on something il cannot
+    // be said in front of.
+    ['it', 'cane', 'm', false, null, 'il cane'],
+    ['it', 'studio', 'm', false, null, 'lo studio'],
+    ['it', 'sbaglio', 'm', false, null, 'lo sbaglio'],
+    ['it', 'sale', 'm', false, null, 'il sale'],          // s before a vowel is ordinary
+    ['it', 'zio', 'm', false, null, 'lo zio'],
+    ['it', 'gnocco', 'm', false, null, 'lo gnocco'],
+    ['it', 'psicologo', 'm', false, null, 'lo psicologo'],
+    ['it', 'yogurt', 'm', false, null, 'lo yogurt'],
+    ['it', 'iato', 'm', false, null, 'lo iato'],          // i before a vowel is a consonant
+    ['it', 'amico', 'm', false, null, 'l’amico'],
+    ['it', 'hotel', 'm', false, null, 'l’hotel'],         // the h is not there
+    // Italian, feminine and the plurals.
+    ['it', 'casa', 'f', false, null, 'la casa'],
+    ['it', 'ora', 'f', false, null, 'l’ora'],
+    ['it', 'iena', 'f', false, null, 'la iena'],
+    ['it', 'case', 'f', true, null, 'le case'],
+    ['it', 'cani', 'm', true, null, 'i cani'],
+    ['it', 'studi', 'm', true, null, 'gli studi'],
+    ['it', 'amici', 'm', true, null, 'gli amici'],
+    // Either gender, which is a fact about the word and so is written out.
+    ['it', 'turista', 'mf', false, null, 'il/la turista'],
+    ['it', 'insegnante', 'mf', false, null, 'l’insegnante'],
+    // Spanish, where the only wrinkle is the stressed a.
+    ['es', 'perro', 'm', false, 1, 'el perro'],
+    ['es', 'perros', 'm', true, 1, 'los perros'],
+    ['es', 'casa', 'f', false, 1, 'la casa'],
+    ['es', 'abeja', 'f', false, 1, 'la abeja'],           // an a, but not a stressed one
+    ['es', 'agua', 'f', false, 0, 'el agua'],
+    ['es', 'hacha', 'f', false, 1, 'el hacha'],           // the h does not count
+    ['es', 'área', 'f', false, 0, 'el área'],
+    ['es', 'aguas', 'f', true, 0, 'las aguas'],           // and the plural is las again
+    ['es', 'alma', 'f', false, null, 'la alma'],          // no stress known: the plain answer
+    // A language with no articles at all gets nothing put in front of it.
+    ['ja', '犬', 'm', false, null, '犬']
+  ];
+  for (const [code, word, gender, plural, stress, expected] of ARTICLES) {
+    const got = Article.join(Article.forWord(code, word, gender, plural, stress), word);
+    check('article: ' + expected, got === expected, 'got ' + got);
+  }
+  check('a word with no gender on it is left alone',
+    Article.join(Article.forWord('it', 'parlare', '', false, null), 'parlare') === 'parlare');
+
+  // The gender itself, as the dictionary build reads it off Wiktionary's
+  // headword template.
+  const GENDERS = [
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'm' } }] }, 'm', false],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'f' } }] }, 'f', false],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'mfbysense' } }] }, 'mf', false],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'm,f<q:rare>' } }] }, 'mf', false],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'm-p' } }] }, 'm', true],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'f-p' } }] }, 'f', true],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'it', 2: 'noun', g: 'm' } }] }, 'm', false],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'it', 2: 'noun form' } }] }, null, false],
+    [{ pos: 'noun', head_templates: [{ args: { 1: 'p' } }] }, null, false]
+  ];
+  for (const [row, gender, plural] of GENDERS) {
+    const got = genderOf(row);
+    check('gender: ' + JSON.stringify(row.head_templates[0].args) + ' -> ' + gender,
+      (got ? got.g : null) === gender && (got ? got.plural : false) === plural,
+      JSON.stringify(got));
   }
 
   // --- deinflector sanity ----------------------------------------------

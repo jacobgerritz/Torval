@@ -232,7 +232,7 @@ Four things can be put on a card:
 
 | | |
 |---|---|
-| **Target word** | the dictionary form, so 食べなかった files under 食べる |
+| **Target word** | the dictionary form, so 食べなかった files under 食べる. An Italian or Spanish noun comes with its article on it, *il cane*, *l’amico*, *el agua*: the gender is half of what there is to know about a noun, and the article is the way a speaker actually carries it around |
 | **Reading** | the kana |
 | **Sentence** | the whole sentence, with the word in bold. On a video this is the whole subtitle line, not the clause the word sits in: the line was written as one thing said, and half of it on a card is half of what was said |
 | **Definition** | every sense, numbered |
@@ -1154,6 +1154,11 @@ looks the same everywhere.
 **`extension/stress.js`**: the stress mark that stands in for them in
 Italian and Spanish. Where the stressed vowel is was decided at build time
 and is a number on the entry; this only puts it in bold.
+
+**`extension/article.js`**: the article an Italian or Spanish noun is
+learned with. The gender is a letter on the entry, put there by the build;
+which article that letter means is a small piece of each language's
+grammar, and it lives here.
 
 **`extension/subtitles.js`**: timing YouTube's subtitles, direct or off the screen.
 

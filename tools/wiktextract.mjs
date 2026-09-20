@@ -185,6 +185,17 @@ function toEntry(row, lang) {
   if (!senses.length) return null;
 
   const entry = { k: [row.word], r: [row.word], s: senses, f: 0, kv: 1 };
+  // A noun's gender, which is what puts the article on the card. Only
+  // common nouns: "il Roma" is not a thing anybody says, so a proper noun
+  // is left without one and article.js then has nothing to add. See
+  // extension/article.js.
+  if (row.pos === 'noun') {
+    const gender = genderOf(row);
+    if (gender) {
+      entry.g = gender.g;
+      if (gender.plural) entry.pl = 1;
+    }
+  }
   // A word that is made out of another word says so, even when it has a
   // meaning of its own. See builtFrom in content.js.
   const from = lemmaIn(row.senses || []);
@@ -192,6 +203,46 @@ function toEntry(row, lang) {
   const stress = lang.stressIndex(row);
   if (stress !== null) entry.st = stress;
   return entry;
+}
+
+/**
+ * A noun's gender and number, read off its headword template.
+ *
+ * Wiktionary writes the gender of an Italian or Spanish noun in the
+ * template that draws the bold headword line, and kaikki hands those
+ * arguments over untouched: {{it-noun|m}} for cane, {{it-noun|f}} for
+ * casa, m-p for a word that only exists in the plural (graffiti),
+ * mfbysense or m,f for one that is either depending on who it is about
+ * (il/la turista). Occasionally a qualifier rides along, "m,f<q:rare>",
+ * and is of no interest here.
+ *
+ * The senses carry the same fact in their tags, but far less cleanly: a
+ * row's tags pool every sense's, including the "feminine plural of ..."
+ * ones, so a masculine noun with a feminine plural form filed alongside it
+ * comes out looking like both. The template says it once and says it about
+ * the headword, which is the question being asked.
+ *
+ * Returns { g: 'm' | 'f' | 'mf', plural } or null when nothing says.
+ */
+export function genderOf(row) {
+  const template = (row.head_templates || [])[0];
+  const args = (template && template.args) || {};
+  // Some rows name the language and part of speech positionally instead
+  // ({{head|it|noun|g=m}}); then the gender, if there is one, is in g.
+  const raw = String(args['1'] || '').match(/^[mfnp?]/i) ? args['1'] : (args.g || '');
+  if (!raw) return null;
+
+  let masculine = false;
+  let feminine = false;
+  let plural = false;
+  for (const part of String(raw).replace(/<[^>]*>/g, '').split(',')) {
+    const bare = part.trim().replace(/-(p|s)$/i, (m) => { if (m === '-p') plural = true; return ''; });
+    if (/^(m|mf|mfbysense)$/i.test(bare)) masculine = true;
+    if (/^(f|mf|mfbysense)$/i.test(bare)) feminine = true;
+    if (/^p$/i.test(bare)) plural = true;
+  }
+  if (!masculine && !feminine) return null;
+  return { g: masculine && feminine ? 'mf' : (masculine ? 'm' : 'f'), plural };
 }
 
 /**

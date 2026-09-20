@@ -35,7 +35,7 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/it/it_full.txt',
   out: 'data-it',
   // Bumping this makes the extension rebuild its Italian database on next start.
-  version: 3,
+  version: 4,
   sourceNote: 'Wiktextract (kaikki.org), from English Wiktionary, CC BY-SA 4.0; ' +
     'word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT',
   stressIndex

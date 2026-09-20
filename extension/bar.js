@@ -89,6 +89,32 @@ var TorvalBar = (function () {
 
 
   /**
+   * Throw away the reading: this is a different page now.
+   *
+   * A site that never reloads keeps the bar it already had, and the number
+   * on it belonged to the last video. Opening a new one then showed that
+   * old number, confidently, for as long as the new transcript took to
+   * arrive, and `quiet` would put it straight back afterwards if the new
+   * page turned out to have nothing to say. Both are worse than saying
+   * nothing: a wrong percentage looks exactly like a right one.
+   *
+   * So the numbers go, and the bar says what it is doing instead until
+   * there is a real one to show.
+   */
+  function forget(what) {
+    data = null;
+    read = null;
+    // Only ever about a bar that is already up. With nothing on the page
+    // there is nothing stale to take down, and saying "reading this page"
+    // would put a handle in the corner of every page navigated to, which is
+    // the one thing busy() waits 400ms specifically to avoid doing.
+    if (!host) return;
+    els.score.textContent = '';
+    els.detail.textContent = '';
+    busy(what || 'Reading this page…');
+  }
+
+  /**
    * Say what Torval is busy doing, before there is any number to show.
    *
    * Building the dictionary takes a minute the first time and reading a page
@@ -539,6 +565,7 @@ var TorvalBar = (function () {
   return {
     show: show,
     busy: busy,
+    forget: forget,
     quiet: quiet,
     restate: restate,
     onRefresh: function (fn) { onRefresh = fn; },

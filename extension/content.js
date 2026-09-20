@@ -949,6 +949,21 @@
   // to be worth watching for constantly.
   let lastTranscript = '';
   let readingPage = false;
+  // How many subtitle lines had arrived when the transcript was last read,
+  // and when that was. -1 means nothing has been read for this video yet,
+  // which is what makes its first lines jump the throttle below.
+  let seenLines = -1;
+  let readLines = 0;
+
+  // What the bar says while a video's transcript is still on its way. Not
+  // "reading this page": the page is read, it is the video that is not.
+  const SUBTITLES_COMING = 'Reading the subtitles…';
+
+  /** Is there a transcript still to come, which would change the number? */
+  function waitingForSubtitles() {
+    return typeof TorvalSubtitles !== 'undefined' &&
+      typeof TorvalSubtitles.waiting === 'function' && TorvalSubtitles.waiting();
+  }
 
   async function watchComprehension() {
     if (typeof TorvalHighlight !== 'undefined') await TorvalHighlight.start();
@@ -967,18 +982,20 @@
     // Subtitles arrive well after the page does, and replace it as the thing
     // worth measuring the moment they do.
     if (typeof TorvalSubtitles !== 'undefined') {
-      let seen = -1;
-      let last = 0;
       setInterval(() => {
         const now = TorvalSubtitles.count();
-        if (!now || now === seen) return;
+        if (!now || now === seenLines) return;
         // Lines arrive one at a time, and a whole transcript takes real
         // work to read. Doing it again for every line kept the background
         // busy enough that hovering a subtitle waited half a second for an
         // answer, and moved the number by a fraction of a percent.
-        if (Date.now() - last < 20000) return;
-        seen = now;
-        last = Date.now();
+        // The first lines of a video Torval knows nothing about yet are
+        // worth reading at once: that is the number the bar is standing
+        // there saying it is working on. It is only the ones after it that
+        // can wait, see the note above.
+        if (seenLines >= 0 && Date.now() - readLines < 20000) return;
+        seenLines = now;
+        readLines = Date.now();
         readPage({ scoreOnly: true });
       }, 2000);
     }
@@ -1072,7 +1089,12 @@
       // Nothing to say about this page: no Japanese on it, or none that could
       // be read. Saying so is what stops an English page keeping a handle in
       // the corner that reads "still working on it" for ever.
-      if (!scored) TorvalBar.quiet();
+      //
+      // A video whose transcript has not arrived yet is the one case where
+      // there genuinely is something still to come, so it keeps saying so
+      // instead of falling silent and speaking up again seconds later.
+      if (!scored && waitingForSubtitles()) TorvalBar.busy(SUBTITLES_COMING);
+      else if (!scored) TorvalBar.quiet();
       readingPage = false;
       reading = false;
     }
@@ -1099,6 +1121,12 @@
       if (location.href === seen) return;
       seen = location.href;
       lastTranscript = '';
+      seenLines = -1;
+      // Straight away, before the wait below: whatever the bar was saying
+      // was about the video being left, and on a video the transcript takes
+      // seconds to arrive. Those seconds used to be spent showing the last
+      // video's percentage and word counts as though they were this one's.
+      TorvalBar.forget(waitingForSubtitles() ? SUBTITLES_COMING : undefined);
       // A moment for the new page to put something on the screen. Reading
       // the instant the address changes reads the page being left.
       setTimeout(readPage, 1200);
@@ -1416,6 +1444,18 @@
 
     const word = document.createElement('span');
     word.className = 'word';
+    // A noun's article, where the language has one. Inside the headword
+    // rather than beside it, so an elided article sits against the word the
+    // way it is written (l’amico) instead of a flex gap away from it, and
+    // so the stressed vowel below is still marked at its own index in the
+    // word rather than at a count of characters into the pair.
+    const article = typeof TorvalArticle !== 'undefined'
+      ? TorvalArticle.forEntry(entry, hit.word) : '';
+    if (article) {
+      word.appendChild(Object.assign(document.createElement('span'), {
+        className: 'article', textContent: TorvalArticle.join(article, '')
+      }));
+    }
     // Italian: mark the stressed vowel inline, built from safe DOM pieces
     // rather than the HTML string stress.js hands to Anki, so nothing
     // about the word text ever passes through innerHTML.
@@ -1426,7 +1466,8 @@
         hit.word.slice(hit.stress + 1)
       );
     } else {
-      word.textContent = hit.word;
+      // Appended, not assigned: the article above is already in there.
+      word.append(hit.word);
     }
     head.appendChild(word);
 
@@ -1449,7 +1490,10 @@
       // (and any video audio) even starts: a duplicate is not an error and
       // never stops the card being made, but it is worth knowing right away
       // rather than only once the recording has already finished.
-      warnIfDuplicate(el, hit.word);
+      // Asked about the word as the card will actually spell it, article and
+      // all, since that is what an existing card made by Torval says.
+      warnIfDuplicate(el, typeof TorvalArticle !== 'undefined'
+        ? TorvalArticle.withArticle(hit.word, entry) : hit.word);
       mine(add, el, {
         word: hit.word,
         reading: hit.reading || '',
@@ -1714,6 +1758,14 @@
     return line;
   }
 
+  /** The stressed-vowel field, with the article in front of it if there is one. */
+  function stressGraph(word, entry, article) {
+    if (typeof TorvalStress === 'undefined') return '';
+    const marked = TorvalStress.graphFor(word, entry);
+    if (!marked || !article) return marked;
+    return escapeHtml(TorvalArticle.join(article, '')) + marked;
+  }
+
   /**
    * A quick, non-blocking heads-up if this word is already in the collection.
    * Duplicates are allowed, one sentence can easily teach three words, and
@@ -1805,9 +1857,17 @@
     // characters into a longer line.
     const written = context ? markSentence(widen(context, chosenContext()), surface.length) : '';
 
+    // Italian and Spanish nouns go on the card with their article, "il cane"
+    // rather than "cane": the gender is half of what there is to know about
+    // a noun, and the article is how it is actually carried around. Nothing
+    // else gets one, see TorvalArticle.forEntry.
+    const article = typeof TorvalArticle !== 'undefined'
+      ? TorvalArticle.forEntry(entry, word) : '';
+    const headword = article ? TorvalArticle.join(article, word) : word;
+
     const note = {
       media,
-      word,
+      word: headword,
       reading,
       // The bold marks the word exactly as the page wrote it, inflection and
       // all, while the Target Word field carries the dictionary form.
@@ -1823,7 +1883,11 @@
       // the stress index lives right on the dictionary entry, which is
       // already in hand at this point and does not need a second trip.
       // Harmless no-op for Japanese entries, which never carry `st`.
-      stress: typeof TorvalStress !== 'undefined' ? TorvalStress.graphFor(word, entry) : ''
+      // The article comes along here too, so the two fields that name the
+      // word name the same thing; the bold still falls on the word's own
+      // vowel, since the article is put back in front afterwards rather
+      // than counted into the index.
+      stress: stressGraph(word, entry, article)
     };
 
     let reply;
