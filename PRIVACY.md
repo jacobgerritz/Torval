@@ -66,4 +66,4 @@ actually doing.
 
 ## Questions
 
-Open an issue at <https://github.com/jacobgerritz/torval>.
+Open an issue at <https://github.com/jacobgerritz/Torval/issues>.
