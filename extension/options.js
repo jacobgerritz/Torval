@@ -265,3 +265,141 @@ if (reader) {
     else window.open(url, '_blank');
   });
 }
+
+// ---------------------------------------------------------------------------
+// Keyboard shortcuts
+// ---------------------------------------------------------------------------
+
+/*
+ * Every key Torval answers to, listed from keys.js rather than written out
+ * again here. Click one and it listens for the next key you press.
+ *
+ * The one that is held rather than pressed is a dropdown of three instead
+ * of a key to press, because "hold Q to look a word up" is not a thing a
+ * keyboard can do: the browser reports a held letter as a stream of
+ * repeats, not as a state, and only the modifiers are reported as being
+ * down.
+ */
+const shortcutList = document.getElementById('shortcuts');
+const keysStatus = document.getElementById('keys-status');
+
+// Which row is waiting for a key, if any.
+let listening = null;
+
+function sayAboutKeys(message, bad) {
+  if (!keysStatus) return;
+  keysStatus.textContent = message;
+  keysStatus.className = bad ? 'error' : '';
+  if (!bad) setTimeout(() => { keysStatus.textContent = ''; }, 2000);
+}
+
+function drawShortcuts() {
+  if (!shortcutList) return;
+  stopListening();
+  shortcutList.textContent = '';
+
+  for (const action of TorvalKeys.all()) {
+    const row = document.createElement('div');
+    row.className = 'shortcut';
+
+    const words = document.createElement('span');
+    words.className = 'shortcut-what';
+    words.appendChild(Object.assign(document.createElement('b'), { textContent: action.label }));
+    words.appendChild(Object.assign(document.createElement('span'), {
+      className: 'hint', textContent: action.hint
+    }));
+    row.appendChild(words);
+
+    row.appendChild(action.hold ? heldChooser(action) : keyButton(action));
+    shortcutList.appendChild(row);
+  }
+}
+
+/** The held key is one of three, so it is a list rather than a listener. */
+function heldChooser(action) {
+  const select = document.createElement('select');
+  select.className = 'shortcut-key';
+  for (const choice of action.choices) {
+    const option = document.createElement('option');
+    option.value = choice;
+    option.textContent = choice;
+    if (choice === action.key) option.selected = true;
+    select.appendChild(option);
+  }
+  select.addEventListener('change', async () => {
+    const taken = TorvalKeys.clash(action.name, select.value);
+    if (taken) {
+      select.value = action.key;
+      return sayAboutKeys(select.value + ' is already ' + taken.toLowerCase() + '.', true);
+    }
+    await TorvalKeys.set(action.name, select.value);
+    drawShortcuts();
+    sayAboutKeys('Saved.');
+  });
+  return select;
+}
+
+function keyButton(action) {
+  const button = document.createElement('button');
+  button.className = 'shortcut-key' + (action.isDefault ? '' : ' changed');
+  button.textContent = TorvalKeys.label(action.key);
+  button.title = action.isDefault ? 'Click to change' : 'Changed from the default. Click to change';
+  button.addEventListener('click', () => {
+    if (listening && listening.button === button) return stopListening();
+    stopListening();
+    listening = { action, button };
+    button.textContent = 'press a key';
+    button.classList.add('listening');
+    sayAboutKeys('');
+  });
+  return button;
+}
+
+function stopListening() {
+  if (!listening) return;
+  const { action, button } = listening;
+  listening = null;
+  button.classList.remove('listening');
+  button.textContent = TorvalKeys.label(action.key);
+}
+
+/*
+ * Captured on the way down and taken away from the page, so that pressing
+ * a key to set it does not also do whatever that key does on this page.
+ */
+document.addEventListener('keydown', async (e) => {
+  if (!listening) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const { action } = listening;
+  if (e.key === 'Escape') return stopListening();
+
+  if (!TorvalKeys.usable(e.key, TorvalKeys.ACTIONS.find((a) => a.name === action.name))) {
+    stopListening();
+    return sayAboutKeys('That one cannot be a shortcut. Try a letter or a number.', true);
+  }
+
+  const taken = TorvalKeys.clash(action.name, e.key);
+  if (taken) {
+    stopListening();
+    return sayAboutKeys(TorvalKeys.label(e.key) + ' is already ' + taken.toLowerCase() + '.', true);
+  }
+
+  await TorvalKeys.set(action.name, e.key);
+  drawShortcuts();
+  sayAboutKeys('Saved.');
+}, true);
+
+const resetKeys = document.getElementById('reset-keys');
+if (resetKeys) {
+  resetKeys.addEventListener('click', async () => {
+    await TorvalKeys.reset();
+    drawShortcuts();
+    sayAboutKeys('Back to the defaults.');
+  });
+}
+
+// Drawn once storage has answered, so the page never shows a default for a
+// moment and then replaces it with what was actually saved.
+if (shortcutList) TorvalKeys.ready().then(drawShortcuts);

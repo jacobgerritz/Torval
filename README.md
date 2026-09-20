@@ -113,6 +113,13 @@ that actually reaches it.
 | **✓** | mark as known, or unmark it |
 | **⊘** | ignore, or stop ignoring |
 
+Every key in that table can be changed, under **Keys** in the settings:
+click the key you want to change and press the one you want instead. The
+page also says which of them you have changed, and has a button to put all
+of them back. Torval lives on top of somebody else's page, and B is bold in
+every editor there is, so a shortcut that cannot be moved is one that
+eventually makes a page unusable.
+
 **B** looks the word up in Anki itself: it opens the card browser searching for
 that word, in every deck and every field, and brings Anki to the front. It acts
 on what you have selected if you have selected something, otherwise on whatever

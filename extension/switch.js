@@ -7,10 +7,11 @@
  * open follow along without being reloaded.
  *
  * This is also the first thing anybody sees, so it is where a language gets
- * picked, before anything else: on a fresh install nothing but the language
- * row shows, and the ordinary switch only appears once one is chosen. After
- * that the language row stays, always changeable, above the switch rather
- * than buried in the settings page.
+ * picked, before anything else. The switch itself is always there, language
+ * or no language: the likeliest reason to open this panel on a fresh
+ * install is to put Torval down again. What waits for a language is the two
+ * doors below it, since neither the settings nor the reader has anything to
+ * say until there is one.
  */
 
 'use strict';
@@ -20,7 +21,7 @@
 
   const box = document.getElementById('on');
   const state = document.getElementById('state');
-  const main = document.getElementById('main');
+  const doors = document.getElementById('doors');
   const pickHint = document.getElementById('pick-hint');
   const languageSelect = document.getElementById('language');
 
@@ -44,7 +45,10 @@
 
   async function paintLanguage() {
     const chosen = await TorvalLang.chosen();
-    main.hidden = !chosen;
+    // The switch is always there; only the two doors wait for a language,
+    // since neither settings nor the reader has anything to say until there
+    // is one.
+    doors.hidden = !chosen;
     pickHint.hidden = chosen;
     if (chosen) languageSelect.value = TorvalLang.active();
   }

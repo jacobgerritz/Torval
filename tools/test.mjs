@@ -32,6 +32,7 @@ const DeinflectIt = require(join(ROOT, 'extension', 'deinflect-it.js'));
 const LookupLatin = require(join(ROOT, 'extension', 'lookup-latin.js'));
 const Common = require(join(ROOT, 'extension', 'lookup-common.js'));
 const Article = require(join(ROOT, 'extension', 'article.js'));
+const Keys = require(join(ROOT, 'extension', 'keys.js'));
 const { stressIndex: stressEs } = await import('./stress-es.mjs');
 const { genderOf } = await import('./wiktextract.mjs');
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
@@ -2738,6 +2739,40 @@ const run = async () => {
       (got ? got.g : null) === gender && (got ? got.plural : false) === plural,
       JSON.stringify(got));
   }
+
+  // --- the keys ---------------------------------------------------------
+  Keys._setAll({});
+  check('a key nobody has changed is its default',
+    Keys.get('known') === '2' && Keys.get('back') === 'a');
+  check('a letter matches whether or not shift is down',
+    Keys.matches('browse', { key: 'b' }) && Keys.matches('browse', { key: 'B' }));
+  check('and a named key is matched exactly',
+    Keys.matches('lookup', { key: 'Shift' }) && !Keys.matches('lookup', { key: 'shift' }));
+  check('a key already doing something else is reported',
+    Keys.clash('browse', '2') === 'Mark as known' && Keys.clash('browse', 'q') === null);
+  check('and a key is never said to clash with itself',
+    Keys.clash('browse', 'b') === null);
+
+  Keys._setAll({ browse: 'q' });
+  check('a changed key is the one that answers',
+    Keys.matches('browse', { key: 'q' }) && !Keys.matches('browse', { key: 'b' }));
+  check('everything else still has its default',
+    Keys.get('known') === '2');
+  check('and the settings page can see which one was changed',
+    Keys.all().filter((a) => !a.isDefault).map((a) => a.name).join() === 'browse');
+  Keys._setAll({});
+
+  // Escape closes the popup on every page there is and is not Torval's to
+  // hand out; Tab and Enter would take the settings page's own keyboard
+  // away from it.
+  check('the keys a page needs for itself are refused',
+    !Keys.usable('Escape', { name: 'browse' }) && !Keys.usable('Tab', { name: 'browse' }) &&
+    !Keys.usable('Enter', { name: 'browse' }));
+  check('an ordinary letter or digit is allowed',
+    Keys.usable('q', { name: 'browse' }) && Keys.usable('7', { name: 'browse' }));
+  check('the held key is one of three and nothing else',
+    Keys.usable('Alt', { name: 'lookup', hold: true, choices: ['Shift', 'Alt', 'Control'] }) &&
+    !Keys.usable('q', { name: 'lookup', hold: true, choices: ['Shift', 'Alt', 'Control'] }));
 
   // --- deinflector sanity ----------------------------------------------
   check('deinflect returns the untouched word first',

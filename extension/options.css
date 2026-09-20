@@ -442,3 +442,57 @@ input[type="file"]:focus-visible ~ .pick,
 
 /* The last card on a page has nothing under it to be spaced from. */
 .panel section:last-child { margin-bottom: 0; }
+
+/*
+ * One shortcut to a row: what it does on the left, the key on the right.
+ * The key is the same width whether it says B or Control, so the column
+ * stays a column and the eye can run down it.
+ */
+.shortcut {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line, #24262b);
+}
+
+.shortcut:last-child { border-bottom: 0; }
+
+.shortcut-what {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcut-what .hint {
+  font-size: 13px;
+  color: var(--ink-faint, #767b84);
+}
+
+.shortcut-key {
+  flex: 0 0 auto;
+  min-width: 108px;
+  padding: 7px 12px;
+  background: #1c1e22;
+  color: #e7e8ea;
+  border: 1px solid #2a2d33;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+button.shortcut-key:hover { background: #24272c; }
+
+/* Waiting for you to press something. Amber, the same as everywhere else
+   in Torval that means "in the middle of doing a thing". */
+button.shortcut-key.listening {
+  border-color: #4a4034;
+  color: #c7ab72;
+}
+
+/* Not the default any more, which is worth being able to see at a glance
+   when a key has stopped working and you are wondering what you changed. */
+button.shortcut-key.changed { border-color: #3d4149; }

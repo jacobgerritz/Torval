@@ -84,6 +84,7 @@
         "spanish.js",
         "spanish-scan.js",
         "lang.js",
+        "keys.js",
         "stress.js",
         "article.js",
         "lookup-common.js",

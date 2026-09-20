@@ -12,6 +12,7 @@
     </label>
     <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="anki">Anki</button>
+    <button class="tab" data-panel="keys">Keys</button>
     <button class="tab" data-panel="about">About</button>
     <span class="sidebar-spacer"></span>
     <button id="open-reader" class="sidebar-action">Open your books</button>
@@ -143,6 +144,31 @@
   <!-- ------------------------------------------------------------------ -->
 
   <!--
+    Every key Torval answers to, and what it is set to now. The list is
+    drawn from the one table in keys.js rather than written out here, so a
+    key that is added, removed or renamed cannot end up described one way
+    in the code and another way on this page.
+  -->
+  <div class="panel" id="panel-keys" hidden>
+    <section>
+      <h2>Keyboard shortcuts</h2>
+      <p class="note">
+        Click a key to change it, then press the one you want. Escape leaves
+        it as it was. A key already doing something else is refused rather
+        than quietly taking it over.
+      </p>
+      <div id="shortcuts"></div>
+    </section>
+
+    <p class="actions">
+      <button id="reset-keys">Reset to defaults</button>
+      <span id="keys-status" role="status"></span>
+    </p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <!--
     Where the words come from. This is not decoration: the dictionaries are
     other people's work, shared on terms that ask to be named, and a copy of
     Torval handed to anybody else carries that obligation with it. It is a
@@ -205,6 +231,7 @@
 <script src="spanish.js"></script>
 <script src="spanish-scan.js"></script>
 <script src="lang.js"></script>
+<script src="keys.js"></script>
 <script src="anki.js"></script>
 <script src="options.js"></script>
 <script src="known.js"></script>

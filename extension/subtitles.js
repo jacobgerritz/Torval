@@ -53,6 +53,9 @@
 if (typeof TorvalJapanese === 'undefined' && typeof require !== 'undefined') {
   var TorvalJapanese = require('./japanese.js');
 }
+if (typeof TorvalKeys === 'undefined' && typeof require !== 'undefined') {
+  var TorvalKeys = require('./keys.js');
+}
 
 var TorvalSubtitles = (function () {
   'use strict';
@@ -361,12 +364,12 @@ var TorvalSubtitles = (function () {
     if (focused && (focused.isContentEditable ||
       /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName))) return;
 
-    var key = (e.key || '').toLowerCase();
-    if (key !== 'a' && key !== 'd') return;
+    var back = TorvalKeys.matches('back', e);
+    if (!back && !TorvalKeys.matches('forward', e)) return;
 
     e.preventDefault();
     e.stopPropagation();
-    jump(key === 'a' ? -1 : 1);
+    jump(back ? -1 : 1);
   }
 
   function jump(direction) {

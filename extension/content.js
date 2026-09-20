@@ -189,11 +189,11 @@
       hide();
       return;
     }
-    if (e.key === '1' && markHover(e, 'unknown')) return;
-    if (e.key === '2' && markHover(e, 'known')) return;
-    if (e.key === '3' && markHover(e, 'ignored')) return;
-    if ((e.key === 'b' || e.key === 'B') && browseInAnki(e)) return;
-    if (e.key !== 'Shift' || shiftDown || !isCurrent()) return;
+    if (TorvalKeys.matches('unknown', e) && markHover(e, 'unknown')) return;
+    if (TorvalKeys.matches('known', e) && markHover(e, 'known')) return;
+    if (TorvalKeys.matches('ignored', e) && markHover(e, 'ignored')) return;
+    if (TorvalKeys.matches('browse', e) && browseInAnki(e)) return;
+    if (!TorvalKeys.matches('lookup', e) || shiftDown || !isCurrent()) return;
     shiftDown = true;
 
     // A selection plus Shift looks up the selection; otherwise use the cursor.
@@ -202,7 +202,9 @@
     else scheduleScan();
   }, true);
 
-  window.addEventListener('keyup', (e) => { if (e.key === 'Shift') shiftDown = false; }, true);
+  window.addEventListener('keyup', (e) => {
+    if (TorvalKeys.matches('lookup', e)) shiftDown = false;
+  }, true);
   window.addEventListener('blur', () => { shiftDown = false; });
 
   /**

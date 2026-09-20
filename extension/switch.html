@@ -10,18 +10,23 @@
   </select>
 </label>
 
-<div id="main" hidden>
-  <label class="switch">
-    <input type="checkbox" id="on" checked>
-    <span class="track"><span class="knob"></span></span>
-    <span class="state" id="state">On</span>
-  </label>
+<!--
+  The switch is outside the part that waits for a language. Turning Torval
+  off is not a thing you do to a language, it is a thing you do to Torval,
+  and having to pick a language before you were allowed to switch it off
+  was backwards: the likeliest reason to open this panel on a fresh
+  install is that the add-on is in the way of the page underneath.
+-->
+<label class="switch">
+  <input type="checkbox" id="on" checked>
+  <span class="track"><span class="knob"></span></span>
+  <span class="state" id="state">On</span>
+</label>
 
-  <nav>
-    <button id="settings">Settings</button>
-    <button id="books">Books</button>
-  </nav>
-</div>
+<nav id="doors" hidden>
+  <button id="settings">Settings</button>
+  <button id="books">Books</button>
+</nav>
 
 <p class="note" id="pick-hint">Pick a language above to get started.</p>
 
