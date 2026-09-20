@@ -35,7 +35,7 @@ Both stores take the same text. Chrome renders no formatting; Firefox takes
 a little HTML. This is written to read correctly as plain text.
 
 > Torval is a pop-up dictionary for Japanese, Italian and Spanish. Hold
-> Shift, hover a word, and it tells you what the word means — handling
+> Shift, hover a word, and it tells you what the word means, handling
 > conjugation and inflection on the way, so 食べなかった finds 食べる and
 > hablábamos finds hablar.
 >
@@ -81,7 +81,7 @@ a little HTML. This is written to read correctly as plain text.
 Everything the add-on does is part of that one job: the lookup itself, the
 count of how much of a page is made of words you know, the subtitle timing
 that makes a line on a video into text you can look up, and sending a word
-to Anki. Keep this sentence handy — a reviewer who cannot find the single
+to Anki. Keep this sentence handy. A reviewer who cannot find the single
 purpose is the most common reason an education extension is bounced.
 
 ---
@@ -100,7 +100,7 @@ justification from a claim into something checkable.
 > anywhere.
 
 **`unlimitedStorage`**
-> The dictionaries are large — around 120 MB across three languages once
+> The dictionaries are large, around 120 MB across three languages once
 > imported into IndexedDB. Without this, the import is refused partway
 > through on most profiles.
 
@@ -136,11 +136,11 @@ justification from a claim into something checkable.
 
 **Host permission: `<all_urls>` (content scripts)**
 > Reading the text of the page is the entire program. Torval has to be
-> present on whatever page the user is reading — a news article, a blog, a
-> forum, a video — to see the word under the cursor and draw the popup. It
-> reads the page locally and sends nothing from it anywhere. There is no
-> list of sites that would work, because the whole point is that it works
-> on the page the learner happens to be on.
+> present on whatever page the user is reading, whether a news article, a
+> blog, a forum or a video, to see the word under the cursor and draw the
+> popup. It reads the page locally and sends nothing from it anywhere.
+> There is no list of sites that would work, because the whole point is
+> that it works on the page the learner happens to be on.
 
 **Host permission: `http://127.0.0.1:8765/*` and `http://localhost:8765/*`**
 > AnkiConnect, the add-on that lets Anki accept a card from outside,
@@ -215,7 +215,7 @@ looks like obfuscation if it is not explained. Say this:
 
 ## Before you press submit
 
-- [ ] Screenshots. Both stores want real captures, not mockups — the site's
+- [ ] Screenshots. Both stores want real captures, not mockups. The site's
       drawn popup will not do. Five is plenty: the popup over a real page,
       the comprehension bar on a YouTube video, a subtitle line with the
       popup open over it, the Anki field mapping, the known-words page.
