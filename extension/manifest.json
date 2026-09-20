@@ -122,6 +122,7 @@
     "http://127.0.0.1:8765/*",
     "http://localhost:8765/*",
     "https://assets.languagepod101.com/*",
+    "https://upload.wikimedia.org/*",
     "https://www.youtube.com/*",
     "*://*.netflix.com/*"
   ],

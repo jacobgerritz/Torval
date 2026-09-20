@@ -23,6 +23,7 @@ import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureAudio } from './build-audio.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CHUNK_BYTES = 4 * 1024 * 1024;
@@ -33,11 +34,21 @@ const CHUNK_BYTES = 4 * 1024 * 1024;
 // rest exist purely for display, added to content.js's LABELS dict the same
 // way JMdict's codes are. Anything not listed here (punctuation, symbols,
 // interfixes, and the like) is not a word Torval has any use for.
+//
+// 'contraction' is here because leaving it out was a real hole rather than
+// a tidy omission. It is what Wiktionary files nella, nel, della, del, al,
+// dal, sul and col under, which is to say most of the commonest words in
+// Italian: an article welded to the preposition in front of it. Hovering
+// any of them got nothing at all, and the few that did answer answered
+// wrongly, because the only thing left in the index under "nei" was the
+// plural of neo, under "dei" the plural of dio, and under "agli" the plural
+// of aglio.
 const POS_MAP = {
   verb: 'v', noun: 'n', 'proper noun': 'n', name: 'n', adj: 'adj',
   adv: 'adv', prep: 'prep', conj: 'conj', intj: 'intj', pron: 'pron',
   num: 'num', article: 'art', particle: 'prt', prefix: 'pref', suffix: 'suf',
-  abbrev: 'abbr'
+  abbrev: 'abbr', contraction: 'contr', det: 'det',
+  phrase: 'phrase', prep_phrase: 'phrase'
 };
 
 // How many entries one inflected form may point at. A form like Italian
@@ -58,6 +69,12 @@ export async function build(lang) {
   const frequency = loadFrequency(FREQ_FILE);
   console.log(`  ${frequency.size} frequency ranks`);
 
+  // Which words somebody has read aloud onto Wikimedia Commons. See
+  // build-audio.mjs; an empty map here simply means no card gets a
+  // recording, which is what Japanese does for a word JapanesePod101 has
+  // never heard of.
+  const recordings = await ensureAudio(ROOT, lang);
+
   console.log('Reading', SOURCE);
   const entries = [];
   const index = new Map();     // term -> [entry ids]
@@ -74,7 +91,7 @@ export async function build(lang) {
     if (!line) continue;
     let row;
     try { row = JSON.parse(line); } catch { continue; }
-    const entry = toEntry(row, lang);
+    const entry = toEntry(row, lang, recordings);
     if (!entry) {
       const target = aliasOf(row, lang);
       if (target && target !== row.word) aliases.push([row.word, target]);
@@ -162,16 +179,23 @@ export async function build(lang) {
  * (form_of/alt_of, the equivalent of JMdict simply not listing conjugated
  * forms as their own entries), or a part of speech Torval has no use for.
  */
-function toEntry(row, lang) {
+function toEntry(row, lang, recordings) {
   if (row.lang_code !== lang.code || !row.word) return null;
   const pos = POS_MAP[row.pos];
   if (!pos) return null;
 
+  // A contraction is the one part of speech whose whole definition is a
+  // pointer at something else. "contraction of in la; in the" is not a
+  // cross-reference standing in for a definition, it is the definition, and
+  // dropping it the way an inflected form is dropped is what left nella,
+  // nel, della and the rest out of the dictionary entirely.
+  const defining = row.pos === 'contraction';
+
   const senses = [];
   for (const sense of row.senses || []) {
-    if (sense.form_of || sense.alt_of) continue;
+    if (!defining && (sense.form_of || sense.alt_of)) continue;
     const tags = sense.tags || [];
-    if (tags.includes('form-of') || tags.includes('alt-of')) continue;
+    if (!defining && (tags.includes('form-of') || tags.includes('alt-of'))) continue;
     // "compound of the infinitive capire with ne" is not what capirne means,
     // it is where capirne came from. Left in, it is an entry that outranks
     // the verb it is made of, because it matches the surface form exactly
@@ -198,10 +222,24 @@ function toEntry(row, lang) {
   }
   // A word that is made out of another word says so, even when it has a
   // meaning of its own. See builtFrom in content.js.
+  //
+  // A contraction points at the preposition rather than at the whole of
+  // what it contracts: nella is filed under "in la", which is two words and
+  // so never an entry, while "in" is one and is exactly the page somebody
+  // reading nella would want next.
   const from = lemmaIn(row.senses || []);
-  if (from && from !== row.word) entry.b = from;
+  if (from) {
+    const lemma = defining ? from.split(' ')[0] : from;
+    if (lemma && lemma !== row.word) entry.b = lemma;
+  }
   const stress = lang.stressIndex(row);
   if (stress !== null) entry.st = stress;
+  // Where to find somebody saying this word, as the two hex characters of
+  // the Commons shard and the name of whoever recorded it. The rest of the
+  // address is this word plus two per-language constants, so it is rebuilt
+  // rather than stored: see voiceUrl in anki.js.
+  const said = recordings.get(row.word);
+  if (said) entry.a = said;
   return entry;
 }
 

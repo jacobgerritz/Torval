@@ -30,6 +30,15 @@ var TorvalAnki = (function () {
   // back. Anything matching is thrown away and the audio field left empty, 
   // better than a collection full of identical "no audio" clips.
   var AUDIO_URL = 'https://assets.languagepod101.com/dictionary/japanese/audiomp3.php';
+
+  // Italian and Spanish have no such endpoint, so their recordings are
+  // found at build time instead and the entry carries the answer: see
+  // build-audio.mjs. What it carries is the two hex characters of the
+  // Commons shard and whoever did the recording, because the rest of the
+  // address is the word itself and two constants off the language profile,
+  // and 27,000 entries do not need to each store the same 200-character
+  // URL with one word changed.
+  var COMMONS = 'https://upload.wikimedia.org/wikipedia/commons/transcoded/';
   var NO_AUDIO_SHA256 = 'ae6398b5a27bc8c0a771df6c907ade794be15518174773c58c7c7ddd17098906';
   // Only to catch empty or truncated replies. Real recordings get small, 犬 is
   // about 1.6 KB, so this has to stay well clear of them; the hash does the
@@ -121,12 +130,46 @@ var TorvalAnki = (function () {
   }
 
   /**
+   * The address of a Lingua Libre recording, rebuilt from the little the
+   * entry stores. Commons files the word under the MD5 of its own name, and
+   * the mp3 is a transcode sitting beside the original wav, at a quarter of
+   * its size. Null when this language has no such recordings or this word
+   * has none.
+   */
+  function voiceUrl(word, said) {
+    if (!word || !said) return null;
+    var profile = typeof TorvalLang !== 'undefined' ? TorvalLang.profile() : null;
+    var voice = profile && profile.voice;
+    if (!voice) return null;
+    var cut = said.indexOf('|');
+    if (cut === -1) return null;
+    var shard = said.slice(0, cut);
+    var speaker = said.slice(cut + 1);
+    var name = 'LL-' + voice.qid + ' (' + voice.iso + ')-' + speaker + '-' + word + '.wav';
+    var file = encodeURIComponent(name.replace(/ /g, '_'));
+    return COMMONS + shard.charAt(0) + '/' + shard + '/' + file + '/' + file + '.mp3';
+  }
+
+  /**
    * Fetch a word's pronunciation, or null if there isn't one.
    * Returns the mp3 as base64, which is what AnkiConnect wants.
+   *
+   * Two sources, and which one is used is the language's business rather
+   * than this function's. Japanese asks JapanesePod101, which answers for
+   * any word and has to be caught out when it is bluffing. Italian and
+   * Spanish already know the answer, because `said` came off the dictionary
+   * entry, so a word with no recording never makes a request at all.
    */
-  async function fetchAudio(word, reading) {
-    var url = AUDIO_URL + '?kanji=' + encodeURIComponent(word) +
-      '&kana=' + encodeURIComponent(reading || word);
+  async function fetchAudio(word, reading, said) {
+    var voice = voiceUrl(word, said);
+    if (typeof TorvalLang !== 'undefined') {
+      var profile = TorvalLang.profile();
+      // A language with recordings of its own never falls through to
+      // JapanesePod101, which would answer in Japanese about an Italian word.
+      if (profile && profile.voice && !voice) return null;
+    }
+    var url = voice || (AUDIO_URL + '?kanji=' + encodeURIComponent(word) +
+      '&kana=' + encodeURIComponent(reading || word));
     var buffer;
     var limit = deadline(AUDIO_SECONDS);
     try {
@@ -142,7 +185,9 @@ var TorvalAnki = (function () {
       limit.done();
     }
     if (buffer.byteLength < MIN_AUDIO_BYTES) return null;
-    if (await sha256(buffer) === NO_AUDIO_SHA256) return null;
+    // Only JapanesePod101 needs catching out; Commons either has the file
+    // or answers 404, which the !res.ok above has already turned into null.
+    if (!voice && await sha256(buffer) === NO_AUDIO_SHA256) return null;
     return toBase64(buffer);
   }
 
@@ -230,10 +275,14 @@ var TorvalAnki = (function () {
     // Not offered outside Japanese, but a mapping saved before that was true
     // would still ask, and the answer would be one more copy of the
     // "unavailable" clip. See the note on `audio` in lang.js.
+    // `voice` rather than `word`, because by here `word` may have gathered
+    // an article ("il cane"), and nobody recorded that. It is the bare
+    // dictionary form that was matched against Commons at build time.
     if (wants(config, 'audio') && note.word && hasAudio()) {
-      var data = await fetchAudio(note.word, note.reading);
+      var spoken = (note.voice && note.voice.word) || note.word;
+      var data = await fetchAudio(spoken, note.reading, note.voice && note.voice.at);
       if (data) {
-        var filename = audioFilename(note.word, note.reading);
+        var filename = audioFilename(spoken, note.reading);
         await invoke(config.url, 'storeMediaFile', { filename: filename, data: data });
         note = Object.assign({}, note, { audio: '[sound:' + filename + ']' });
       }
@@ -356,6 +405,7 @@ var TorvalAnki = (function () {
     checkReady: checkReady,
     alreadyHave: alreadyHave,
     fetchAudio: fetchAudio,
+    voiceUrl: voiceUrl,
     browse: browse,
     // Exposed so the tests can watch a deadline pass without waiting for one.
     _deadlines: function (anki, audio) { ANKI_SECONDS = anki; AUDIO_SECONDS = audio; },

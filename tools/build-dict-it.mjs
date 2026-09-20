@@ -35,7 +35,11 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/it/it_full.txt',
   out: 'data-it',
   // Bumping this makes the extension rebuild its Italian database on next start.
-  version: 4,
+  version: 5,
+  // Where recorded pronunciations come from. The category is walked
+  // once at build time; the id and ISO code are the two constants a
+  // Lingua Libre filename is built from. See build-audio.mjs.
+  voice: { category: 'Lingua Libre pronunciation-ita', qid: 'Q652', iso: 'ita' },
   sourceNote: 'Wiktextract (kaikki.org), from English Wiktionary, CC BY-SA 4.0; ' +
     'word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT',
   stressIndex

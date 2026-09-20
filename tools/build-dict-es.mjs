@@ -25,7 +25,11 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/es/es_full.txt',
   out: 'data-es',
   // Bumping this makes the extension rebuild its Spanish database on next start.
-  version: 2,
+  version: 3,
+  // Where recorded pronunciations come from. The category is walked
+  // once at build time; the id and ISO code are the two constants a
+  // Lingua Libre filename is built from. See build-audio.mjs.
+  voice: { category: 'Lingua Libre pronunciation-spa', qid: 'Q1321', iso: 'spa' },
   sourceNote: 'Wiktextract (kaikki.org), from English Wiktionary, CC BY-SA 4.0; ' +
     'word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT',
   stressIndex

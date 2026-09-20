@@ -81,7 +81,8 @@
     // Italian parts of speech (n, adv, prt, pref, suf, num and abbr above
     // are shared with JMdict's own codes and need no separate entry)
     v: 'verb', adj: 'adjective', prep: 'preposition', intj: 'interjection',
-    pron: 'pronoun', art: 'article',
+    pron: 'pronoun', art: 'article', contr: 'contraction', det: 'determiner',
+    phrase: 'phrase',
     // usage
     uk: 'usually kana', abbr: 'abbreviation', col: 'colloquial', sl: 'slang',
     arch: 'archaic', obs: 'obsolete', rare: 'rare', dated: 'dated', hist: 'historical',
@@ -1931,7 +1932,12 @@
       // word name the same thing; the bold still falls on the word's own
       // vowel, since the article is put back in front afterwards rather
       // than counted into the index.
-      stress: stressGraph(word, entry, article)
+      stress: stressGraph(word, entry, article),
+      // Who said this word and where Commons keeps it, for the languages
+      // whose recordings are known in advance. The bare dictionary form
+      // travels with it because `word` above may have grown an article,
+      // and it is "cane" that somebody recorded, not "il cane".
+      voice: entry.a ? { word: word, at: entry.a } : null
     };
 
     let reply;

@@ -220,11 +220,11 @@ TorvalLang.register({
   // that shows a pitch diagram; the others mark the stressed vowel instead.
   // The Anki settings page offers whichever of the two this is.
   accent: 'pitch',
-  // A card can carry a recording of the word. The one source Torval has for
-  // that, JapanesePod101's dictionary, only has Japanese in it, so this is
-  // the only language where the option means anything; see fetchAudio in
-  // anki.js. Offered anywhere else, it is a checkbox that silently does
-  // nothing and a request to a service that has nothing to answer with.
+  // A card can carry a recording of the word. Japanese gets its from
+  // JapanesePod101, which will answer about any Japanese word and has to be
+  // caught out when it has nothing; the other two carry the answer on the
+  // dictionary entry instead and so never ask in vain. See fetchAudio in
+  // anki.js.
   audio: true,
   // Named in the error when the built data is missing.
   build: 'node tools/build-dict.mjs',
@@ -260,6 +260,13 @@ TorvalLang.register({
   lookup: lazy('TorvalLookupLatin'),
   deinflector: lazy('TorvalDeinflectIt'),
   accent: 'stress',
+  audio: true,
+  // Recordings come from Lingua Libre, by way of Wikimedia Commons: real
+  // people reading their own language a word at a time, CC BY-SA. Which
+  // words have one is settled at build time and stored on the entry; these
+  // two constants are the rest of what a Commons filename is made of. See
+  // tools/build-audio.mjs and voiceUrl in anki.js.
+  voice: { qid: 'Q652', iso: 'ita' },
   build: 'node tools/build-dict-it.mjs',
   dbSuffix: '-it',
   dataPath: 'data-it',
@@ -301,6 +308,13 @@ TorvalLang.register({
   lookup: lazy('TorvalLookupLatin'),
   deinflector: lazy('TorvalDeinflectEs'),
   accent: 'stress',
+  audio: true,
+  // Recordings come from Lingua Libre, by way of Wikimedia Commons: real
+  // people reading their own language a word at a time, CC BY-SA. Which
+  // words have one is settled at build time and stored on the entry; these
+  // two constants are the rest of what a Commons filename is made of. See
+  // tools/build-audio.mjs and voiceUrl in anki.js.
+  voice: { qid: 'Q1321', iso: 'spa' },
   build: 'node tools/build-dict-es.mjs',
   dbSuffix: '-es',
   dataPath: 'data-es',

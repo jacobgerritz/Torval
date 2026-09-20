@@ -251,11 +251,23 @@ Four things can be put on a card:
 | **Sentence after** | and what was said just after |
 | **Sentence audio** | the subtitle line, spoken. **Audio lead-in** in the settings says roughly how much sound to keep from before the line, a tenth of a second by default, so the first word is not clipped by a subtitle that appears exactly as it is said. Roughly, because a recorder swallows an unpredictable moment when it starts, measured at anything from 0.05 to 0.4 seconds, so Torval starts it early and lets it |
 
-Audio comes from JapanesePod101's dictionary. It answers every request with an
-mp3 and a 200 even when it has nothing, handing back a fixed "audio unavailable"
-recording instead, so Torval hashes what comes back and discards that one, leaving
-the field empty rather than filling your collection with identical clips. Anki
-downloads and stores nothing itself; Torval passes it the file.
+Japanese audio comes from JapanesePod101's dictionary. It answers every request
+with an mp3 and a 200 even when it has nothing, handing back a fixed "audio
+unavailable" recording instead, so Torval hashes what comes back and discards
+that one, leaving the field empty rather than filling your collection with
+identical clips.
+
+Italian and Spanish audio comes from **Lingua Libre**, a Wikimedia project where
+volunteers read their own language a word at a time, hosted on Wikimedia Commons
+under CC BY-SA. There is no endpoint to ask, so the question is answered while
+the dictionary is built: `tools/build-audio.mjs` walks the category, reads the
+word out of each filename, and the entry ends up carrying who recorded it and
+where Commons keeps it. A word with no recording therefore makes no request at
+all, and the field is simply left empty. About 10,400 Italian words and 17,100
+Spanish ones have one, weighted towards common vocabulary: a little over half
+the thousand commonest Italian words, three quarters of the Spanish.
+
+Anki downloads and stores nothing itself; Torval passes it the file.
 
 Pitch accents come from **Kanjium**, which derives from the NHK accent
 dictionary and 大辞林, the same data Yomitan and AJT Pitch Accent use. A word's

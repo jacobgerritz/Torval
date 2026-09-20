@@ -43,8 +43,14 @@ only while you are on it.
 you press **+** on a word or open the Anki settings. This is Anki running on
 your computer; it is not on the network.
 
-**assets.languagepod101.com**, for a word's pronunciation, and only when a
-card you are making asks for word audio. That request contains the word.
+**assets.languagepod101.com**, for a Japanese word's pronunciation, and only
+when a card you are making asks for word audio. That request contains the word.
+
+**upload.wikimedia.org**, for an Italian or Spanish word's pronunciation,
+under the same condition. The recordings are Lingua Libre's, hosted on
+Wikimedia Commons. Which words have one is settled when the dictionary is
+built, so Torval only asks for a file it already knows is there, and the
+request is for that file rather than a search for the word.
 
 ## What the permissions are for
 

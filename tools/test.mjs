@@ -2671,6 +2671,79 @@ const run = async () => {
       'Run: node tools/build-dict-es.mjs)');
   }
 
+  // The articulated prepositions, which were missing entirely until
+  // 'contraction' was added to the build's part-of-speech map. These are
+  // not obscure: nella, nel, della, del and al are among the commonest
+  // words in the language, and hovering any of them used to give either
+  // nothing or the wrong word, because the only thing left in the index
+  // under "nei" was the plural of neo.
+  const ITALIAN = join(ROOT, 'extension', 'data-it');
+  if (existsSync(join(ITALIAN, 'meta.json'))) {
+    const itDb = loadDictionary(ITALIAN);
+    Lang._setActive('it');
+    for (const [text, at, lemma] of [
+      ['Vive nella città.', 5, 'nella'],
+      ['Nel bosco.', 0, 'nel'],
+      ['La porta della casa.', 9, 'della'],
+      ['Il colore del cielo.', 10, 'del'],
+      ['Andiamo al mare.', 8, 'al'],
+      ['Sulla strada.', 0, 'sulla'],
+      ['Parlo con gli amici.', 0, 'parlare']
+    ]) {
+      const found = await LookupLatin.hover(text, at, itDb);
+      const hit = found.groups[0] && found.groups[0].hits[0];
+      check('Italian lookup: ' + text, hit && hit.entry.k[0] === lemma,
+        hit ? 'got ' + hit.entry.k[0] : 'nothing found');
+    }
+
+    // A contraction keeps the gloss that says what it is made of, which is
+    // the whole of what it has to say, and points at the preposition rather
+    // than at "in la", which is two words and so never an entry.
+    const nella = (await LookupLatin.hover('nella', 0, itDb)).groups[0].hits[0].entry;
+    check('a contraction is glossed as one', /contraction of in la/.test(nella.s[0].g[0]),
+      nella.s[0].g[0]);
+    check('and points at the preposition it contains', nella.b === 'in', nella.b);
+
+    // Recordings, folded in at build time. `a` is the two hex characters of
+    // the Commons shard and whoever read the word; the address is rebuilt
+    // from it. See voiceUrl below.
+    const cane = (await LookupLatin.hover('cane', 0, itDb)).groups[0].hits[0].entry;
+    check('a recorded word carries where to find the recording',
+      typeof cane.a === 'string' && /^[0-9a-f]{2}\|.+/.test(cane.a), String(cane.a));
+    Lang._setActive('ja');
+  } else {
+    console.log('  (no Italian dictionary built; skipping its lookup checks. ' +
+      'Run: node tools/build-dict-it.mjs)');
+  }
+
+  // --- where a Lingua Libre recording lives ------------------------------
+  //
+  // Commons files everything under the MD5 of its own name, so the whole
+  // address is rebuilt from the word, the shard and the speaker. Getting
+  // this wrong is a 404 rather than a wrong recording, but it would be a
+  // 404 on every Italian and Spanish card at once.
+  globalThis.TorvalLang = Lang;
+  Lang._setActive('it');
+  check('a Commons recording address is rebuilt from the entry',
+    Anki.voiceUrl('aquila', '70|Cerchia G') ===
+      'https://upload.wikimedia.org/wikipedia/commons/transcoded/7/70/' +
+      'LL-Q652_(ita)-Cerchia_G-aquila.wav/LL-Q652_(ita)-Cerchia_G-aquila.wav.mp3',
+    String(Anki.voiceUrl('aquila', '70|Cerchia G')));
+  check('a word with no recording has no address', Anki.voiceUrl('qwerty', '') === null);
+  check('and neither has a malformed one', Anki.voiceUrl('aquila', 'nonsense') === null);
+
+  // The point of knowing in advance: a language with its own recordings
+  // never falls through to JapanesePod101, which would answer in Japanese
+  // about an Italian word, and never makes a request for a word it already
+  // knows has none.
+  let voiceCalls = 0;
+  globalThis.fetch = async () => { voiceCalls++; throw new Error('should not be called'); };
+  check('an unrecorded Italian word makes no request at all',
+    (await Anki.fetchAudio('qwerty', '', '')) === null && voiceCalls === 0,
+    'asked ' + voiceCalls);
+  Lang._setActive('ja');
+  delete globalThis.TorvalLang;
+
   // --- the article a noun is learned with -------------------------------
   //
   // forWord rather than forEntry: the entry-shaped wrapper only reads the

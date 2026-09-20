@@ -154,6 +154,12 @@ justification from a claim into something checkable.
 > note type has a field mapped to word audio. The request contains the
 > word being looked up and nothing else.
 
+**Host permission: `https://upload.wikimedia.org/*`**
+> The same thing for an Italian or Spanish card: a Lingua Libre recording
+> hosted on Wikimedia Commons, CC BY-SA. Which words have a recording is
+> decided when the dictionary is built, so this fetches a known file
+> rather than searching for the word.
+
 **Host permissions: `https://www.youtube.com/*` and `*://*.netflix.com/*`**
 > Fetching the subtitle track of the video the user has open, so each line
 > can be timed. The same request the player itself makes, for the video
