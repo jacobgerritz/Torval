@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Torval</title>
+<meta name="description" content="Torval collects nothing. No account, no telemetry, no analytics, no server.">
+<link rel="icon" href="icon-32.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="./">← Torval</a>
+
+<h1>Privacy</h1>
+
+<p class="lede" style="margin-bottom:40px">Torval collects nothing.</p>
+
+<p>
+  There is no account, no telemetry, no analytics, no crash reporting and no
+  server belonging to this project. Nothing you read, look up, mark as known
+  or add to Anki leaves your computer, and none of it is visible to anybody
+  but you.
+</p>
+
+<section>
+  <h2>What is stored, and where</h2>
+  <p>All of it is in your own browser profile, and all of it is deleted when the add-on is.</p>
+  <table>
+    <tr><th>The dictionaries</th><td>IndexedDB, one database per language, built from files that ship inside the add-on</td></tr>
+    <tr><th>Your known and ignored word lists</th><td>The add-on's own storage</td></tr>
+    <tr><th>Anki deck, note type and field settings</th><td>The add-on's own storage</td></tr>
+    <tr><th>Which language you are reading, and whether Torval is on</th><td>The add-on's own storage</td></tr>
+    <tr><th>Where you dragged the subtitle line</th><td>The add-on's own storage</td></tr>
+  </table>
+  <p>
+    Once a day, Torval also writes both word lists to <b>Downloads/Torval</b>
+    as a plain JSON file. That is a file on your disk like any other
+    download; it is there because an add-on loaded temporarily is thrown away
+    when the browser restarts, and a word list is months of reading. Delete
+    the folder if you would rather it did not.
+  </p>
+</section>
+
+<section>
+  <h2>What Torval connects to</h2>
+  <p>
+    Three things, each of them the direct consequence of something you asked
+    for. Nothing is contacted in the background.
+  </p>
+  <p>
+    <b>The video site you are watching.</b> On YouTube, Torval asks for the
+    subtitle track of the video you have open, the same request the player
+    itself makes, so it can know when each line starts and ends. On Netflix
+    it takes a copy of the subtitle file the player was already given. Only
+    the page you are on, only while you are on it.
+  </p>
+  <p>
+    <b>AnkiConnect, on your own machine.</b> <code>http://127.0.0.1:8765</code>,
+    and only when you press <b>+</b> on a word or open the Anki settings.
+    This is Anki running on your computer; it is not on the network.
+  </p>
+  <p>
+    <b>assets.languagepod101.com</b>, for a word's pronunciation, and only
+    when a card you are making asks for word audio. That request contains
+    the word.
+  </p>
+</section>
+
+<section>
+  <h2>What the permissions are for</h2>
+  <p>
+    Your browser asks you to trust a list of permissions, so here is what
+    each one is actually doing.
+  </p>
+  <p>
+    <b>Access your data for all websites.</b> Reading the text of a page is
+    the whole program. Torval looks at the words under your cursor and draws
+    a popup. It reads pages; it does not send them anywhere.
+  </p>
+  <p>
+    <b>Storage</b> and <b>unlimited storage</b>. The dictionaries are large.
+    That is all this is.
+  </p>
+  <p>
+    <b>Downloads.</b> The daily copy of your word lists, described above.
+  </p>
+  <p>
+    <b>webRequest</b>, and on Chrome <b>declarativeNetRequest</b>. Two narrow
+    uses, both on video sites. One notices the address YouTube's own player
+    uses for subtitles, because that address cannot be reconstructed. The
+    other adds a permission header to the reply so the extension is allowed
+    to read it.
+  </p>
+  <p>
+    <b>Scripting.</b> Netflix's subtitle file is only visible to code running
+    as part of the page, so a small script is injected there to take a copy.
+  </p>
+</section>
+
+<section>
+  <h2>Questions</h2>
+  <p>
+    Open an issue at
+    <a href="https://github.com/jacobgerritz/Torval/issues">github.com/jacobgerritz/Torval</a>.
+  </p>
+</section>
+
+<footer>
+  <p>© 2026 Jacob Gerritz · <a href="./">Torval</a></p>
+</footer>
+
+</div>
+</body>
+</html>

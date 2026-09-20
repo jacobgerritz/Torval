@@ -1,0 +1,224 @@
+/*
+ * Torval, the website
+ *
+ * The same palette, type and spacing as the add-on itself: one dark card
+ * colour, one border, one bright text colour, everything else muted, and
+ * the amber that the pin and the busy handle already use. A site that looks
+ * like the thing it is selling is doing part of the explaining for free.
+ */
+
+:root {
+  --bg: #0f1013;
+  --card: #16171a;
+  --line: #292b30;
+  --ink: #f4f5f7;
+  --ink-dim: #a4a9b2;
+  --ink-faint: #767b84;
+  --accent: #dba35f;
+  --cool: #93b4c6;
+  --measure: 46rem;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  padding: 0 16px;
+  background: var(--bg);
+  color: var(--ink-dim);
+  font: 16px/1.65 -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+
+.wrap {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 72px 0 96px;
+}
+
+/* --- the top ------------------------------------------------------------ */
+
+header { margin-bottom: 64px; }
+
+.mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 40px;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.mark img { width: 24px; height: 24px; }
+
+h1 {
+  margin: 0 0 18px;
+  font-size: clamp(30px, 6vw, 44px);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.lede {
+  margin: 0;
+  font-size: clamp(17px, 2.4vw, 19px);
+  max-width: 34rem;
+}
+
+.lede b { color: var(--ink); font-weight: 500; }
+
+/* --- buttons ------------------------------------------------------------ */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+
+.button {
+  display: inline-block;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
+  text-decoration: none;
+  transition: border-color .15s ease, color .15s ease;
+}
+
+.button:hover { border-color: #3d4149; }
+
+.button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #16171a;
+  font-weight: 500;
+}
+
+.button.primary:hover { background: #e6b578; border-color: #e6b578; }
+
+.button[aria-disabled="true"] {
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+.pending {
+  margin: 14px 0 0;
+  font-size: 14px;
+  color: var(--ink-faint);
+}
+
+/* --- the popup drawing -------------------------------------------------- */
+
+figure {
+  margin: 56px 0 0;
+}
+
+figure svg { display: block; width: 100%; height: auto; }
+
+figcaption {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--ink-faint);
+}
+
+/* --- sections ----------------------------------------------------------- */
+
+section { margin-top: 72px; }
+
+h2 {
+  margin: 0 0 20px;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+p { margin: 0 0 16px; }
+
+p:last-child { margin-bottom: 0; }
+
+.things {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.things p { font-size: 15px; }
+
+.claim {
+  padding: 24px 26px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.claim strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+a { color: var(--cool); }
+a:hover { color: var(--accent); }
+
+.note { font-size: 14px; color: var(--ink-faint); }
+
+/* --- footer ------------------------------------------------------------- */
+
+footer {
+  margin-top: 88px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink-faint);
+}
+
+footer p { margin-bottom: 10px; }
+
+footer a { color: var(--ink-faint); text-decoration: underline; }
+footer a:hover { color: var(--ink-dim); }
+
+/* --- the privacy page --------------------------------------------------- */
+
+.back {
+  display: inline-block;
+  margin-bottom: 40px;
+  font-size: 14px;
+  color: var(--ink-faint);
+  text-decoration: none;
+}
+
+.back:hover { color: var(--ink-dim); }
+
+table {
+  width: 100%;
+  margin: 0 0 16px;
+  border-collapse: collapse;
+  font-size: 15px;
+  text-align: left;
+}
+
+th, td {
+  padding: 10px 14px 10px 0;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+th { color: var(--ink); font-weight: 500; }

@@ -1412,4 +1412,13 @@ data Jisho.org is built on. It is downloaded by the build script and is not
 stored in this repository; if you ever distribute a packaged copy of this
 extension, that copy carries the dictionary's licence with it.
 
-The code is MIT, see [LICENSE](LICENSE).
+The code is **GPL-3.0**, see [LICENSE](LICENSE). Copyright © 2026 Jacob
+Gerritz. You may use it, change it and pass it on, including for money; what
+you may not do is take it private. Anything built on Torval and given to
+somebody else has to come with its source, under the same licence.
+
+That is the same bargain the dictionaries themselves are handed over on:
+JMdict and Wiktextract are CC BY-SA, which says the same thing about data
+that the GPL says about code. Torval was MIT until version 1.0; anyone who
+took a copy before then still has it under those terms, which is how it
+should be.

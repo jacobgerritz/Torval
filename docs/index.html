@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torval — a pop-up dictionary that stays on your machine</title>
+<meta name="description" content="Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. Free, open source, and nothing leaves your computer.">
+<link rel="icon" href="icon-32.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="mark"><img src="icon-48.png" alt=""> Torval</div>
+
+  <h1>Hold Shift and hover any word.</h1>
+
+  <p class="lede">
+    A pop-up dictionary for <b>Japanese</b>, <b>Italian</b> and <b>Spanish</b>
+    that runs entirely in your browser. It reads the page you are on, tells
+    you how much of it you already know, and puts any word you meet onto an
+    Anki card in one click.
+  </p>
+
+  <div class="actions">
+    <a class="button primary" href="https://github.com/jacobgerritz/Torval">Get it from GitHub</a>
+    <a class="button" aria-disabled="true" href="#">Firefox Add-ons — soon</a>
+    <a class="button" aria-disabled="true" href="#">Chrome Web Store — soon</a>
+  </div>
+
+  <p class="pending">
+    Both stores are reviewing. Until then the repository has a build you can
+    load yourself, and instructions for doing it.
+  </p>
+</header>
+
+<figure>
+  <!--
+    The popup as it actually appears, drawn rather than screenshotted: a
+    screenshot of a dark panel over somebody else's web page is mostly
+    somebody else's web page. The colours are the extension's own.
+  -->
+  <svg viewBox="0 0 640 210" role="img" aria-label="The Torval popup over a line of Italian: the word amico, its article, its stress mark and its definitions.">
+    <rect x="0" y="0" width="640" height="210" rx="10" fill="#0f1013"/>
+    <text x="28" y="44" font-family="-apple-system, Segoe UI, sans-serif" font-size="17" fill="#5a5f67">
+      Ho incontrato un vecchio <tspan fill="#f4f5f7" text-decoration="underline">amico</tspan> per strada.
+    </text>
+
+    <rect x="28" y="70" width="380" height="116" rx="8" fill="#16171a" stroke="#292b30"/>
+    <text x="48" y="104" font-family="-apple-system, Segoe UI, sans-serif" font-size="21" fill="#f4f5f7">
+      <tspan fill="#8f959e">l’</tspan>am<tspan font-weight="700">i</tspan>co
+    </text>
+    <text x="48" y="128" font-family="-apple-system, Segoe UI, sans-serif" font-size="12" fill="#767b84">
+      very common · masculine noun
+    </text>
+    <text x="48" y="154" font-family="-apple-system, Segoe UI, sans-serif" font-size="14" fill="#a4a9b2">
+      1. friend
+    </text>
+    <text x="48" y="174" font-family="-apple-system, Segoe UI, sans-serif" font-size="14" fill="#a4a9b2">
+      2. supporter, well-wisher
+    </text>
+    <text x="370" y="104" font-family="-apple-system, Segoe UI, sans-serif" font-size="18" fill="#dba35f">+</text>
+
+    <rect x="440" y="70" width="172" height="40" rx="6" fill="#16171a" stroke="#292b30"/>
+    <text x="458" y="95" font-family="-apple-system, Segoe UI, sans-serif" font-size="15" fill="#8fbf8a">94%</text>
+    <text x="500" y="95" font-family="-apple-system, Segoe UI, sans-serif" font-size="13" fill="#767b84">of this video</text>
+  </svg>
+  <figcaption>
+    The word with its article and its stressed vowel, what kind of word it
+    is, what it means, and one button to send it to Anki.
+  </figcaption>
+</figure>
+
+<section>
+  <h2>What it does</h2>
+  <div class="things">
+    <div>
+      <h3>Looks words up</h3>
+      <p>
+        Hold Shift, hover, read. It handles conjugation and inflection, so
+        <i>食べなかった</i> finds 食べる and <i>hablábamos</i> finds
+        <i>hablar</i>. Italian and Spanish nouns come with their article,
+        because that is how you actually have to know them.
+      </p>
+    </div>
+    <div>
+      <h3>Says what you already know</h3>
+      <p>
+        One number across the top of the page: how much of what is in front
+        of you is built from words you know. On a video that is the whole
+        transcript, before you start watching, which is what decides whether
+        it is worth watching at all.
+      </p>
+    </div>
+    <div>
+      <h3>Mines subtitles</h3>
+      <p>
+        On YouTube and Netflix it times every line itself, so a card can
+        carry the sentence, the frame on screen and the line as it was
+        spoken. Step between lines with A and D; replay the one you are on.
+      </p>
+    </div>
+    <div>
+      <h3>Talks to Anki</h3>
+      <p>
+        Straight into your own collection through AnkiConnect, into whatever
+        note type you already use. Pitch accent for Japanese, the stressed
+        vowel for Italian and Spanish.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Privacy</h2>
+  <div class="claim">
+    <strong>Torval collects nothing.</strong>
+    <p>
+      No account, no telemetry, no analytics, no crash reporting, and no
+      server belonging to this project. The dictionaries were downloaded
+      once, when they were built, and ship inside the add-on. Nothing you
+      read, look up, mark as known or add to Anki ever leaves your computer.
+    </p>
+    <p class="note" style="margin-top:14px">
+      <a href="privacy.html">The whole privacy policy</a> — it is short,
+      because there is not much to say.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>What it costs</h2>
+  <p>
+    Nothing, and there is no paid version waiting behind it. Torval has no
+    servers to pay for and no accounts to run, so there is nothing to
+    charge a subscription for.
+  </p>
+  <p>
+    If it earns its keep and you want to say so, there is somewhere to do
+    that. It will never be asked for inside the add-on.
+  </p>
+  <div class="actions">
+    <a class="button" href="https://github.com/sponsors/jacobgerritz">Support the work</a>
+  </div>
+</section>
+
+<footer>
+  <p>
+    <a href="https://github.com/jacobgerritz/Torval">Source</a> ·
+    <a href="privacy.html">Privacy</a> ·
+    <a href="https://github.com/jacobgerritz/Torval/issues">Report a problem</a>
+  </p>
+  <p>
+    The program is GPL-3.0. The dictionaries keep their own licences:
+    <b>JMdict</b> from the
+    <a href="https://www.edrdg.org/">Electronic Dictionary Research and Development Group</a>
+    and <b>Wiktextract</b> from
+    <a href="https://kaikki.org/">kaikki.org</a>, both under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>;
+    pitch accent from Kanjium; word frequency from
+    hermitdave/FrequencyWords and JPDB.
+  </p>
+  <p>© 2026 Jacob Gerritz</p>
+</footer>
+
+</div>
+</body>
+</html>
