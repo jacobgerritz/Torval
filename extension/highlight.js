@@ -159,7 +159,10 @@ var TorvalHighlight = (function () {
 
     pageRanges = build(found, reply.result);
     apply();
-    return { total: reply.result.total, known: reply.result.known, counts: reply.result.counts };
+    return {
+      total: reply.result.total, known: reply.result.known,
+      counts: reply.result.counts, model: reply.result.model
+    };
   }
 
   /**

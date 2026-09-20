@@ -434,6 +434,7 @@ var TorvalLookupLatin = (function () {
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
     coverage: TorvalLookupCommon.coverage,
+    model: TorvalLookupCommon.model,
     within: TorvalLookupCommon.within,
     isKnown: TorvalLookupCommon.isKnown,
     // A property rather than a number, since it is a different number in

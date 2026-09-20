@@ -140,6 +140,79 @@ var TorvalLookupCommon = (function () {
   }
 
   /**
+   * The same reading, in a shape small enough to hand to the bar and complete
+   * enough for it to work the number out again by itself.
+   *
+   * The bar used to be told only how many times each word was said, and it
+   * moved the score by that number whenever a word was ticked. That is wrong
+   * whenever a word is already understood under another name: "ha" is counted
+   * under "ha", but a reader who knows "avere" already had every one of those
+   * occurrences credited to them, so ticking "ha" paid for them a second
+   * time. Words like that are common enough, "e", "il", "le", "ha", that a
+   * session of marking words walked the score up past the total, where it was
+   * clamped, and the bar sat on 1,623 of 1,623 on a page full of words the
+   * reader had never seen.
+   *
+   * There is no arithmetic that fixes this from counts alone, because whether
+   * one more tick changes an occurrence depends on every other word that
+   * occurrence could be. So the occurrences themselves go across: a table of
+   * the distinct words, each occurrence as the list of words it might be, and
+   * which of those words are known and ignored right now. Ticking a word then
+   * means putting it in a set and counting again, which is the same answer
+   * this file would have given had the whole page been read afresh.
+   *
+   * Indices rather than strings because a transcript is thousands of
+   * occurrences of a few hundred words, and the strings would be most of the
+   * message.
+   */
+  function model(tokens, known, ignored) {
+    var place = Object.create(null);
+    var words = [];
+    function number(word) {
+      if (place[word] === undefined) {
+        place[word] = words.length;
+        words.push(word);
+      }
+      return place[word];
+    }
+
+    var rows = tokens.map(function (token) {
+      // The word the reading settled on comes first: that is the one the
+      // ignored list is asked about, exactly as in `coverage`.
+      var row = [number(token.word)];
+      var also = token.words || [];
+      for (var i = 0; i < also.length; i++) {
+        var n = number(also[i]);
+        if (row.indexOf(n) === -1) row.push(n);
+      }
+      return row;
+    });
+
+    var knownNow = [];
+    var ignoredNow = [];
+    for (var i = 0; i < words.length; i++) {
+      if (known && known.has(words[i])) knownNow.push(i);
+      if (ignored && ignored.has(words[i])) ignoredNow.push(i);
+    }
+    return { words: words, tokens: rows, known: knownNow, ignored: ignoredNow };
+  }
+
+  /** The other end of `model`: tokens and sets `coverage` can be given. */
+  function expand(packed) {
+    var words = packed.words;
+    return {
+      tokens: packed.tokens.map(function (row) {
+        return {
+          word: words[row[0]],
+          words: row.map(function (n) { return words[n]; })
+        };
+      }),
+      known: new Set(packed.known.map(function (n) { return words[n]; })),
+      ignored: new Set(packed.ignored.map(function (n) { return words[n]; }))
+    };
+  }
+
+  /**
    * The words of a longer text as they fall across one stretch of it,
    * counted from the start of that stretch. A word lying across the join is
    * kept on both sides, cut to the part actually on each, so a subtitle line
@@ -265,6 +338,8 @@ var TorvalLookupCommon = (function () {
     frequencyBand: frequencyBand,
     isKnown: isKnown,
     coverage: coverage,
+    model: model,
+    expand: expand,
     within: within,
     pause: pause,
     extractTokens: extractTokens,

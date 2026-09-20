@@ -26,7 +26,8 @@ var TorvalBar = (function () {
   var host = null;
   var root = null;
   var els = {};
-  var data = null;        // the last reading: { total, known, counts }
+  var data = null;        // the last reading: { total, known, counts, model }
+  var read = null;        // that reading's occurrences, for recounting
   var onRefresh = null;
 
   var BAR_HEIGHT = 40;   // the bar itself, and the room the page gives it
@@ -75,7 +76,12 @@ var TorvalBar = (function () {
    */
   function show(reading) {
     data = reading;
-    if (!reading || !reading.total) return;
+    if (!data || !data.total) return;
+    // The occurrences behind the number, so that ticking one more word can be
+    // answered exactly rather than estimated. Kept apart from `data`, which
+    // is the reading as it arrived.
+    read = (data.model && typeof TorvalLookupCommon !== 'undefined')
+      ? TorvalLookupCommon.expand(data.model) : null;
     build();
     idle();
     render();
@@ -170,8 +176,25 @@ var TorvalBar = (function () {
    * and only knowing where it came from says so.
    */
   function restate(word, before, after) {
-    if (!data || !data.counts || before === after) return;
-    var count = data.counts[word] || 0;
+    if (!data || before === after) return;
+
+    if (read) {
+      // Move the word between the two sets and count the page again. Cheap:
+      // a few thousand occurrences of a few hundred words, and it is the one
+      // answer that stays right however many words are marked in a row.
+      read.known[after === 'known' ? 'add' : 'delete'](word);
+      read.ignored[after === 'ignored' ? 'add' : 'delete'](word);
+      var score = TorvalLookupCommon.coverage(read.tokens, read.known, read.ignored);
+      data.total = score.total;
+      data.known = score.known;
+      if (host) render();
+      return;
+    }
+
+    // No occurrences to count, an old reading, or a page read by something
+    // that does not send them. Shift the number by how many times the word
+    // was said, which is right as far as it goes.
+    var count = (data.counts && data.counts[word]) || 0;
     if (!count) return;
 
     // An ignored word is not part of the question at all, so it leaves the

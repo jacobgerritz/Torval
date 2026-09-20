@@ -118,6 +118,9 @@ var TorvalSubtitles = (function () {
       catches: false,
       id: function () { return new URLSearchParams(location.search).get('v'); },
       captions: '.ytp-caption-window-container, .captions-text',
+      // Where the words are inside that box, best first: see captionText for
+      // why the box itself is not read.
+      lines: ['.ytp-caption-segment', '.caption-visual-line', '.captions-text'],
       player: '.html5-video-player',
       seek: null,           // moving the video element is enough here
       // Only ever called once every way of getting the file has failed and
@@ -132,6 +135,7 @@ var TorvalSubtitles = (function () {
         return match ? match[1] : null;
       },
       captions: '.player-timedtext',
+      lines: ['.player-timedtext-text-container span', '.player-timedtext-text-container'],
       player: '.watch-video--player-view, .watch-video, .VideoContainer',
       catches: true,
       // Netflix streams in pieces it chose in advance, and moving the
@@ -1384,9 +1388,42 @@ var TorvalSubtitles = (function () {
     checkCaption();
   }
 
+  /**
+   * The line the player is showing at this moment.
+   *
+   * Read out of the caption lines themselves rather than out of the box they
+   * sit in. The box belongs to the player, and the player keeps its own
+   * furniture in there: on YouTube the caption window carries the name of the
+   * language and a way into the caption settings, which came through as part
+   * of the line and went onto Torval's own subtitle, "ItalianClick for
+   * settings Poi dagli studi…". Taking the segments leaves the words.
+   *
+   * A line that repeats the one before it is dropped as well. A caption
+   * changing over is two windows on screen for a moment, and a player that
+   * draws its text twice, once offset underneath for the shadow, is two
+   * copies of every line; either way the sentence arrived doubled.
+   */
   function captionText() {
-    var el = document.querySelector(site.captions);
-    return el ? squash(el.textContent) : '';
+    var box = document.querySelector(site.captions);
+    if (!box) return '';
+
+    var parts = null;
+    for (var pick = 0; pick < site.lines.length && !parts; pick++) {
+      var found = box.querySelectorAll(site.lines[pick]);
+      if (found.length) parts = found;
+    }
+    // Nothing matched. A box with no elements in it is its own text and can
+    // be read as it is; one full of elements Torval does not recognise is
+    // furniture it cannot tell from words, and saying nothing is better than
+    // reading the furniture out loud.
+    if (!parts) return box.firstElementChild ? '' : squash(box.textContent);
+
+    var lines = [];
+    for (var i = 0; i < parts.length; i++) {
+      var line = squash(parts[i].textContent);
+      if (line && line !== lines[lines.length - 1]) lines.push(line);
+    }
+    return lines.join(' ');
   }
 
   /**
@@ -1703,8 +1740,21 @@ var TorvalSubtitles = (function () {
    * their own; a caption with no punctuation in it, which is most automatic
    * ones, is simply read straight through.
    */
+  /** Whether this language puts a space between one word and the next. */
+  function spaced() {
+    var profile = typeof TorvalLang !== 'undefined' ? TorvalLang.profile() : null;
+    return !!profile && !profile.seams;
+  }
+
   function allText() {
-    return cues.map(function (cue) { return cue.text; }).join('');
+    // Joined the way the language joins words. Run together, "il tempo" at
+    // the end of one line and "Poi" at the start of the next became
+    // "tempoPoi", a word nothing in the dictionary matches, and every line
+    // break in a transcript cost the score a word. Japanese writes without
+    // spaces and a space between the lines would be the invention, so it is
+    // the one language that still joins them straight on.
+    return cues.map(function (cue) { return cue.text; })
+      .join(spaced() ? ' ' : '');
   }
 
   /** Does this line carry straight on from the one before it? */

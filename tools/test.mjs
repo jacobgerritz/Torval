@@ -30,6 +30,7 @@ const Lang = require(join(ROOT, 'extension', 'lang.js'));
 const DeinflectEs = require(join(ROOT, 'extension', 'deinflect-es.js'));
 const DeinflectIt = require(join(ROOT, 'extension', 'deinflect-it.js'));
 const LookupLatin = require(join(ROOT, 'extension', 'lookup-latin.js'));
+const Common = require(join(ROOT, 'extension', 'lookup-common.js'));
 const { stressIndex: stressEs } = await import('./stress-es.mjs');
 Pitch._setData(JSON.parse(readFileSync(join(DATA, 'pitch.json'), 'utf8')));
 
@@ -1106,6 +1107,47 @@ const run = async () => {
     after.known - before.known === before.counts['本'],
     `${after.known - before.known} vs ${before.counts['本']}`);
 
+  // --- the bar counting again for itself ---------------------------------
+  // A count on its own is not enough once a word can be understood under
+  // another name. "ha" is filed under "ha", but a reader who knows "avere"
+  // was already credited with every one of those occurrences, and the bar
+  // adding the count a second time is what walked the score up to its own
+  // total and sat there at 100%.
+  const aliased = [
+    { word: 'ha', words: ['ha', 'avere'] },
+    { word: 'ha', words: ['ha', 'avere'] },
+    { word: 'cane', words: ['cane'] }
+  ];
+  const knowsAvere = new Set(['avere']);
+  const packed = Common.model(aliased, knowsAvere, new Set());
+  check('the packed reading is the words once each, and the occurrences by number',
+    packed.words.join() === 'ha,avere,cane' &&
+    JSON.stringify(packed.tokens) === '[[0,1],[0,1],[2]]' &&
+    JSON.stringify(packed.known) === '[1]',
+    JSON.stringify(packed));
+
+  const unpacked = Common.expand(packed);
+  check('unpacked, it scores exactly as the reading it came from',
+    JSON.stringify(Common.coverage(unpacked.tokens, unpacked.known, unpacked.ignored)) ===
+    JSON.stringify(Common.coverage(aliased, knowsAvere, new Set())));
+
+  const started = Common.coverage(aliased, knowsAvere, new Set());
+  unpacked.known.add('ha');
+  const ticked = Common.coverage(unpacked.tokens, unpacked.known, unpacked.ignored);
+  check('ticking a word already understood under another name moves nothing',
+    started.counts['ha'] === 2 && started.known === 2 && ticked.known === 2,
+    `counted ${started.counts['ha']}, ${started.known} -> ${ticked.known}`);
+
+  unpacked.known.add('cane');
+  const both = Common.coverage(unpacked.tokens, unpacked.known, unpacked.ignored);
+  check('and a word that really was new does move it', both.known === 3 && both.total === 3,
+    JSON.stringify(both));
+
+  unpacked.ignored.add('cane');
+  const setAside = Common.coverage(unpacked.tokens, unpacked.known, unpacked.ignored);
+  check('setting one aside takes it out of the question rather than out of the score',
+    setAside.total === 2 && setAside.known === 2, JSON.stringify(setAside));
+
   // --- pitch accent -----------------------------------------------------
   // Small kana join the mora before them; ー, っ and ん stand alone.
   check('きょ is one mora, っ and ん are their own',
@@ -1235,6 +1277,36 @@ const run = async () => {
     Subs.allText().indexOf('見に行ったので') !== -1, JSON.stringify(Subs.allText()));
   check('no breaks are put between the lines at all',
     Subs.allText().indexOf('\n') === -1, JSON.stringify(Subs.allText()));
+
+  // A language that spaces its words is the other way round. Run straight
+  // on, "al tempo" ending one line and "Poi" starting the next came out as
+  // "tempoPoi", which is not a word, so every line break in a transcript
+  // quietly cost the score a word.
+  globalThis.TorvalLang = Lang;
+  Lang._setActive('it');
+  Subs._setCues([
+    { start: 0, end: 2, text: 'per sfuggire al tempo' },
+    { start: 2, end: 4, text: 'Poi dagli studi' }
+  ]);
+  check('lines of a spaced language are joined with the space they need',
+    Subs.allText() === 'per sfuggire al tempo Poi dagli studi',
+    JSON.stringify(Subs.allText()));
+  Lang._setActive('ja');
+  Subs._setCues([
+    { start: 0, end: 2, text: '昨日は友達と映画を見に行っ' },
+    { start: 2, end: 4, text: 'たので楽しかった' }
+  ]);
+  check('and Japanese, which spaces nothing, still runs straight on',
+    Subs.allText() === '昨日は友達と映画を見に行ったので楽しかった',
+    JSON.stringify(Subs.allText()));
+  delete globalThis.TorvalLang;
+
+  Subs._setCues([
+    { start: 0, end: 2, text: '昨日は友達と映画を見に行っ' },
+    { start: 2, end: 4, text: 'たので楽しかった' },
+    { start: 9, end: 11, text: '今日は雨です。' },
+    { start: 11, end: 13, text: '明日は晴れます' }
+  ]);
   check('a line is told what came before it',
     Subs.around('たので楽しかった').before === '昨日は友達と映画を見に行っ',
     JSON.stringify(Subs.around('たので楽しかった')));

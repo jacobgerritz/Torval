@@ -806,6 +806,7 @@ var TorvalLookup = (function () {
     locateTokens: locateTokens,
     decomposeKnown: decomposeKnown,
     coverage: TorvalLookupCommon.coverage,
+    model: TorvalLookupCommon.model,
     within: TorvalLookupCommon.within,
     isKnown: TorvalLookupCommon.isKnown,
     MAX_SCAN: MAX_SCAN

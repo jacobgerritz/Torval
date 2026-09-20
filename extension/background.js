@@ -388,7 +388,12 @@ async function comprehension(text, say) {
   const tokens = await lookup.locateTokens(text, reader, say);
   if (!TorvalLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
-  return lookup.coverage(tokens, known, await ignoredSet());
+  const ignored = await ignoredSet();
+  const score = lookup.coverage(tokens, known, ignored);
+  // What the bar needs to answer the same question again after one more word
+  // is ticked, without the page being read a second time. See `model`.
+  score.model = lookup.model(tokens, known, ignored);
+  return score;
 }
 
 /*
@@ -484,7 +489,10 @@ async function wordPlaces(text, before, after, trusted, say) {
   // about, and reading a page twice over to answer two questions about it
   // would be silly.
   const score = lookup.coverage(tokens, known, ignored);
-  return { total: score.total, known: score.known, counts: score.counts, places, unmarked };
+  return {
+    total: score.total, known: score.known, counts: score.counts,
+    model: lookup.model(tokens, known, ignored), places, unmarked
+  };
 }
 
 // ---------------------------------------------------------------------------
