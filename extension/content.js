@@ -1857,6 +1857,21 @@
       : null;
     const ankiConfigKey = 'ankiConfig' + TorvalLang.profile().storageSuffix;
     const settings = await api.storage.local.get(ankiConfigKey).catch(() => ({}));
+
+    // Before the recording, not after it. Anki not running, no deck picked,
+    // no fields mapped: all three were knowable the moment + was pressed,
+    // and all three used to be reported at the end, after sitting through a
+    // line of video being recorded in real time for a card that was never
+    // going to be made. Whatever comes back is thrown, which is what puts
+    // it under the entry as an error and gives the + back.
+    let ready;
+    try {
+      ready = await api.runtime.sendMessage({ type: 'ankiReady' });
+    } catch (err) {
+      ready = { ok: false, error: String(err) };
+    }
+    if (!ready || !ready.ok) throw new Error((ready && ready.error) || 'Could not reach Anki.');
+
     let media = {};
     if (fromVideo && typeof TorvalVideo !== 'undefined') {
       const doing = cue ? saying(entryEl, 'Recording the line…') : null;

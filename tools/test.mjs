@@ -388,6 +388,26 @@ const run = async () => {
   check('alreadyHave reports no duplicate for a genuinely new word',
     !(await Anki.alreadyHave(mining, { word: '新語' })));
 
+  // What can be known to be wrong before a line is recorded. The point of
+  // asking these early is that on a video the recording takes as long as
+  // the line does, so an answer that arrives afterwards arrives too late.
+  check('no deck picked is caught before anything is recorded',
+    /No deck chosen/.test(Anki.whatIsMissing({ model: 'Mining' }) || ''),
+    String(Anki.whatIsMissing({ model: 'Mining' })));
+  check('no note type picked is caught too',
+    /No deck chosen/.test(Anki.whatIsMissing({ deck: 'Japanese' }) || ''));
+  check('a mapping with every field left blank is caught',
+    /fields are mapped/.test(
+      Anki.whatIsMissing({ deck: 'A', model: 'B', fields: { Front: '', Back: '' } }) || ''));
+  check('a usable configuration is not complained about',
+    Anki.whatIsMissing(mining) === null, String(Anki.whatIsMissing(mining)));
+
+  globalThis.fetch = async () => { throw new Error('connection refused'); };
+  let notRunning = '';
+  await Anki.checkReady(mining).catch((e) => { notRunning = e.message; });
+  check('Anki not running is reported before a card is attempted',
+    /not answering|not running/i.test(notRunning), notRunning);
+
   // A call that never answers must end in something being said, rather than in
   // the + on a card showing a dot for ever, which is what it did.
   Anki._deadlines(0.05, 0.05);

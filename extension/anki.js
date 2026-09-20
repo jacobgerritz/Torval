@@ -184,10 +184,47 @@ var TorvalAnki = (function () {
    * Turn a lookup into a card. `note` carries the pieces (word, reading,
    * sentence, definition); `config` says which field each piece belongs in.
    */
-  async function addNote(config, note) {
+  /**
+   * What is wrong before a card is attempted, or null if nothing is.
+   *
+   * Two of these used to be discovered by addNote, at the end: on a video
+   * that is after the line has been recorded, which takes as long as the
+   * line does. Waiting through ten seconds of recording to be told that
+   * Anki is not running, or that no deck has been picked, is the wrong way
+   * round, because both were knowable before any of it started.
+   *
+   * So the same questions are asked up front. addNote still asks them
+   * too, since it can be reached without coming through here and a check
+   * that can be skipped is not a check.
+   */
+  function whatIsMissing(config) {
     if (!config || !config.deck || !config.model) {
-      throw new Error('No deck chosen yet, open Torval’s options and pick one.');
+      return 'No deck chosen yet, open Torval’s options and pick one.';
     }
+    var fields = config.fields || {};
+    if (!Object.keys(fields).some(function (f) { return fields[f]; })) {
+      return 'None of the note type’s fields are mapped yet, see Torval’s options.';
+    }
+    return null;
+  }
+
+  /**
+   * Everything that can be known to be wrong before a card is made,
+   * including whether Anki is answering at all. Throws what to say.
+   */
+  async function checkReady(config) {
+    var missing = whatIsMissing(config);
+    if (missing) throw new Error(missing);
+    // The cheapest thing AnkiConnect will answer. It is not the answer that
+    // matters, it is that there was one: invoke throws its own sentence
+    // about Anki not running or sitting on a dialog, and that sentence is
+    // exactly what wants saying here.
+    await invoke(config.url, 'version');
+  }
+
+  async function addNote(config, note) {
+    var missing = whatIsMissing(config);
+    if (missing) throw new Error(missing);
 
     // Only go looking for audio if somewhere on the card wants it.
     // Not offered outside Japanese, but a mapping saved before that was true
@@ -220,7 +257,9 @@ var TorvalAnki = (function () {
       var value = note[config.fields[field]];
       if (value) { fields[field] = value; any = true; }
     });
-    if (!any) throw new Error('None of the note type’s fields are mapped yet, see Torval’s options.');
+    // Different from the check up front: the fields are mapped, but this
+    // particular word filled none of them.
+    if (!any) throw new Error('Nothing to put on the card. Check the field mapping in Torval’s options.');
 
     // Duplicates are allowed on purpose: mining a second word from a sentence
     // you have already mined once is completely ordinary. Anki's own
@@ -313,6 +352,8 @@ var TorvalAnki = (function () {
     guessMapping: guessMapping,
     escapeSearch: escapeSearch,
     fieldFor: fieldFor,
+    whatIsMissing: whatIsMissing,
+    checkReady: checkReady,
     alreadyHave: alreadyHave,
     fetchAudio: fetchAudio,
     browse: browse,

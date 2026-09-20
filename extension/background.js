@@ -193,6 +193,7 @@ api.runtime.onMessage.addListener((message, sender) => {
     case 'status': return Promise.resolve({ status });
     case 'tags':   return loadTags();
     case 'ankiAdd':      return ankiAdd(message.note);
+    case 'ankiReady':    return ankiReady();
     case 'ankiDuplicate': return ankiDuplicate(message.word);
     case 'ankiBrowse':   return guard(() => ankiBrowse(message.word));
     case 'ankiDescribe': return guard(() => TorvalAnki.describe(message.url));
@@ -251,6 +252,18 @@ async function guard(fn) {
 async function ankiBrowse(word) {
   const stored = await api.storage.local.get(langKey('ankiConfig'));
   return TorvalAnki.browse(stored[langKey('ankiConfig')] || {}, word);
+}
+
+/**
+ * Is there anything stopping a card being made? Asked before the line is
+ * recorded rather than after, see checkReady in anki.js.
+ */
+async function ankiReady() {
+  return guard(async () => {
+    const stored = await api.storage.local.get(langKey('ankiConfig'));
+    await TorvalAnki.checkReady(stored[langKey('ankiConfig')]);
+    return true;
+  });
 }
 
 async function ankiDuplicate(word) {
