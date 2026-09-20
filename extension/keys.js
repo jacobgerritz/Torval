@@ -8,9 +8,9 @@
  * of things. A shortcut you cannot change is a shortcut that eventually
  * makes a page unusable.
  *
- * So the seven live here instead, in one table, with what each one is for
- * written beside it, and the settings page renders that table rather than
- * repeating it. Adding an eighth means adding a row here and nothing else.
+ * So the seven live here instead, in one table, and the settings page
+ * renders that table rather than repeating it. Adding an eighth means
+ * adding a row here and nothing else.
  *
  * What is stored is only what has been changed: an empty setting means the
  * defaults, and resetting is deleting rather than writing seven values back.
@@ -36,21 +36,14 @@ var TorvalKeys = (function () {
    * between three rather than as any key you like.
    */
   var ACTIONS = [
-    { name: 'lookup', label: 'Look a word up', hold: true,
-      choices: ['Shift', 'Alt', 'Control'], fallback: 'Shift',
-      hint: 'Held down while pointing at a word' },
-    { name: 'unknown', label: 'Mark as not known', fallback: '1',
-      hint: 'Takes the word off your known list' },
-    { name: 'known', label: 'Mark as known', fallback: '2',
-      hint: 'And moves the number at the top of the page' },
-    { name: 'ignored', label: 'Ignore this word', fallback: '3',
-      hint: 'Names, foreign words: never mentioned again, and left out of the count' },
-    { name: 'browse', label: 'Find it in Anki', fallback: 'b',
-      hint: 'Opens Anki’s card browser on the word' },
-    { name: 'back', label: 'Previous subtitle line', fallback: 'a',
-      hint: 'On a video, jumps back to the line before' },
-    { name: 'forward', label: 'Next subtitle line', fallback: 'd',
-      hint: 'And forward to the line after' }
+    { name: 'lookup', label: 'Hold to look a word up', fallback: 'Shift',
+      hold: true, choices: ['Shift', 'Alt', 'Control'] },
+    { name: 'unknown', label: 'Mark as not known', fallback: '1' },
+    { name: 'known', label: 'Mark as known', fallback: '2' },
+    { name: 'ignored', label: 'Ignore the word', fallback: '3' },
+    { name: 'browse', label: 'Find it in Anki', fallback: 'b' },
+    { name: 'back', label: 'Previous subtitle line', fallback: 'a' },
+    { name: 'forward', label: 'Next subtitle line', fallback: 'd' }
   ];
 
   var chosen = {};       // only what has been changed from the default
@@ -72,7 +65,7 @@ var TorvalKeys = (function () {
   function all() {
     return ACTIONS.map(function (action) {
       return {
-        name: action.name, label: action.label, hint: action.hint,
+        name: action.name, label: action.label,
         hold: !!action.hold, choices: action.choices || null,
         key: get(action.name), isDefault: get(action.name) === action.fallback
       };

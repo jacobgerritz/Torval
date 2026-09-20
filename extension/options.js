@@ -274,11 +274,11 @@ if (reader) {
  * Every key Torval answers to, listed from keys.js rather than written out
  * again here. Click one and it listens for the next key you press.
  *
- * The one that is held rather than pressed is a dropdown of three instead
- * of a key to press, because "hold Q to look a word up" is not a thing a
- * keyboard can do: the browser reports a held letter as a stream of
- * repeats, not as a state, and only the modifiers are reported as being
- * down.
+ * One row is one label and one button, and every button is the same
+ * button. The held key cycles through its three rather than being a
+ * dropdown: holding a letter is not something a keyboard reports, so it
+ * cannot be captured the way the others are, and a select box among six
+ * buttons sat at a different height and broke the column.
  */
 const shortcutList = document.getElementById('shortcuts');
 const keysStatus = document.getElementById('keys-status');
@@ -290,61 +290,32 @@ function sayAboutKeys(message, bad) {
   if (!keysStatus) return;
   keysStatus.textContent = message;
   keysStatus.className = bad ? 'error' : '';
-  if (!bad) setTimeout(() => { keysStatus.textContent = ''; }, 2000);
+  if (message && !bad) setTimeout(() => { keysStatus.textContent = ''; }, 2000);
 }
 
 function drawShortcuts() {
   if (!shortcutList) return;
-  stopListening();
+  listening = null;
   shortcutList.textContent = '';
 
   for (const action of TorvalKeys.all()) {
     const row = document.createElement('div');
     row.className = 'shortcut';
-
-    const words = document.createElement('span');
-    words.className = 'shortcut-what';
-    words.appendChild(Object.assign(document.createElement('b'), { textContent: action.label }));
-    words.appendChild(Object.assign(document.createElement('span'), {
-      className: 'hint', textContent: action.hint
+    row.appendChild(Object.assign(document.createElement('span'), {
+      className: 'shortcut-what', textContent: action.label
     }));
-    row.appendChild(words);
-
-    row.appendChild(action.hold ? heldChooser(action) : keyButton(action));
+    row.appendChild(keyButton(action));
     shortcutList.appendChild(row);
   }
-}
-
-/** The held key is one of three, so it is a list rather than a listener. */
-function heldChooser(action) {
-  const select = document.createElement('select');
-  select.className = 'shortcut-key';
-  for (const choice of action.choices) {
-    const option = document.createElement('option');
-    option.value = choice;
-    option.textContent = choice;
-    if (choice === action.key) option.selected = true;
-    select.appendChild(option);
-  }
-  select.addEventListener('change', async () => {
-    const taken = TorvalKeys.clash(action.name, select.value);
-    if (taken) {
-      select.value = action.key;
-      return sayAboutKeys(select.value + ' is already ' + taken.toLowerCase() + '.', true);
-    }
-    await TorvalKeys.set(action.name, select.value);
-    drawShortcuts();
-    sayAboutKeys('Saved.');
-  });
-  return select;
 }
 
 function keyButton(action) {
   const button = document.createElement('button');
   button.className = 'shortcut-key' + (action.isDefault ? '' : ' changed');
   button.textContent = TorvalKeys.label(action.key);
-  button.title = action.isDefault ? 'Click to change' : 'Changed from the default. Click to change';
+  button.title = action.hold ? 'Click to change it' : 'Click, then press a key';
   button.addEventListener('click', () => {
+    if (action.hold) return cycleHeld(action);
     if (listening && listening.button === button) return stopListening();
     stopListening();
     listening = { action, button };
@@ -353,6 +324,17 @@ function keyButton(action) {
     sayAboutKeys('');
   });
   return button;
+}
+
+/** Shift, then Alt, then Control, then round again. */
+async function cycleHeld(action) {
+  const choices = action.choices;
+  const next = choices[(choices.indexOf(action.key) + 1) % choices.length];
+  const taken = TorvalKeys.clash(action.name, next);
+  if (taken) return sayAboutKeys(next + ' is already ' + taken.toLowerCase() + '.', true);
+  await TorvalKeys.set(action.name, next);
+  drawShortcuts();
+  sayAboutKeys('Saved.');
 }
 
 function stopListening() {
@@ -375,7 +357,7 @@ document.addEventListener('keydown', async (e) => {
   const { action } = listening;
   if (e.key === 'Escape') return stopListening();
 
-  if (!TorvalKeys.usable(e.key, TorvalKeys.ACTIONS.find((a) => a.name === action.name))) {
+  if (!TorvalKeys.usable(e.key, { name: action.name })) {
     stopListening();
     return sayAboutKeys('That one cannot be a shortcut. Try a letter or a number.', true);
   }
