@@ -2158,6 +2158,23 @@ const run = async () => {
   check('filenames survive any filesystem', /^torval-[a-z0-9]+\.jpg$/.test(name1), name1);
   check('the extension is kept', Video.name('x', 'webm').endsWith('.webm'));
 
+  // Mining a second word out of the same subtitle should not record the
+  // line again. What counts as "the same" is the same stretch of the same
+  // video asked for with the same lead-in.
+  const oneVideo = { currentSrc: 'blob:https://www.youtube.com/abc' };
+  const anotherVideo = { currentSrc: 'blob:https://www.youtube.com/xyz' };
+  const theLine = 'Ho visto le sue case.';
+  const theCue = { start: 12.5, end: 15.25 };
+  check('the same line in the same video is the same recording',
+    Video._clipKey(oneVideo, theLine, theCue, 0.1) === Video._clipKey(oneVideo, theLine, theCue, 0.1));
+  check('a different video is not',
+    Video._clipKey(oneVideo, theLine, theCue, 0.1) !== Video._clipKey(anotherVideo, theLine, theCue, 0.1));
+  check('nor is a different stretch of the same one',
+    Video._clipKey(oneVideo, theLine, theCue, 0.1) !==
+    Video._clipKey(oneVideo, theLine, { start: 12.5, end: 15.5 }, 0.1));
+  check('nor the same stretch asked for with a different lead-in',
+    Video._clipKey(oneVideo, theLine, theCue, 0.1) !== Video._clipKey(oneVideo, theLine, theCue, 0.4));
+
   // --- how long a line actually lasts ---------------------------------------
   // An automatic caption revises itself as the recogniser hears more, and
   // every revision is filed as a cue of its own. What you read as one line is

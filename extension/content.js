@@ -1874,7 +1874,13 @@
 
     let media = {};
     if (fromVideo && typeof TorvalVideo !== 'undefined') {
-      const doing = cue ? saying(entryEl, 'Recording the line…') : null;
+      // Only say it when it is true. A second word out of the same subtitle
+      // reuses the line already recorded, so nothing is played back and
+      // there is nothing to wait for; the message would be a flash of a
+      // sentence describing something that did not happen.
+      const recording = cue && !TorvalVideo.hasClip(sentence, cue,
+        { lead: (settings[ankiConfigKey] || {}).lead });
+      const doing = recording ? saying(entryEl, 'Recording the line…') : null;
       try {
         media = await TorvalVideo.capture(sentence, cue, { lead: (settings[ankiConfigKey] || {}).lead });
       } finally {

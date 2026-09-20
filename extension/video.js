@@ -128,19 +128,62 @@ var TorvalVideo = (function () {
    * seconds; without one there is no audio, only the frame.
    * Returns {} where there is no video, or where the video refuses to be read.
    */
+  /*
+   * The line recorded most recently, and what it was recorded from.
+   *
+   * Mining two words out of one subtitle is completely ordinary, and it
+   * meant recording the same line twice: the video jumped back, played the
+   * line again in real time, and produced a second copy of a file identical
+   * to the one just made. The second word cost as long as the line does for
+   * nothing.
+   *
+   * One line is remembered, not a collection of them. The case this is for
+   * is two or three words out of the line in front of you, and a clip is a
+   * few hundred kilobytes of WAV; keeping every line of a film in memory to
+   * serve a case that does not arise is the wrong trade.
+   */
+  var lastClip = null;
+
+  /**
+   * What makes one recording the same as another: the same stretch of the
+   * same video, asked for with the same lead-in. The video's own source is
+   * in there so that two videos whose lines happen to coincide in text and
+   * timing cannot be mistaken for one, and so that the memory is dropped
+   * the moment a different video is playing.
+   */
+  function clipKey(video, sentence, cue, lead) {
+    return [video.currentSrc || video.src || '', sentence, cue.start, cue.end, lead].join('\u0000');
+  }
+
+  /** Is the line already recorded, so that mining it again costs nothing? */
+  function hasClip(sentence, cue, options) {
+    var video = currentVideo();
+    if (!video || !cue || !(cue.end > cue.start)) return false;
+    return !!lastClip && lastClip.key === clipKey(video, sentence, cue, leadFrom(options));
+  }
+
+  function leadFrom(options) {
+    return options && typeof options.lead === 'number' && isFinite(options.lead)
+      ? Math.max(0, Math.min(MAX_LEAD_SECONDS, options.lead))
+      : LEAD_SECONDS;
+  }
+
   async function capture(sentence, cue, options) {
     var video = currentVideo();
     if (!video) return {};
     var out = {};
-    var lead = options && typeof options.lead === 'number' && isFinite(options.lead)
-      ? Math.max(0, Math.min(MAX_LEAD_SECONDS, options.lead))
-      : LEAD_SECONDS;
+    var lead = leadFrom(options);
 
     // Before anything moves: the picture you were actually looking at.
     var frame = grabFrame(video);
     if (frame) out.image = { filename: name(sentence, 'jpg'), data: frame };
 
     if (cue && cue.end > cue.start) {
+      var key = clipKey(video, sentence, cue, lead);
+      if (lastClip && lastClip.key === key) {
+        out.sentenceAudio = lastClip.audio;
+        return out;
+      }
       var clip = await record(video, cue.start, cue.end, lead);
       var sound = clip ? await asWav(clip) : null;
       if (sound) {
@@ -150,6 +193,10 @@ var TorvalVideo = (function () {
         // with sound Anki may refuse is better than a card with none.
         out.sentenceAudio = { filename: name(sentence, 'webm'), data: await toBase64(clip) };
       }
+      // Only a recording that actually came out is worth remembering. A line
+      // too short to record, or one the recorder returned nothing for, has
+      // to be allowed to be tried again.
+      if (out.sentenceAudio) lastClip = { key: key, audio: out.sentenceAudio };
     }
     return out;
   }
@@ -383,6 +430,9 @@ var TorvalVideo = (function () {
 
   return {
     capture: capture, record: record, currentVideo: currentVideo, name: name,
+    hasClip: hasClip,
+    // Exposed for the tests: what counts as the same recording.
+    _clipKey: clipKey, _forgetClip: function () { lastClip = null; },
     // Exposed for the tests: the file the card actually carries.
     _toMono: toMono, _wavFile: wavFile
   };
