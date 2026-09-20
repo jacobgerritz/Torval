@@ -132,18 +132,35 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
  * the CORS permission the response never carries, before the browser decides
  * whether the read is allowed, the same technique CORS-unblocking extensions
  * use generally, scoped only to the address Torval itself asks for again.
+ *
+ * Chrome has no such thing any more. A blocking webRequest listener is
+ * refused outright under Manifest V3 there, so Chrome is handed the same
+ * rewrite as a declarativeNetRequest rule instead, in rules.json: it says
+ * the same thing, declared up front rather than decided per request, which
+ * is the whole of what Chrome took blocking listeners away for. The two
+ * never both apply, since only one of them is in any given browser's
+ * manifest, and the registration below is wrapped because a browser that
+ * will not have it says so by throwing.
  */
 if (api.webRequest && api.webRequest.onHeadersReceived) {
-  api.webRequest.onHeadersReceived.addListener(
-    (details) => {
-      const headers = (details.responseHeaders || [])
-        .filter((h) => h.name.toLowerCase() !== 'access-control-allow-origin');
-      headers.push({ name: 'Access-Control-Allow-Origin', value: '*' });
-      return { responseHeaders: headers };
-    },
-    { urls: ['https://www.youtube.com/api/timedtext*'] },
-    ['blocking', 'responseHeaders']
-  );
+  try {
+    api.webRequest.onHeadersReceived.addListener(
+      (details) => {
+        const headers = (details.responseHeaders || [])
+          .filter((h) => h.name.toLowerCase() !== 'access-control-allow-origin');
+        headers.push({ name: 'Access-Control-Allow-Origin', value: '*' });
+        return { responseHeaders: headers };
+      },
+      { urls: ['https://www.youtube.com/api/timedtext*'] },
+      ['blocking', 'responseHeaders']
+    );
+  } catch (err) {
+    // Chrome, where rules.json is doing this instead. Worth one line rather
+    // than silence: if it ever throws in Firefox, subtitles stop working and
+    // this is the only thing that would say why.
+    console.log('Torval: this browser does not take a blocking listener, ' +
+      'so the caption rewrite is coming from its own rule file instead.');
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1068,9 +1085,47 @@ async function start() {
     return db;
   }
 
-  await importDictionary(db, meta);
+  const awake = keepAwake();
+  try {
+    await importDictionary(db, meta);
+  } finally {
+    awake();
+  }
   dropFormerDatabases().catch(() => {});
   return db;
+}
+
+/**
+ * Keep the background script alive for the length of the import.
+ *
+ * Chrome runs this file as a service worker and shuts it down after thirty
+ * seconds with nothing to do. Importing a dictionary is about a minute, and
+ * almost all of it is waiting on IndexedDB, which is not something Chrome
+ * counts as having something to do: the worker would be stopped halfway
+ * through, every time, for ever.
+ *
+ * Calling an extension API resets that timer, so one trivial call every
+ * twenty seconds holds it open. It is nothing but a heartbeat: nothing is
+ * asked of the answer.
+ *
+ * Firefox does not stop an event page mid-await and so never needs this,
+ * but it costs one call every twenty seconds while a dictionary is being
+ * built and nothing at all afterwards, which is not worth branching on.
+ *
+ * This is deliberately a belt to importDictionary's braces, not a
+ * replacement for them: the import writes down where it got to after every
+ * chunk and picks up from there, so a worker stopped anyway, by a browser
+ * restart, a crash, a heartbeat that did not land, loses one chunk rather
+ * than the whole minute.
+ *
+ * Returns the function that stops it.
+ */
+function keepAwake() {
+  if (!(api.runtime && api.runtime.getPlatformInfo)) return function () {};
+  const beat = setInterval(() => {
+    try { api.runtime.getPlatformInfo(); } catch (err) { /* nothing to do about it */ }
+  }, 20000);
+  return function () { clearInterval(beat); };
 }
 
 /**

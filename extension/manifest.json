@@ -6,8 +6,10 @@
   "author": "Jacob Gerritz",
   "homepage_url": "https://github.com/jacobgerritz/torval",
   "icons": {
-    "48": "icon.svg",
-    "96": "icon.svg"
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
   },
   "browser_specific_settings": {
     "gecko": {
@@ -23,10 +25,21 @@
     "unlimitedStorage",
     "webRequest",
     "webRequestBlocking",
+    "declarativeNetRequest",
     "downloads",
     "scripting"
   ],
+  "declarative_net_request": {
+    "rule_resources": [
+      {
+        "id": "captions",
+        "enabled": true,
+        "path": "rules.json"
+      }
+    ]
+  },
   "background": {
+    "service_worker": "sw.js",
     "scripts": [
       "japanese.js",
       "scan.js",
@@ -72,6 +85,7 @@
         "spanish-scan.js",
         "lang.js",
         "stress.js",
+        "article.js",
         "lookup-common.js",
         "subtitles.js",
         "video.js",
@@ -96,7 +110,12 @@
   "action": {
     "default_title": "Torval",
     "default_popup": "switch.html",
-    "default_icon": "icon.svg"
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
+    }
   },
   "host_permissions": [
     "http://127.0.0.1:8765/*",
