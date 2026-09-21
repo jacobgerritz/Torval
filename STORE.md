@@ -235,6 +235,11 @@ looks like obfuscation if it is not explained. Say this:
       each zip in its own browser. The Chrome service worker and the
       declarativeNetRequest rule have no Firefox equivalent and are the two
       things most likely to be wrong.
+- [ ] The AnkiWeb link on the Words page is a real one. The add-on in
+      `anki/known_words_export/` gets its id from AnkiWeb at its first
+      upload; until then `extension/options.html` links to
+      `shared/info/000000000`. `node tools/package.mjs` says so on every
+      build until it is replaced.
 - [ ] Chrome's one-time $5 developer registration is paid.
 - [ ] Nothing in the console. Torval says nothing on an ordinary page now,
       and narrates itself only when the box on the About panel is ticked.

@@ -42,7 +42,8 @@ const DICTIONARIES = [
 ];
 
 const manifest = JSON.parse(readFileSync(join(EXTENSION, 'manifest.json'), 'utf8'));
-const problems = [];
+const problems = [];   // these stop the build
+const warnings = [];   // these only say so
 
 // --- every file the manifest names ----------------------------------------
 const named = [
@@ -109,6 +110,20 @@ for (const [dir, how] of DICTIONARIES) {
 // --- nothing left lying around --------------------------------------------
 for (const f of readdirSync(EXTENSION)) {
   if (/^zz-|\.orig$|\.rej$|~$/.test(f)) problems.push(`extension/${f} looks like a leftover`);
+}
+
+// --- and one thing that is only wrong on the day it ships -----------------
+// The settings page links to the Anki add-on on AnkiWeb, which hands out its
+// id at the first upload. Until then the link is a placeholder. That must not
+// stop a build, since the builds are how the add-on gets tested, but it must
+// not go quietly into a store either.
+if (readFileSync(join(EXTENSION, 'options.html'), 'utf8').includes('shared/info/000000000')) {
+  warnings.push('the AnkiWeb link on the Words page is still the placeholder id');
+}
+
+if (warnings.length) {
+  for (const w of warnings) console.warn('note: ' + w);
+  console.warn('');
 }
 
 if (problems.length) {
