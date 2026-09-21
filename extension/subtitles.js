@@ -203,6 +203,11 @@ var TorvalSubtitles = (function () {
       // segments there is nothing being said, and saying nothing is the
       // right answer rather than a missed one.
       lines: ['.ytp-caption-segment'],
+      // Drawn over the video, so it lands in a photograph of the window
+      // unless it is put away first. See hideOverlays in video.js.
+      overlays: '.ytp-chrome-top, .ytp-chrome-bottom, .ytp-gradient-top, ' +
+        '.ytp-gradient-bottom, .ytp-ce-element, .ytp-paid-content-overlay, ' +
+        '.iv-branding, .ytp-title, .annotation',
       // Anything in the caption box that is a control rather than words,
       // left out of a line even when it sits inside one. See wordsIn.
       furniture: 'button, a, [role="button"], [role="menu"], [role="menuitem"], ' +
@@ -222,6 +227,10 @@ var TorvalSubtitles = (function () {
       },
       captions: '.player-timedtext',
       lines: ['.player-timedtext-text-container span', '.player-timedtext-text-container'],
+      overlays: '.watch-video--bottom-controls-container, ' +
+        '[data-uia="controls-standard"], .watch-video--back-to-browsing, ' +
+        '.watch-video--evidence-overlay, .PlayerControlsNeo__layout, ' +
+        '.watch-video--skip-content, .advisory-text-container',
       furniture: 'button, a, [role="button"]',
       player: '.watch-video--player-view, .watch-video, .VideoContainer',
       catches: true,
@@ -246,6 +255,15 @@ var TorvalSubtitles = (function () {
    * subtitle file could not be had and the lines are being read off the
    * screen instead.
    */
+  /**
+   * Everything this site draws on top of the video: the control bar, the
+   * title, the skip button. Harmless on screen and ruinous in a screenshot,
+   * which is the only thing that asks for it.
+   */
+  function overlays() {
+    return (site && site.overlays) || '';
+  }
+
   function captionBox() {
     if (!site || !site.captions) return null;
     try { return document.querySelector(site.captions); } catch (err) { return null; }
@@ -2328,6 +2346,7 @@ var TorvalSubtitles = (function () {
     wholeLine: wholeLine,
     siteFor: siteFor,
     captionBox: captionBox,
+    overlays: overlays,
     seekTo: seekTo,
     /** Whether this site insists on being moved by its own player. */
     ownSeek: function () { return !!(site && site.seek); },

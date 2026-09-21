@@ -194,6 +194,10 @@ var TorvalVideo = (function () {
     if (!video) return {};
     var out = {};
     var lead = leadFrom(options);
+    // Cleared here, not left standing. It says "click the toolbar button",
+    // which is true of the attempt that set it and a lie on every card
+    // after somebody has.
+    needsInvoking = false;
     var sealed = contentProtected(video);
     trace('Torval: capturing from a video that is ' +
       (sealed ? 'decrypting, so the sound has to come off the tab' : 'not protected'));
@@ -417,7 +421,7 @@ var TorvalVideo = (function () {
     var rect = video.getBoundingClientRect();
     if (rect.width < 1 || rect.height < 1) return null;
 
-    var show = hideCaptions();
+    var show = hideOverlays();
     var shot = null;
     try {
       await painted();
@@ -436,16 +440,65 @@ var TorvalVideo = (function () {
     return await cropTo(shot.data, rect);
   }
 
-  /** Put the site's captions away, and hand back the undo. */
-  function hideCaptions() {
-    var box = null;
-    if (typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.captionBox) {
-      try { box = TorvalSubtitles.captionBox(); } catch (err) { box = null; }
+  /** Torval's own furniture, all of which sits over the page. */
+  var OWN_OVERLAYS = '[data-torval-bar], [data-torval-subtitle], ' +
+    '[data-torval-popup], [data-torval-say]';
+
+  /**
+   * Everything drawn over the video, out of the way for one frame.
+   *
+   * A photograph of the window is a photograph of what is in front of the
+   * video as well: the site's subtitles, its control bar, Torval's own bar
+   * and popup. Subtitles are the one that ruins the card outright, since
+   * the answer would be printed on the front of it, but a screenshot with
+   * a scrub bar across the bottom is nobody's idea of a picture either.
+   *
+   * visibility rather than display: nothing reflows, so nothing moves in
+   * the frame being photographed and nothing has to settle afterwards.
+   */
+  function hideOverlays() {
+    var found = [];
+    var gather = function (selector) {
+      if (!selector) return;
+      var all;
+      try { all = document.querySelectorAll(selector); } catch (err) { return; }
+      for (var i = 0; i < all.length; i++) found.push(all[i]);
+    };
+    gather(OWN_OVERLAYS);
+    if (typeof TorvalSubtitles !== 'undefined') {
+      try {
+        var box = TorvalSubtitles.captionBox && TorvalSubtitles.captionBox();
+        if (box) found.push(box);
+      } catch (err) { /* no captions to hide */ }
+      try {
+        if (TorvalSubtitles.overlays) gather(TorvalSubtitles.overlays());
+      } catch (err) { /* this site has none named */ }
     }
-    if (!box) return function () { /* nothing was hidden */ };
-    var was = box.style.visibility;
-    box.style.visibility = 'hidden';
-    return function () { box.style.visibility = was; };
+    var was = found.map(function (el) { return el.style.visibility; });
+    found.forEach(function (el) { el.style.visibility = 'hidden'; });
+    return function () {
+      found.forEach(function (el, at) { el.style.visibility = was[at]; });
+    };
+  }
+
+  /**
+   * Wait for a backward seek to actually take.
+   *
+   * The seeked event cannot be trusted here. Netflix is seeked through its
+   * own player rather than by setting currentTime, so the event that
+   * arrives may belong to a seek that finished a moment ago, and the clock
+   * still reads where the person was watching. Everything after it then
+   * passes at once: the recorder starts and is told the line is already
+   * over, and what comes out is the half second before the line, which is
+   * the tail of the line before it.
+   *
+   * So the clock is watched instead. It is going backwards past `open`
+   * that proves the seek landed. Somebody who pressed + before the line had
+   * started is already behind it, and there is nothing to wait for.
+   */
+  function landed(video, open) {
+    if (video.currentTime < open) return Promise.resolve();
+    return until(function () { return video.currentTime < open; }, 5000);
   }
 
   /** Two frames, so a style change has actually reached the screen. */
@@ -556,6 +609,7 @@ var TorvalVideo = (function () {
 
       // Watch the clock rather than trusting a timer: buffering, or a frame
       // dropped, would otherwise cut the line short at either end.
+      await landed(video, open);
       await until(function () { return video.currentTime >= open; }, 5000);
       recorder.start();
       headTrim = Math.max(0, from - video.currentTime - TRIM_SAFETY);
@@ -634,6 +688,7 @@ var TorvalVideo = (function () {
       if (!seekTo(Math.max(0, open - PREROLL_SECONDS))) return null;
       await seeked(video);
       await video.play();
+      await landed(video, open);
       await until(function () { return video.currentTime >= open; }, 5000);
 
       await ask(api, { type: 'tabAudioStart', mimeType: mimeType() });
