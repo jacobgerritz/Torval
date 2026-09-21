@@ -2068,6 +2068,29 @@ const run = async () => {
     Subs.segmentText({}) === '' && Subs.segmentText(null) === '');
 
   // --- picking which track to use -----------------------------------------
+  //
+  // These are all about Japanese tracks, so Japanese has to be the language
+  // being read. It used to be enough to say nothing, because subtitles.js
+  // fell back to Japanese whenever no language could be reached; it does
+  // not any more, since falling back to a language is guessing what
+  // somebody is watching and a wrong guess draws Japanese over an Italian
+  // film. Saying which language it is, is now the test's job, which is how
+  // it should have been written in the first place.
+  //
+  // First, the bug that prompted all this: with no language reachable at
+  // all, nothing is picked. On a reload the content script used to start
+  // before storage had answered, TorvalLang still said Japanese because
+  // that is what it says until it knows better, and a reader on Italian
+  // got a Japanese track fetched and drawn over an Italian film.
+  check('with no language known, no subtitle track is chosen',
+    !Subs.pickTrack([
+      { languageCode: 'ja', baseUrl: 'ja', auto: false },
+      { languageCode: 'it', baseUrl: 'it', auto: false }
+    ]));
+
+  globalThis.TorvalLang = Lang;
+  Lang._setActive('ja');
+
   // A video can carry both a manual and an auto-generated Japanese track;
   // nothing about their order says which is which, so the manual one is
   // preferred by property, not position.
@@ -2152,6 +2175,20 @@ const run = async () => {
     !Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&lang=ja&tlang=en'));
   check('and one that says no language at all is not vouched for',
     !Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&signature=x'));
+
+  // And on Italian it is the Italian track that is wanted, which is the
+  // other half of the same question.
+  Lang._setActive('it');
+  check('the wanted track follows the language being read',
+    Subs.pickTrack([
+      { languageCode: 'ja', baseUrl: 'ja', auto: false },
+      { languageCode: 'it', baseUrl: 'it', auto: false }
+    ]).baseUrl === 'it');
+  check('and so does the caption address that is accepted',
+    Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&lang=it&signature=x') &&
+    !Subs.wantedTimedtext('https://www.youtube.com/api/timedtext?v=abc&lang=ja&signature=x'));
+  Lang._setActive('ja');
+  delete globalThis.TorvalLang;
 
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its

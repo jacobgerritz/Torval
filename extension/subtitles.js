@@ -66,9 +66,16 @@ var TorvalSubtitles = (function () {
   // reported as having no subtitle track no matter how many Italian tracks
   // it offered, and fell all the way back to reading the captions off the
   // screen.
+  //
+  // And an empty list rather than a Japanese one when there is no profile
+  // to ask. A default here is a guess about what somebody is watching, and
+  // a wrong guess is not a smaller version of the right one: it fetches a
+  // Japanese track and draws it over an Italian film. Wanting nothing is
+  // the honest answer, and the only thing that happens is that no track is
+  // chosen.
   function languages() {
     var profile = typeof TorvalLang !== 'undefined' ? TorvalLang.profile() : null;
-    return (profile && profile.subtitles) || ['ja', 'ja-JP'];
+    return (profile && profile.subtitles) || [];
   }
   var MAX_LOOKUP_ATTEMPTS = 12;    // ~12s of retrying before giving up on the player existing
   var MIN_OBSERVED_SECONDS = 0.15; // shorter than this is a DOM flicker, not a line
@@ -316,7 +323,33 @@ var TorvalSubtitles = (function () {
     if (overlay && suspended) overlay.style.display = 'none';
   }
 
+  /**
+   * Start watching, once it is known what to watch for.
+   *
+   * The wait is the whole point. TorvalLang answers synchronously from a
+   * cache, and until storage comes back that cache says Japanese, because
+   * that is what every install had before there was anything to choose.
+   * This used to start the moment the content script ran, which on a
+   * reload is comfortably inside that window, so the first pass went
+   * looking for a Japanese track and, on a video that had one, found it
+   * and drew it. The reader was on Italian throughout; nothing was wrong
+   * with the setting, only with when it was read.
+   *
+   * lang.js has had `ready()` for exactly this since background.js needed
+   * it to open the right dictionary. This is the other caller that needed
+   * it and did not know.
+   */
   function enable() {
+    if (enabled || starting) return;
+    starting = true;
+    var settled = (typeof TorvalLang !== 'undefined' && TorvalLang.ready)
+      ? TorvalLang.ready() : Promise.resolve();
+    settled.then(start, start);
+  }
+
+  var starting = false;
+
+  function start() {
     if (enabled) return;
     site = null;
     for (var name in SITES) {
@@ -499,6 +532,21 @@ var TorvalSubtitles = (function () {
       return current;
     }
     return best;
+  }
+
+  /**
+   * Forget this video's subtitles and go and get them again.
+   *
+   * For a change of language, which makes everything already fetched the
+   * wrong language. Without this, switching from Japanese to Italian left
+   * the Japanese lines on screen until the video was changed, since that
+   * was the only thing that ever cleared them.
+   */
+  function restart() {
+    if (!enabled) return;
+    videoId = null;      // watch() clears the rest when it sees the id change
+    if (overlay) overlay.style.display = 'none';
+    watch();
   }
 
   function watch() {
@@ -2139,6 +2187,7 @@ var TorvalSubtitles = (function () {
     count: count,
     waiting: waiting,
     enable: enable,
+    restart: restart,
     cueAt: cueAt,
     cueFor: cueFor,
     around: around,

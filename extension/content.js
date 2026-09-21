@@ -156,7 +156,14 @@
   /** And put back, without making anybody reload the page. */
   function bringBack() {
     if (typeof TorvalBar !== 'undefined') TorvalBar.visible(true);
-    if (typeof TorvalSubtitles !== 'undefined') TorvalSubtitles.suspend(false);
+    if (typeof TorvalSubtitles !== 'undefined') {
+      TorvalSubtitles.suspend(false);
+      // A change of language makes every line already fetched the wrong
+      // language, and the only thing that used to clear them was opening a
+      // different video. Switching from Japanese to Italian left the
+      // Japanese ones on screen over the Italian film.
+      if (TorvalSubtitles.restart) TorvalSubtitles.restart();
+    }
     lastTranscript = '';
     readPage();
   }
