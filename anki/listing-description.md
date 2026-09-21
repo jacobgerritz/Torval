@@ -7,7 +7,8 @@ the clipboard, or as JSON.
 
 * **Save as text**: one word per line.
 * **Copy**: the same, on the clipboard.
-* **Save for Torval**: JSON, with the date each word was first studied.
+* **Save for Torval**: JSON, with the date each word was first studied,
+  which a text file can't carry.
 
 ### What it exports
 
@@ -46,18 +47,11 @@ article.
 Named for the deck and the day, so exporting several decks in a row doesn't
 overwrite anything.
 
-### If you use Torval
+### That third button
 
-[Torval](https://github.com/jacobgerritz/Torval) is a free, open-source
-pop-up dictionary for Japanese, Italian and Spanish. Hold Shift over a word
-on any page and it tells you what the word means. It can also keep track of
-the words you know, and that list starts empty, which is what the third
-button is for. Load the file under **Settings → Words → Keeping a copy →
-Load from a file**.
-
-The other two buttons have nothing to do with it. A plain list of words, one
-per line, is read by plenty of things; the JSON is only there because a text
-file can't carry a date.
+[Torval](https://github.com/jacobgerritz/Torval) is a pop-up dictionary that
+keeps a list of the words you know. Load the JSON into it under **Settings →
+Words → Keeping a copy → Load from a file**.
 
 Free and open source, GPL-3.0.
 Source and issues: <https://github.com/jacobgerritz/Torval>
