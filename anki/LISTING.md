@@ -23,10 +23,17 @@ the add-on comes from AnkiWeb.
 
     https://github.com/jacobgerritz/Torval/issues
 
-**Supported Anki versions.** Minimum 2.1.50, maximum left open. That floor is
-where `aqt.qt` and the modern add-on API settled, and the one line that knew
-which Qt it was talking to has been made to work either way, so the claim is
-true rather than hopeful.
+**Branches.** One branch, because there is one file. Supports `2.1.50` to
+`26.09`, with no `-` in front of the second number.
+
+The floor is where `aqt.qt` and the modern add-on API settled, and the one
+line that knew which Qt it was talking to has been made to work either way,
+so the claim is true rather than hopeful. The ceiling is simply the newest
+Anki this has been run on: without a `-` prefix it is not a cap, and AnkiWeb
+keeps offering the add-on to versions above it. Writing `-26.09` would stop
+that, which is for an add-on known to break on the next release, not for one
+that merely has not met it yet. Raise the number when a newer Anki has been
+tried.
 
 ---
 
