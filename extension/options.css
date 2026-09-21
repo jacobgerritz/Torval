@@ -167,6 +167,17 @@ h2 {
   font-size: 12.5px;
 }
 
+/*
+ * The same, under a tick box. That 162px is the width of the label column
+ * a field sits in, and a tick box is not in it: the hint under one landed
+ * a third of the way across the card with nothing above it, which is how
+ * this was noticed. Here it lines up with the tick box's own words
+ * instead, one box and one gap in from the edge.
+ */
+.check + .hint {
+  margin: 4px 0 16px 26px;
+}
+
 /* --- forms --------------------------------------------------------------- */
 
 label {
