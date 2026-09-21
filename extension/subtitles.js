@@ -105,6 +105,13 @@ var TorvalSubtitles = (function () {
   // How many passes of watch(), which is one a second, to wait for a site to
   // hand over its own subtitle file before reading the screen instead.
   var WAIT_TO_BE_HANDED = 5;
+  // And how long to go on reading the screen with nothing appearing on it
+  // before saying so. Generous, because a film can open on two minutes of
+  // nobody speaking; but not for ever, which is what it used to be. The
+  // usual reason nothing appears is that the site's own subtitles are
+  // switched off, and on Netflix there is no button Torval can reach to
+  // turn them on, so the only thing left is to say what is wrong.
+  var WATCH_IN_SILENCE = 90;
 
   var ROLL_CHARACTERS = 60;
   var ROLL_SECONDS = 10;
@@ -243,6 +250,7 @@ var TorvalSubtitles = (function () {
   var video = null;
   var state = 'idle';        // idle | loading | ready | watching | unavailable
   var attempts = 0;
+  var silence = 0;           // passes spent watching a screen with nothing on it
 
   /**
    * Put the subtitles away, or bring them back, for the switch on the
@@ -587,6 +595,7 @@ var TorvalSubtitles = (function () {
       attempts = 0;
       caughtFile = '';
       caughtWrong = '';
+      silence = 0;
       trace('Torval: video is now', id || '(none, not a watch page)');
     }
 
@@ -607,6 +616,29 @@ var TorvalSubtitles = (function () {
       // screen, since the file usually arrives about as fast as the video.
       if (site.fetches) { if (attempts <= MAX_LOOKUP_ATTEMPTS) load(id); }
       else if (attempts > WAIT_TO_BE_HANDED) fallBackToWatching();
+    }
+
+    /*
+     * Reading the screen, and nothing has appeared on it for a long time.
+     *
+     * 'unavailable' has been in the list of states this can be in since the
+     * beginning, and in the test `waiting()` makes, and it was never once
+     * assigned: nothing ever concluded that subtitles were not coming. So
+     * the bar said "Reading the subtitles…" for as long as the video was
+     * open, which on a Netflix episode with the site's own subtitles
+     * switched off is for ever, and looks from the outside exactly like
+     * Torval doing nothing at all.
+     */
+    if (id && state === 'watching' && !cues.length) {
+      silence++;
+      if (silence === WATCH_IN_SILENCE) {
+        state = 'unavailable';
+        console.warn('Torval: no subtitles have appeared on this video. ' +
+          'Torval is reading them off the screen, which needs the site’s own ' +
+          'subtitles switched on, in ' + (TorvalLang.profile().name) + '.');
+      }
+    } else {
+      silence = 0;
     }
 
     video = document.querySelector('video');

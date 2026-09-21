@@ -95,15 +95,60 @@ var TorvalNetflix = (function () {
    * and the language it reads is only settled once storage has answered.
    */
   function announce() {
-    var wanted = (typeof TorvalLang !== 'undefined' && TorvalLang.profile().subtitles) || null;
+    var wanted = wantedLanguages();
     if (!wanted) return;
     window.postMessage({ torval: 'torval-netflix-want', languages: wanted }, '*');
   }
 
+  /**
+   * The subtitle languages to ask Netflix for, or null when there is no
+   * answer to give: TorvalLang has not loaded into this scope yet, or
+   * nobody has chosen a language.
+   *
+   * Null rather than a guess. askFor used to fall back to ['ja'] here,
+   * which meant that in the window before the rest of Torval had loaded,
+   * Netflix was asked for a Japanese subtitle file for a Spanish show.
+   * The same mistake was in the YouTube path and was taken out of it; this
+   * is the copy that was missed.
+   */
+  function wantedLanguages() {
+    if (typeof TorvalLang === 'undefined') return null;
+    if (TorvalLang.picked && !TorvalLang.picked()) return null;
+    var profile = TorvalLang.profile();
+    return (profile && profile.subtitles) || null;
+  }
+
+  /*
+   * This file runs at document_start, and everything else Torval puts on
+   * the page runs at document_idle, so at the moment these lines are read
+   * TorvalLang does not exist yet. Content scripts of one extension share
+   * a scope, so it appears a moment later, which the delayed announces
+   * above were already relying on.
+   *
+   * What it was not relying on, and should have been, is that the same is
+   * true of the listener: `TorvalLang.onChange(announce)` was written
+   * straight into this file's top level, where the guard around it was
+   * always false and the listener was therefore never registered at all.
+   * Picking a language, or changing it, never reached Netflix. So the
+   * registration waits for TorvalLang to turn up.
+   */
   announce();
   setTimeout(announce, 2000);
   setTimeout(announce, 6000);
-  if (typeof TorvalLang !== 'undefined' && TorvalLang.onChange) TorvalLang.onChange(announce);
+  listenForLanguage();
+
+  function listenForLanguage() {
+    if (typeof TorvalLang === 'undefined' || !TorvalLang.onChange) {
+      // Not yet. The rest of Torval is a few hundred milliseconds behind
+      // this file at most, and this stops after a minute either way.
+      if (Date.now() - started < 60000) setTimeout(listenForLanguage, 250);
+      return;
+    }
+    TorvalLang.onChange(announce);
+    TorvalLang.ready().then(announce);
+  }
+
+  var started = Date.now();
 
   /**
    * Which of the tracks Netflix offered to ask for.
@@ -115,7 +160,11 @@ var TorvalNetflix = (function () {
    * closed captions write out speaker names and sounds as well as speech.
    */
   function askFor(tracks) {
-    var wanted = (typeof TorvalLang !== 'undefined' && TorvalLang.profile().subtitles) || ['ja'];
+    var wanted = wantedLanguages();
+    if (!wanted) {
+      say('not asking for a subtitle file yet: no language has been chosen.');
+      return;
+    }
     var best = null;
     for (var i = 0; i < tracks.length; i++) {
       var track = tracks[i];

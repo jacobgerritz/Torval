@@ -214,12 +214,22 @@ var TorvalBar = (function () {
    * least once, it has earned its corner, and on a tab where it never has,
    * it takes itself off the page exactly as before.
    */
-  function quiet() {
+  function quiet(why) {
     stopWaiting();
     if (!host) return;
     if (data && data.total) { idle(); return; }
     idle();
     els.score.textContent = '';
+    // A reason is worth staying on the page for. "Nothing to read here" is
+    // not, and is the ordinary case on the ordinary web page; but "this
+    // video has no Spanish subtitles" is the answer to the question
+    // somebody is in the middle of asking, and vanishing rather than
+    // saying it is how Torval came to look broken on Netflix.
+    if (why) {
+      els.detail.textContent = why;
+      setExpanded(pinned || always);
+      return;
+    }
     // A bar that was asked to stay, stays, and says why it is empty rather
     // than leaving somebody to wonder. `always` is the reader, whose shelf
     // has no Japanese on it; `pinned` is a deliberate answer to this exact

@@ -990,6 +990,20 @@
       typeof TorvalSubtitles.waiting === 'function' && TorvalSubtitles.waiting();
   }
 
+  /**
+   * On a video whose subtitles never came, what to say instead of nothing.
+   *
+   * This is a different thing from a page with nothing on it. A page with
+   * nothing on it is most pages, and Torval takes itself off those. A
+   * video is somewhere somebody went on purpose, expecting Torval to work,
+   * so the one thing it must not do there is disappear without a word.
+   */
+  function noSubtitlesHere() {
+    if (typeof TorvalSubtitles === 'undefined' || !TorvalSubtitles.status) return '';
+    if (TorvalSubtitles.status() !== 'unavailable') return '';
+    return 'No ' + TorvalLang.profile().name + ' subtitles found on this video';
+  }
+
   async function watchComprehension() {
     if (typeof TorvalHighlight !== 'undefined') await TorvalHighlight.start();
 
@@ -1138,7 +1152,7 @@
       // there genuinely is something still to come, so it keeps saying so
       // instead of falling silent and speaking up again seconds later.
       if (!scored && waitingForSubtitles()) TorvalBar.busy(SUBTITLES_COMING);
-      else if (!scored) TorvalBar.quiet();
+      else if (!scored) TorvalBar.quiet(noSubtitlesHere());
       readingPage = false;
       reading = false;
     }
