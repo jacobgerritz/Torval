@@ -686,12 +686,19 @@ var TorvalBar = (function () {
     // not shrink at all, and below a certain width the two pieces that are
     // decoration rather than information go away entirely. The percentage
     // is what the bar is for and is the last thing to go.
+    // Cutting text with an ellipsis needs overflow:hidden, and overflow on
+    // a flex item makes its height exactly the line box. The bar is set in
+    // 16px/1, so that box is 16 pixels tall while the letters need nearer
+    // 19, and the bottom of every g, y and p was shaved off: "Reading the
+    // subtitles…" lost the tail of its g. The line box has to be taller
+    // than the letters are, which is all line-height is for.
     '.mark { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;',
-    '  white-space: nowrap; font-size: 14px; letter-spacing: 0.08em; color: #5a5f67; }',
+    '  white-space: nowrap; font-size: 14px; line-height: 1.5;',
+    '  letter-spacing: 0.08em; color: #5a5f67; }',
     '.score { flex: 0 0 auto; font-size: 24px; font-weight: 600; color: #f4f5f7;',
     '  font-variant-numeric: tabular-nums; }',
     '.detail, .note {',
-    '  flex: 0 1 auto; min-width: 0; overflow: hidden;',
+    '  flex: 0 1 auto; min-width: 0; overflow: hidden; line-height: 1.5;',
     '  text-overflow: ellipsis; white-space: nowrap;',
     '}',
     '.detail { color: #767b84; }',
