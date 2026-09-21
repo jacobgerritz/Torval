@@ -54,10 +54,11 @@ a little HTML. This is written to read correctly as plain text.
 > IT MAKES ANKI CARDS. One click sends a word to your own collection
 > through AnkiConnect, into whatever note type you already use: the
 > dictionary form, the sentence with the word in bold, the definitions, the
-> frame on screen, and the line as it was spoken. On a copy-protected service
-> such as Netflix the sound cannot be taken at all, and the picture only with
-> your browser's hardware acceleration turned off; Torval says which is
-> missing and why rather than leaving you to notice. Japanese cards can carry
+> frame on screen, and the line as it was spoken. A copy-protected service
+> such as Netflix asks two things of you: the picture needs your browser's
+> hardware acceleration turned off, and the sound needs Chrome, which is the
+> only browser that will hand a tab's audio to an add-on. Torval says which
+> is missing and why rather than leaving you to notice. Japanese cards can carry
 > a pitch-accent diagram; Italian and Spanish mark the stressed vowel, and
 > nouns come with their article, because "il cane" is the thing to learn
 > and "cane" is only half of it.
@@ -130,6 +131,24 @@ justification from a claim into something checkable.
 > rules.json rather than decided per request, because Manifest V3 does not
 > allow a blocking listener. One rule, one URL pattern:
 > `||youtube.com/api/timedtext`.
+
+**`tabCapture`** (Chrome only, and optional: never requested until asked for)
+> The sound of a line on a copy-protected video, for a card. A video the
+> browser is decrypting hands over no audio when its element is asked for a
+> stream, and a tab's own output is the only place left. This is requested
+> at the moment the user ticks "Record its sound from the tab" on the
+> settings page, never on install and never by visiting a site, and it is
+> used on a copy-protected video and nowhere else. The recording is made in
+> an offscreen document, is a few seconds of the line the user just asked to
+> mine, and goes straight onto their own card in their own Anki. Nothing is
+> uploaded. Firefox has no equivalent API, so the Firefox package contains
+> none of this code.
+
+**`offscreen`** (Chrome only)
+> A Manifest V3 service worker has no MediaRecorder, so the recording above
+> has nowhere to happen. offscreen.html is a document with no window and no
+> content, holding that one recorder and nothing else. It is created the
+> first time a line is recorded from a tab and not before.
 
 **`scripting`**
 > Netflix hands its subtitle file to its own player, where only code
@@ -220,6 +239,14 @@ looks like obfuscation if it is not explained. Say this:
 >
 > The add-on is GPL-3.0. Its data keeps the licences of its sources, listed
 > in the add-on's own About panel and in README.md.
+>
+> The Firefox package deliberately differs from the Chrome one in two
+> places, both built by tools/package.mjs from the single
+> extension/manifest.json: webRequestBlocking against declarativeNetRequest,
+> and the absence here of tabCapture, the offscreen permission and
+> offscreen.html/offscreen.js. Those last are Chrome's only way to record a
+> copy-protected video's sound, which Firefox has no API for at all, so
+> shipping them here would be dead code in a review that reads every line.
 
 ---
 

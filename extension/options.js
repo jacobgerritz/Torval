@@ -497,6 +497,65 @@ if (appearance) TorvalLook.ready().then(drawAppearance);
 
 
 // ---------------------------------------------------------------------------
+// Recording a copy-protected video's sound
+// ---------------------------------------------------------------------------
+
+/*
+ * The one thing in Torval that works in one browser and not the other, so
+ * it says which and why rather than looking broken.
+ *
+ * Chrome can hand an extension the sound coming out of a tab, which is the
+ * only way to get a copy-protected video's audio: asking the video element
+ * for a stream of it gets an empty one. Firefox cannot. It has no tabCapture
+ * API, and its getDisplayMedia ignores `audio` without an error, which is
+ * bug 1541425, filed in 2019 and still open. There is nothing to fall back
+ * on and nothing to work around.
+ *
+ * Permission is asked for here and nowhere else, at the moment somebody
+ * ticks the box. Nothing is requested on a fresh install, and nothing is
+ * requested by watching a video: YouTube's sound comes off the element and
+ * always has, which is the ordinary case and wants none of this.
+ */
+const tabAudio = document.getElementById('tab-audio');
+const tabAudioNote = document.getElementById('tab-audio-note');
+
+if (tabAudio && tabAudioNote) {
+  paintTabAudio();
+
+  tabAudio.addEventListener('change', async () => {
+    const wanted = tabAudio.checked;
+    try {
+      if (wanted) await api.permissions.request({ permissions: ['tabCapture'] });
+      else await api.permissions.remove({ permissions: ['tabCapture'] });
+    } catch (err) { /* refused, or asked for from somewhere it may not be */ }
+    // Never from what was clicked: a request can be declined, and a box
+    // that stays ticked after a refusal is a promise the browser did not
+    // make. What is actually held is the only thing worth showing.
+    paintTabAudio();
+  });
+}
+
+async function paintTabAudio() {
+  let state = { can: false, granted: false };
+  try {
+    const reply = await api.runtime.sendMessage({ type: 'tabAudioReady' });
+    if (reply && reply.ok) state = reply.result;
+  } catch (err) { /* the background is still waking up */ }
+
+  tabAudio.checked = !!state.granted;
+  tabAudio.disabled = !state.can;
+  tabAudioNote.textContent = state.can
+    ? 'The line is played back and the tab is recorded, so you hear what is ' +
+      'being captured. Only ever on a copy-protected video; everywhere else ' +
+      'the sound comes off the video itself and this changes nothing.'
+    : 'Chrome and Edge only. Firefox has no way to record a tab: no ' +
+      'tabCapture API, and getDisplayMedia ignores audio (Mozilla bug ' +
+      '1541425, open since 2019). Nothing can work around it. Cards from a ' +
+      'copy-protected video are made here without their sound.';
+}
+
+
+// ---------------------------------------------------------------------------
 // The console
 // ---------------------------------------------------------------------------
 

@@ -233,7 +233,15 @@ api.runtime.onMessage.addListener((message, sender) => {
     case 'exportWords':  return guard(() => exportWords());
     case 'importWords':  return guard(() => importWords(message.data));
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
+    case 'tabAudioReady': return guard(() => tabAudioReady());
+    case 'tabAudioStart': return guard(() => tabAudioStart(sender && sender.tab && sender.tab.id,
+      message.mimeType));
+    case 'tabAudioStop':  return guard(() => tabAudioStop());
     default:
+      // Not for this listener. The offscreen recorder is reached the only
+      // way an extension can reach one of its own documents, which is the
+      // same broadcast everything else here arrives on.
+      if (message && message.to === 'offscreen') return undefined;
       // Saying so out loud. A message with no case here simply never answers,
       // and the caller's `await` sits there for ever, which is exactly how a
       // whole feature can be wired up, look right in every preview, and do
@@ -925,6 +933,103 @@ async function merged(data) {
     known: await saveWords(KNOWN(), known),
     ignored: await saveWords(IGNORED(), ignored)
   };
+}
+
+// ---------------------------------------------------------------------------
+// Recording a copy-protected video's sound
+// ---------------------------------------------------------------------------
+
+/*
+ * Chrome only, and not for want of trying.
+ *
+ * A video the browser is decrypting hands over no audio track when its
+ * element is asked for a stream, so the ordinary path in video.js gets
+ * nothing. The tab's own output is a different thing entirely, just sound
+ * coming out of a tab, and Chrome will hand that over through tabCapture.
+ *
+ * Firefox has no tabCapture API, and its getDisplayMedia ignores `audio`
+ * without an error (bug 1541425, filed in 2019, still open). There is no
+ * third way and nothing to fall back on, so the Firefox build ships without
+ * any of this and the card says the sound cannot be had. package.mjs takes
+ * the two keys out of that manifest rather than leaving Firefox to warn
+ * about an ability the build does not have.
+ *
+ * Permission is asked for only when somebody turns this on, under Settings
+ * → Anki, and never otherwise: YouTube's audio comes off the element and
+ * wants none of this, which is the common case and stays untouched.
+ */
+const OFFSCREEN = 'offscreen.html';
+let offscreenOpen = null;
+
+/** Can this browser do it, and has it been allowed to? */
+async function tabAudioReady() {
+  const can = !!(api.tabCapture && api.offscreen && api.permissions);
+  if (!can) return { can: false, granted: false };
+  let granted = false;
+  try {
+    granted = await api.permissions.contains({ permissions: ['tabCapture'] });
+  } catch (err) { granted = false; }
+  return { can: true, granted: !!granted };
+}
+
+/**
+ * The offscreen document, made once and left open.
+ *
+ * Chrome allows exactly one per extension and throws on a second, which two
+ * quick presses of + will otherwise cause; that particular failure means it
+ * already exists, which is what was wanted anyway.
+ */
+async function ensureOffscreen() {
+  if (offscreenOpen) return offscreenOpen;
+  offscreenOpen = (async () => {
+    if (api.runtime.getContexts) {
+      const open = await api.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+        documentUrls: [api.runtime.getURL(OFFSCREEN)]
+      });
+      if (open.length) return true;
+    }
+    try {
+      await api.offscreen.createDocument({
+        url: OFFSCREEN,
+        reasons: ['USER_MEDIA'],
+        justification: "Recording a copy-protected video's sound for an Anki card."
+      });
+    } catch (err) {
+      if (!/single offscreen|already/i.test(String(err && err.message))) throw err;
+    }
+    return true;
+  })();
+  try {
+    return await offscreenOpen;
+  } catch (err) {
+    offscreenOpen = null;   // so the next press may try again
+    throw err;
+  }
+}
+
+async function tabAudioStart(tabId, mimeType) {
+  const state = await tabAudioReady();
+  if (!state.can) throw new Error('This browser cannot record a tab\u2019s sound.');
+  if (!state.granted) {
+    throw new Error('Torval has not been allowed to record this tab. ' +
+      'Settings \u2192 Anki \u2192 Recording from video.');
+  }
+  if (typeof tabId !== 'number') throw new Error('No tab to record.');
+
+  await ensureOffscreen();
+  const streamId = await api.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  const reply = await api.runtime.sendMessage({
+    to: 'offscreen', type: 'recordStart', streamId, mimeType
+  });
+  if (!reply || !reply.ok) throw new Error((reply && reply.error) || 'The recorder did not start.');
+  return true;
+}
+
+async function tabAudioStop() {
+  const reply = await api.runtime.sendMessage({ to: 'offscreen', type: 'recordStop' });
+  if (!reply || !reply.ok) throw new Error((reply && reply.error) || 'Nothing was recorded.');
+  return { type: reply.type, data: reply.data };
 }
 
 /*

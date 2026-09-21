@@ -513,11 +513,26 @@ var TorvalSubtitles = (function () {
     jump(back ? -1 : 1);
   }
 
+  /**
+   * Move the video, whichever way this site allows.
+   *
+   * Netflix streams in pieces it chose in advance, and setting currentTime
+   * on the element under it ends the session with error F7375 and an error
+   * page. Its own player has a seek; that is the one. A or D has gone
+   * through this for a long time, and recording a line has to go through it
+   * too, for exactly the same reason.
+   */
+  function seekTo(seconds) {
+    if (site && site.seek) { site.seek(seconds); return true; }
+    if (!video) return false;
+    video.currentTime = seconds;
+    return true;
+  }
+
   function jump(direction) {
     var target = step(video.currentTime, direction, openCue);
     if (!target) return;
-    if (site.seek) site.seek(target.start);
-    else video.currentTime = target.start;
+    seekTo(target.start);
   }
 
   /**
@@ -2283,6 +2298,9 @@ var TorvalSubtitles = (function () {
     wholeLine: wholeLine,
     siteFor: siteFor,
     captionBox: captionBox,
+    seekTo: seekTo,
+    /** Whether this site insists on being moved by its own player. */
+    ownSeek: function () { return !!(site && site.seek); },
     parseVtt: parseVtt,
     parseTtml: parseTtml,
     status: function () { return state; },

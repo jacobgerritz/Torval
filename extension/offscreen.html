@@ -1,0 +1,12 @@
+<!doctype html>
+<!--
+  Nothing is ever shown here. An offscreen document is Chrome's answer to a
+  problem its own Manifest V3 created: a service worker has no getUserMedia
+  and no MediaRecorder, so the one piece of Torval that records sound cannot
+  live where the rest of the background does. This page is that piece, and
+  holds nothing else.
+-->
+<html lang="en">
+<head><meta charset="utf-8"><title>Torval recorder</title></head>
+<body><script src="offscreen.js"></script></body>
+</html>

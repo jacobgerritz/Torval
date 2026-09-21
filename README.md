@@ -589,10 +589,12 @@ says which of the two is in use.
 advance, and moving the element under it ends the session with error F7375 and
 an error page.
 
-One thing is different from YouTube either way: the audio on a mined card may
-not record, because Netflix video is encrypted and the browser will not hand
-its sound to an extension. The card is still made, with the sentence and the
-word on it.
+One thing is different from YouTube either way: on Firefox the audio on a
+mined card does not record, because the browser has no way to hand an
+extension a tab's sound, and a decrypting video element hands over none of
+its own. On Chrome it does, once the box under Settings → Anki is ticked.
+Either way the card is made, with the sentence and the word on it, and it
+says which half is missing. See the capture section further down.
 
 There are four ways it gets the timing, tried in the order below, each a
 fallback for the one before it, not a choice between them. The first three all
@@ -754,13 +756,37 @@ is thrown away rather than put on a card. A real picture is never that flat,
 however dark, and the one thing that is, a deliberate fade to black, is a
 cheap thing to be wrong about.
 
-*The sound cannot, not this way.* Two separate walls. `captureStream()` on a
-decrypting element hands over no audio track at all, and getting to the start
-of the line means setting `currentTime`, which on Netflix ends the playback
-session outright with its error F7375. So nothing is attempted: no seek, no
-recording, and no announcement of a recording that cannot happen. Taking it
-from the tab's own audio output instead, which is what asbplayer and Migaku
-do, is a different mechanism from the one here and is not built.
+*The sound needs a different mechanism, and one browser has it.*
+`captureStream()` on a decrypting element hands over no audio track at all,
+so the ordinary path has nothing to record. The tab's own output is a
+different thing entirely, just sound coming out of a tab, and Chrome hands
+that over through `tabCapture`. That is what Torval does there, and what
+asbplayer and Migaku do.
+
+**Firefox cannot, and this is the one thing in Torval that works in one
+browser and not the other.** It has no `tabCapture` API at all, and its
+`getDisplayMedia` ignores the `audio` option without an error or a warning,
+which is [Mozilla bug 1541425](https://bugzilla.mozilla.org/show_bug.cgi?id=1541425),
+filed in 2019 and still open. There is no third mechanism and nothing to fall
+back on. The Firefox build ships without any of it: `package.mjs` takes both
+manifest keys and both offscreen files out rather than leave a reviewer to
+work out why Chrome-only code is in the package, and the settings panel says
+plainly that this one needs Chrome.
+
+On Chrome it is off until asked for. `tabCapture` is an optional permission,
+requested at the moment somebody ticks the box under **Settings → Anki →
+Recording from video** and at no other time: not on install, and not by
+watching a video. It is used on a copy-protected video and nowhere else,
+because YouTube's sound comes off the element and always has.
+
+Two details that are not optional. The recorder lives in an offscreen
+document, because a Manifest V3 service worker has neither `getUserMedia`
+nor `MediaRecorder`. And capturing a tab takes its sound away from the
+speakers, so the captured stream is played straight back out through an
+`AudioContext`; without that the video goes mute mid-sentence, which looks
+exactly like a crash, and mining blind is the thing this design exists to
+avoid. The seek to the start of the line goes through the site's own player,
+the same way A and D do, for the same F7375 reason.
 
 Whichever half is missing, the card is still made, and the popup says which
 and why, naming hardware acceleration where that is the fix. Torval asks the

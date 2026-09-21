@@ -156,13 +156,33 @@ const TARGETS = {
   firefox: (m) => {
     delete m.background.service_worker;
     delete m.declarative_net_request;
-    m.permissions = m.permissions.filter((p) => p !== 'declarativeNetRequest');
+    // Recording a copy-protected video's sound is a Chrome-only thing, and
+    // not by choice: Firefox has no tabCapture API and its getDisplayMedia
+    // ignores `audio` outright (bug 1541425, open since 2019). Both keys
+    // would be warnings on the listing for an ability the build does not
+    // have, and an offscreen document is Chrome's answer to a problem
+    // Firefox's event page does not have in the first place.
+    delete m.optional_permissions;
+    m.permissions = m.permissions.filter(
+      (p) => p !== 'declarativeNetRequest' && p !== 'offscreen');
   },
   chrome: (m) => {
     delete m.background.scripts;
     delete m.browser_specific_settings;   // Firefox's add-on id, meaningless here
     m.permissions = m.permissions.filter((p) => p !== 'webRequestBlocking');
   }
+};
+
+/*
+ * Files that belong to one browser and not the other.
+ *
+ * Shipping Firefox an offscreen document, whose whole subject is a Chrome
+ * API Firefox does not have, is shipping dead code to a reviewer who reads
+ * every line of it and has to work out why it is there.
+ */
+const LEAVE_OUT = {
+  firefox: ['offscreen.html', 'offscreen.js'],
+  chrome: []
 };
 
 const asked = process.argv.slice(2).map((a) => a.replace(/^--/, ''));
@@ -188,7 +208,9 @@ for (const target of building) {
   // this target's written in over it, so neither browser ever sees a key
   // meant for the other, and 119 MB of dictionaries are not copied twice to
   // achieve it.
-  execFileSync('zip', ['-r', '-q', '-X', out, '.', '-x', 'manifest.json'], { cwd: EXTENSION });
+  execFileSync('zip',
+    ['-r', '-q', '-X', out, '.', '-x', 'manifest.json'].concat(LEAVE_OUT[target] || []),
+    { cwd: EXTENSION });
   const staged = join(DIST, `${target}-manifest.json`);
   writeFileSync(staged, JSON.stringify(tailored, null, 2) + '\n');
   execFileSync('cp', [staged, join(DIST, 'manifest.json')]);

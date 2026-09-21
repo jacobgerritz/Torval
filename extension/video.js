@@ -181,19 +181,19 @@ var TorvalVideo = (function () {
     var frame = grabFrame(video);
     if (frame) out.image = { filename: name(sentence, 'jpg'), data: frame };
 
-    // The sound is a different matter, and there are two reasons not to try
-    // for it here rather than one. The stream a protected element hands over
-    // is empty, and getting to the start of the line means setting
-    // currentTime, which on Netflix ends the playback session outright with
-    // its error F7375. So the line is not replayed at all: no seek, no
-    // recording, and no announcement of a recording that cannot happen.
-    if (!sealed && cue && cue.end > cue.start) {
+    // The sound comes off the element on an ordinary video and out of the
+    // tab on a protected one, which is the only place it can be had: a
+    // decrypting element hands over no audio track at all. The tab path is
+    // Chrome's alone and has to be allowed first, so it may not be there.
+    if (cue && cue.end > cue.start) {
       var key = clipKey(video, sentence, cue, lead);
       if (lastClip && lastClip.key === key) {
         out.sentenceAudio = lastClip.audio;
         return out;
       }
-      var clip = await record(video, cue.start, cue.end, lead);
+      var clip = sealed
+        ? await recordTab(video, cue.start, cue.end, lead)
+        : await record(video, cue.start, cue.end, lead);
       var sound = clip ? await asWav(clip) : null;
       if (sound) {
         out.sentenceAudio = { filename: name(sentence, 'wav'), data: await toBase64(sound) };
@@ -212,7 +212,7 @@ var TorvalVideo = (function () {
     // answers: the sound cannot be had from a protected video at all, and
     // the picture usually can, once the browser stops decoding on the GPU.
     var lostImage = !!(video.videoWidth && !out.image);
-    var lostAudio = !!(sealed && cue && cue.end > cue.start);
+    var lostAudio = !!(cue && cue.end > cue.start && !out.sentenceAudio);
     if (lostImage || lostAudio) out.blocked = { image: lostImage, audio: lostAudio };
     return out;
   }
@@ -428,6 +428,108 @@ var TorvalVideo = (function () {
     return chunks.length ? new Blob(chunks, { type: type }) : null;
   }
 
+  // -------------------------------------------------------------------------
+  // The same line, off the tab instead of off the element
+  // -------------------------------------------------------------------------
+
+  /*
+   * A copy-protected video hands over no audio track when its element is
+   * asked for one, so there is nothing for recordNow to record. The tab's
+   * own output is a different thing, just sound coming out of a tab, and
+   * Chrome will hand it over through tabCapture. The recorder itself lives
+   * in an offscreen document, because a Manifest V3 service worker has no
+   * MediaRecorder; see offscreen.js.
+   *
+   * Firefox has no tabCapture and no getDisplayMedia audio either, so this
+   * whole path is absent there and the card says the sound cannot be had.
+   * Nothing is asked for until somebody turns it on under Settings → Anki,
+   * and nothing here runs on an ordinary video: YouTube's sound comes off
+   * the element, as it always has.
+   *
+   * Otherwise this is recordNow, with two differences that matter. The seek
+   * goes through the site's own player rather than the element, because
+   * setting currentTime on Netflix ends the session with error F7375. And
+   * the recording is started and stopped by message rather than in hand,
+   * which is why the clock is watched here and only the two edges cross.
+   */
+  function recordTab(video, start, end, lead) {
+    return inTurn(function () { return recordTabNow(video, start, end, lead); });
+  }
+
+  async function recordTabNow(video, start, end, lead) {
+    var api = (typeof browser !== 'undefined' && browser.runtime) ? browser
+      : (typeof chrome !== 'undefined' ? chrome : null);
+    if (!api || !api.runtime) return null;
+
+    var ready = await ask(api, { type: 'tabAudioReady' });
+    if (!ready || !ready.can || !ready.granted) return null;
+
+    var from = Math.max(0, start - (lead || 0));
+    var open = Math.max(0, from - WARMUP_SECONDS);
+    var length = Math.min(Math.max(end - from, MIN_CLIP_SECONDS), MAX_CLIP_SECONDS);
+
+    var wasPaused = video.paused;
+    var wasTime = video.currentTime;
+    var wasRate = video.playbackRate;
+    var started = false;
+
+    try {
+      video.playbackRate = 1;
+      if (!seekTo(Math.max(0, open - PREROLL_SECONDS))) return null;
+      await seeked(video);
+      await video.play();
+      await until(function () { return video.currentTime >= open; }, 5000);
+
+      await ask(api, { type: 'tabAudioStart', mimeType: mimeType() });
+      started = true;
+      await until(function () { return video.currentTime >= from + length; },
+        length * 1000 + 5000);
+    } catch (err) {
+      if (started) { try { await ask(api, { type: 'tabAudioStop' }); } catch (ignored) { /* */ } }
+      await restore(video, Math.max(wasTime, from + length), wasRate, wasPaused);
+      return null;
+    }
+
+    var got = null;
+    try {
+      got = await ask(api, { type: 'tabAudioStop' });
+    } catch (err) {
+      got = null;
+    }
+    await restore(video, Math.max(wasTime, from + length), wasRate, wasPaused);
+    if (!got || !got.data) return null;
+    return fromBase64(got.data, got.type || 'audio/webm');
+  }
+
+  /** One message, with the wrapper the background puts round every answer. */
+  async function ask(api, message) {
+    var reply = await api.runtime.sendMessage(message);
+    if (!reply || !reply.ok) {
+      throw new Error((reply && reply.error) || 'Torval could not reach the recorder.');
+    }
+    return reply.result;
+  }
+
+  /**
+   * Whichever way this site allows the video to be moved. Netflix insists on
+   * its own player, and subtitles.js is where that already lives, since A
+   * and D have had to go through it for as long as they have existed.
+   */
+  function seekTo(seconds) {
+    if (typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.seekTo) {
+      return TorvalSubtitles.seekTo(seconds);
+    }
+    return false;
+  }
+
+  /** A blob back out of what crossed between documents as text. */
+  function fromBase64(data, type) {
+    var binary = atob(data);
+    var bytes = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: type });
+  }
+
   /**
    * Put the video back. Waits for the seek to actually land before resuming
    * play or pause, setting currentTime does not take effect instantly, and
@@ -438,7 +540,12 @@ var TorvalVideo = (function () {
   async function restore(video, time, rate, paused) {
     try {
       video.playbackRate = rate;
-      video.currentTime = time;
+      // Through the site's own player where it has one. Putting the video
+      // back by setting currentTime is the same move that ends a Netflix
+      // session with error F7375, and doing it on the way out would be a
+      // worse place to do it than on the way in: the card is already made
+      // and the error page arrives looking like Torval broke the film.
+      if (!seekTo(time)) video.currentTime = time;
       await seeked(video);
       if (paused) video.pause(); else video.play();
     } catch (err) { /* the page took the video away mid-capture */ }

@@ -29,7 +29,11 @@
     "webRequestBlocking",
     "declarativeNetRequest",
     "downloads",
-    "scripting"
+    "scripting",
+    "offscreen"
+  ],
+  "optional_permissions": [
+    "tabCapture"
   ],
   "declarative_net_request": {
     "rule_resources": [

@@ -2386,12 +2386,53 @@ const run = async () => {
   check('every position inside a node is found, whichever it is',
     [0, 1, 2, 3, 4, 6, 7, 8, 9].every((i) => at(i) !== null));
 
+  // --- the one thing that is Chrome's alone ------------------------------
+  // Recording a copy-protected video's sound is the only ability in Torval
+  // that one browser has and the other does not: Firefox has no tabCapture
+  // API, and its getDisplayMedia ignores `audio` outright (bug 1541425,
+  // open since 2019). What is checked here is that the difference is
+  // handled in the build rather than left to be discovered by a reviewer,
+  // or by somebody's console.
+  {
+    const shared = JSON.parse(readFileSync(join(ROOT, 'extension', 'manifest.json'), 'utf8'));
+    check('the manifest asks for tab capture only if asked to',
+      JSON.stringify(shared.optional_permissions) === '["tabCapture"]',
+      JSON.stringify(shared.optional_permissions));
+    check('and never has it outright',
+      !shared.permissions.includes('tabCapture'));
+    check('the offscreen document has somewhere to be declared',
+      shared.permissions.includes('offscreen'));
+
+    for (const f of ['offscreen.html', 'offscreen.js']) {
+      check('and the file it names is there: ' + f,
+        existsSync(join(ROOT, 'extension', f)));
+    }
+    const page = readFileSync(join(ROOT, 'extension', 'offscreen.html'), 'utf8');
+    check('the offscreen page loads its one script',
+      page.includes('src="offscreen.js"'));
+
+    // The Firefox build has to lose all four, and the list of what it loses
+    // lives in one place, which is the place this reads.
+    const packaging = readFileSync(join(ROOT, 'tools', 'package.mjs'), 'utf8');
+    const firefox = packaging.slice(packaging.indexOf('firefox: (m) =>'),
+      packaging.indexOf('chrome: (m) =>'));
+    check('the Firefox manifest loses the optional permission',
+      firefox.includes('delete m.optional_permissions'));
+    check('and loses the offscreen permission with it',
+      /p !== 'offscreen'/.test(firefox));
+    const leaveOut = packaging.slice(packaging.indexOf('const LEAVE_OUT'),
+      packaging.indexOf('const asked'));
+    check('and the Firefox package leaves both files out',
+      leaveOut.includes("'offscreen.html'") && leaveOut.includes("'offscreen.js'"),
+      leaveOut);
+  }
+
   // --- every message has somewhere to go ---------------------------------
   // A message with no case in the background script never answers, and the
   // caller waits for ever. Nothing about that looks like a failure: the
   // feature is simply silent. This shipped once, so it is checked now.
   const sources = ['bar.js', 'content.js', 'highlight.js', 'known.js', 'options.js',
-    'reader.js', 'subtitles.js']
+    'reader.js', 'subtitles.js', 'video.js']
     .map((f) => readFileSync(join(ROOT, 'extension', f), 'utf8')).join(' ');
   const backgroundSource = readFileSync(join(ROOT, 'extension', 'background.js'), 'utf8');
 
