@@ -1114,12 +1114,21 @@
    */
   async function readPage(options) {
     if (!isCurrent()) return;
-    // Nothing to read a page for. The percentage and the colours are the
-    // only two reasons this runs, and with neither wanted the whole thing
-    // is skipped: no message to the background, no thousands of words
-    // looked up, and no bar across a page that has nothing to say on it.
-    // The popup is untouched, which is the point of the switch.
-    if (!TorvalTrack.on()) { TorvalBar.quiet(noSubtitlesHere()); return; }
+    // Nothing to read a page for: the percentage and the colours are the
+    // only two reasons this runs. No message to the background, no
+    // thousands of words looked up, and no bar across an ordinary page.
+    //
+    // Keeping no score is not the same as having nothing to say, though. A
+    // video still has subtitles to find, A and D still do nothing until
+    // they arrive, and the bar is the only thing that ever says whether
+    // they did. Skipping that too left somebody on a video where the keys
+    // silently did nothing, with no way to tell a slow fetch from a failed
+    // one, which is exactly how this was found.
+    if (!TorvalTrack.on()) {
+      if (waitingForSubtitles()) TorvalBar.busy(SUBTITLES_COMING);
+      else TorvalBar.quiet(noSubtitlesHere());
+      return;
+    }
     // A read already running is not a reason to drop this one. Reading a
     // long page takes seconds, and the commonest moment to ask for another
     // is a second after the address changed, which is very often still
