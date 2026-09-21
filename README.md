@@ -743,20 +743,39 @@ mining fail there for different reasons and only one of them is fixed, which
 is worth separating, because "DRM, nothing to be done" is both the easy answer
 and the wrong one. Other mining tools do get pictures off Netflix.
 
-*The picture usually can be had.* A protected frame does not refuse to be
-drawn. It draws as one flat black rectangle: nothing throws, the canvas is not
-tainted, and what would go on the card is a black JPEG, which is worse than no
-picture because it looks like a card that worked. Whether that happens is not
-up to the protection alone but to who decoded the frame. With the browser's
-hardware acceleration on, the frame lives in a GPU texture on the protected
-path and comes back black; with it off, the browser usually decodes in
-ordinary memory and the same frame draws as itself. Usually, not always:
-Chrome on some machines keeps the protected path whatever the setting says,
-and then there is nothing to be done. So Torval takes the frame, then looks at
-it: a frame that is one single value across its whole area is not a frame, and
-is thrown away rather than put on a card. A real picture is never that flat,
-however dark, and the one thing that is, a deliberate fade to black, is a
-cheap thing to be wrong about.
+*The picture can be had, the long way round.* A protected frame does not
+refuse to be drawn. It draws as one flat black rectangle: nothing throws, the
+canvas is not tainted, and what would go on the card is a black JPEG, which is
+worse than no picture because it looks like a card that worked. So Torval
+takes the frame, then looks at it: a frame that is one single value across its
+whole area is not a frame, and is thrown away rather than put on a card. A
+real picture is never that flat, however dark, and the one thing that is, a
+deliberate fade to black, is a cheap thing to be wrong about.
+
+Turning the browser's hardware acceleration off used to be the answer, and on
+Firefox it still is: the frame stops living in a GPU texture on the protected
+path and draws as itself. On Chrome the setting is no answer at all on plenty
+of machines, because the refusal is not really about where the frame was
+decoded. The element will not hand its pixels to page script, and page script
+is what a canvas is.
+
+So the frame is taken from outside the page instead. `tabs.captureVisibleTab`
+is the browser photographing what is on screen, the picture a person is
+already looking at, and by the time it exists the protection has had its say.
+Torval crops the video out of that photograph using the element's own
+rectangle, scaling by the ratio between the image and `innerWidth` rather than
+by `devicePixelRatio`, which is wrong the moment a page is zoomed. Two things
+follow. The site's own subtitles are drawn over the video and would land on
+the front of the card, so they are hidden for the one frame and put straight
+back. And this is the top window only: the coordinates belong to it, and a
+video in a frame is a YouTube embed, which is not protected and never takes
+this path.
+
+Both the photograph and the tab recording need the extension to have been
+invoked on the tab, which is Chrome's `activeTab` rule and has no way round
+it. One click on the toolbar button covers the tab until it navigates. When
+the browser refuses for that reason the card says so in those words, because
+it is the one failure here with a cure the reader can apply.
 
 *The sound needs a different mechanism, and one browser has it.*
 `captureStream()` on a decrypting element hands over no audio track at all,
@@ -792,8 +811,8 @@ the same way A and D do, for the same F7375 reason.
 
 Whichever half is missing, the card is still made, and the popup says which
 and why, and sends anybody who wants the longer answer to Settings → Anki.
-It does not name hardware acceleration there: the popup line has to stay
-short, and on Chrome that advice is as often wrong as right. Torval asks the
+The one exception is the uninvoked tab, which gets its own sentence naming
+the toolbar button, since that is a cure rather than an explanation. Torval asks the
 video element whether it is decrypting rather than keeping a list of sites:
 the page sets `mediaKeys` on it when it starts, which stays right on the day
 a fourth service launches and on the day one of these three plays an

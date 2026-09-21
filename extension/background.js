@@ -250,6 +250,7 @@ api.runtime.onMessage.addListener((message, sender) => {
       api.runtime.openOptionsPage();
       return true;
     });
+    case 'grabVisible':  return guard(() => grabVisible(sender && sender.tab));
     case 'tabAudioReady': return guard(() => tabAudioReady());
     case 'tabAudioStart': return guard(() => tabAudioStart(sender && sender.tab && sender.tab.id,
       message.mimeType));
@@ -1036,6 +1037,31 @@ async function ensureOffscreen() {
     offscreenOpen = null;   // so the next press may try again
     throw err;
   }
+}
+
+/**
+ * A photograph of the tab, for the frame a canvas will not give up.
+ *
+ * Drawing a decrypting video into a canvas is not a decode that happens to
+ * fail. The element is not allowed to hand its pixels to page script at
+ * all, which is why turning hardware acceleration off rescues it on one
+ * machine and does nothing on the next. This is not page script asking: it
+ * is the browser photographing what is already on screen, and by then the
+ * protection has had its say.
+ *
+ * Needs the extension to have been invoked on the tab, so the error is
+ * passed along rather than flattened; video.js knows what to say about it.
+ */
+async function grabVisible(tab) {
+  if (!api.tabs || !api.tabs.captureVisibleTab) {
+    throw new Error('this browser will not photograph a tab');
+  }
+  const where = tab && typeof tab.windowId === 'number' ? tab.windowId : undefined;
+  const shot = where === undefined
+    ? await api.tabs.captureVisibleTab({ format: 'jpeg', quality: 92 })
+    : await api.tabs.captureVisibleTab(where, { format: 'jpeg', quality: 92 });
+  if (!shot) throw new Error('the tab came back blank');
+  return { data: shot };
 }
 
 async function tabAudioStart(tabId, mimeType) {

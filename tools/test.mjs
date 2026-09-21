@@ -2348,6 +2348,23 @@ const run = async () => {
     Video._allOneColour(new Uint8ClampedArray(0)) === true &&
     Video._allOneColour(null) === true);
 
+  // --- cutting the warm-up off the front -------------------------------------
+  // Recording opens half a second before the line, so the tail of the line
+  // before is on every clip until it is cut off again.
+  const ramp = new Float32Array(24000);          // one second at the WAV rate
+  for (let i = 0; i < ramp.length; i++) ramp[i] = i;
+
+  check('the warm-up comes off the front',
+    Video._trimHead(ramp, 0.5).length === 12000 &&
+    Video._trimHead(ramp, 0.5)[0] === 12000);
+  check('nothing is cut when there was no warm-up',
+    Video._trimHead(ramp, 0).length === ramp.length &&
+    Video._trimHead(ramp, -1).length === ramp.length &&
+    Video._trimHead(ramp, undefined).length === ramp.length);
+  check('a measurement gone wrong costs a word, not the line',
+    Video._trimHead(ramp, 5).length === ramp.length &&
+    Video._trimHead(ramp, 0.95).length === ramp.length);
+
   // --- how long a line actually lasts ---------------------------------------
   // An automatic caption revises itself as the recogniser hears more, and
   // every revision is filed as a cue of its own. What you read as one line is

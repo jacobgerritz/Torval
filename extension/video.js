@@ -35,6 +35,15 @@ var TorvalVideo = (function () {
     if (typeof TorvalLog !== 'undefined') TorvalLog.say.apply(null, arguments);
   }
 
+  // Set when the browser has refused because the extension has not been
+  // invoked on this tab. Clicking the toolbar button is the whole cure.
+  var needsInvoking = false;
+
+  // How much of the warm-up the last recording actually caught, in seconds,
+  // measured off the video clock rather than assumed. Set by whichever of
+  // the two recorders ran; only one runs per card.
+  var headTrim = 0;
+
   var MAX_WIDTH = 1280;         // frames are scaled down to this before saving
   var JPEG_QUALITY = 0.82;
   var MAX_CLIP_SECONDS = 20;    // no subtitle line is longer than this
@@ -70,6 +79,10 @@ var TorvalVideo = (function () {
   // rough amount rather than an exact one. Erring towards a little extra sound
   // at the front is the right way to be wrong.
   var WARMUP_SECONDS = 0.5;
+  // Left on the front when the warm-up is cut away. A recorder does not
+  // begin the instant it is told to, so cutting exactly to the measurement
+  // shaves the first syllable, and a trailing word is the smaller sin.
+  var TRIM_SAFETY = 0.08;
 
   var stream = null;
   var streamFor = null;
@@ -189,6 +202,7 @@ var TorvalVideo = (function () {
     // is attempted on a protected video too, because whether it works there
     // is not up to the protection alone, see grabFrame.
     var frame = grabFrame(video);
+    if (!frame && sealed) frame = await grabVisible(video);
     if (frame) out.image = { filename: name(sentence, 'jpg'), data: frame };
 
     // The sound comes off the element on an ordinary video and out of the
@@ -201,10 +215,11 @@ var TorvalVideo = (function () {
         out.sentenceAudio = lastClip.audio;
         return out;
       }
+      headTrim = 0;
       var clip = sealed
         ? await recordTab(video, cue.start, cue.end, lead)
         : await record(video, cue.start, cue.end, lead);
-      var sound = clip ? await asWav(clip) : null;
+      var sound = clip ? await asWav(clip, headTrim) : null;
       if (sound) {
         out.sentenceAudio = { filename: name(sentence, 'wav'), data: await toBase64(sound) };
       } else if (clip) {
@@ -223,7 +238,10 @@ var TorvalVideo = (function () {
     // the picture usually can, once the browser stops decoding on the GPU.
     var lostImage = !!(video.videoWidth && !out.image);
     var lostAudio = !!(cue && cue.end > cue.start && !out.sentenceAudio);
-    if (lostImage || lostAudio) out.blocked = { image: lostImage, audio: lostAudio };
+    if (lostImage || lostAudio) {
+      out.blocked = { image: lostImage, audio: lostAudio };
+      if (needsInvoking) out.blocked.invoke = true;
+    }
     return out;
   }
 
@@ -254,17 +272,37 @@ var TorvalVideo = (function () {
    */
   var WAV_RATE = 24000;
 
-  async function asWav(clip) {
+  async function asWav(clip, skip) {
     try {
       var bytes = await clip.arrayBuffer();
       // Decoding through a context set to the rate we want is also what
       // resamples it: an AudioContext hands back everything at its own rate.
       var context = new OfflineAudioContext(1, 1, WAV_RATE);
       var audio = await context.decodeAudioData(bytes);
-      return wavFile(toMono(audio), WAV_RATE);
+      return wavFile(trimHead(toMono(audio), skip), WAV_RATE);
     } catch (err) {
       return null;
     }
+  }
+
+  /**
+   * The warm-up off the front.
+   *
+   * Recording opens half a second before the line so the first syllable is
+   * not lost while the recorder gets going, and what that half second holds
+   * is the tail of the line before, which arrives on the card as a stray
+   * word. It is cut off here rather than never recorded, because the whole
+   * point of the warm-up is that a recorder cannot be trusted to start on
+   * command.
+   *
+   * Never so far in that there is nothing left: a measurement that has gone
+   * wrong should cost a stray word, not the line.
+   */
+  function trimHead(samples, seconds) {
+    var at = Math.round((seconds || 0) * WAV_RATE);
+    if (at <= 0) return samples;
+    if (at > samples.length - Math.round(WAV_RATE * 0.2)) return samples;
+    return samples.subarray(at);
   }
 
   /** Both channels averaged into one. A subtitle line is speech, not music. */
@@ -350,6 +388,109 @@ var TorvalVideo = (function () {
     return true;
   }
 
+  /**
+   * The frame as the browser drew it, for the frame the canvas will not
+   * give up.
+   *
+   * A decrypting video refuses page script its pixels whatever decoded
+   * them, so a canvas gets one flat black rectangle and no amount of
+   * fiddling with hardware acceleration reliably changes that. Asking the
+   * browser for a photograph of the tab goes round the outside: it is the
+   * same picture a person is looking at, taken after the protection has
+   * already had its say.
+   *
+   * The cost is that it photographs the window, so whatever is drawn over
+   * the video comes too. The site's own subtitles are the one thing that
+   * must not: the answer printed on the front of a card is not a card. They
+   * go away for the one frame and come straight back.
+   *
+   * Top window only. The coordinates are the top window's, so a video in a
+   * frame would be cropped from the wrong part of the picture, and a framed
+   * video is a YouTube embed, which is not protected and never gets here.
+   */
+  async function grabVisible(video) {
+    var api = (typeof browser !== 'undefined' && browser.runtime) ? browser
+      : (typeof chrome !== 'undefined' ? chrome : null);
+    if (!api || !api.runtime) return null;
+    if (window.top !== window) return null;
+
+    var rect = video.getBoundingClientRect();
+    if (rect.width < 1 || rect.height < 1) return null;
+
+    var show = hideCaptions();
+    var shot = null;
+    try {
+      await painted();
+      shot = await ask(api, { type: 'grabVisible' });
+    } catch (err) {
+      var why = (err && err.message) || String(err);
+      // One failure has a cure the person can apply, so it is remembered
+      // and said on the card rather than left in a console nobody opens.
+      if (/invoked|activeTab|access/i.test(why)) needsInvoking = true;
+      console.warn('Torval: could not photograph the tab:', why);
+      return null;
+    } finally {
+      show();
+    }
+    if (!shot || !shot.data) return null;
+    return await cropTo(shot.data, rect);
+  }
+
+  /** Put the site's captions away, and hand back the undo. */
+  function hideCaptions() {
+    var box = null;
+    if (typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.captionBox) {
+      try { box = TorvalSubtitles.captionBox(); } catch (err) { box = null; }
+    }
+    if (!box) return function () { /* nothing was hidden */ };
+    var was = box.style.visibility;
+    box.style.visibility = 'hidden';
+    return function () { box.style.visibility = was; };
+  }
+
+  /** Two frames, so a style change has actually reached the screen. */
+  function painted() {
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () { requestAnimationFrame(function () { resolve(); }); });
+    });
+  }
+
+  /**
+   * The video out of a photograph of the whole window.
+   *
+   * The photograph is in device pixels and the rectangle is in CSS pixels;
+   * the ratio between them is read off the image rather than taken from
+   * devicePixelRatio, which is wrong the moment the page is zoomed.
+   */
+  function cropTo(dataUrl, rect) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onerror = function () { resolve(null); };
+      img.onload = function () {
+        var wide = window.innerWidth || img.naturalWidth;
+        var ratio = img.naturalWidth / wide;
+        var w = Math.round(rect.width * ratio);
+        var h = Math.round(rect.height * ratio);
+        if (w < 1 || h < 1) { resolve(null); return; }
+        var scale = Math.min(1, MAX_WIDTH / w);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(w * scale));
+        canvas.height = Math.max(1, Math.round(h * scale));
+        try {
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(img, Math.round(rect.left * ratio), Math.round(rect.top * ratio),
+            w, h, 0, 0, canvas.width, canvas.height);
+          var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          if (allOneColour(pixels.data)) { resolve(null); return; }
+          resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1]);
+        } catch (err) {
+          resolve(null);
+        }
+      };
+      img.src = dataUrl;
+    });
+  }
+
   function grabFrame(video) {
     if (!video.videoWidth) return null;
     var scale = Math.min(1, MAX_WIDTH / video.videoWidth);
@@ -417,6 +558,7 @@ var TorvalVideo = (function () {
       // dropped, would otherwise cut the line short at either end.
       await until(function () { return video.currentTime >= open; }, 5000);
       recorder.start();
+      headTrim = Math.max(0, from - video.currentTime - TRIM_SAFETY);
       await until(function () { return video.currentTime >= from + length; },
         length * 1000 + 5000);
       recorder.stop();
@@ -496,6 +638,7 @@ var TorvalVideo = (function () {
 
       await ask(api, { type: 'tabAudioStart', mimeType: mimeType() });
       started = true;
+      headTrim = Math.max(0, from - video.currentTime - TRIM_SAFETY);
       await until(function () { return video.currentTime >= from + length; },
         length * 1000 + 5000);
     } catch (err) {
@@ -503,7 +646,9 @@ var TorvalVideo = (function () {
       // the sound is somebody else's: a permission, an offscreen document,
       // a tab the browser may decline to hand over. A card that arrives
       // silent with no reason anywhere is a morning of guessing.
-      console.warn('Torval: could not record the tab:', (err && err.message) || err);
+      var why = (err && err.message) || String(err);
+      if (/invoked|activeTab|access/i.test(why)) needsInvoking = true;
+      console.warn('Torval: could not record the tab:', why);
       if (started) { try { await ask(api, { type: 'tabAudioStop' }); } catch (ignored) { /* */ } }
       await restore(video, Math.max(wasTime, from + length), wasRate, wasPaused);
       return null;
@@ -620,7 +765,8 @@ var TorvalVideo = (function () {
     // Exposed for the tests: the file the card actually carries.
     _toMono: toMono, _wavFile: wavFile,
     // Exposed for the tests: telling a picture from a black rectangle.
-    _allOneColour: allOneColour
+    _allOneColour: allOneColour,
+    _trimHead: trimHead
   };
 })();
 

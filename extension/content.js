@@ -1918,6 +1918,13 @@
    */
   function missing(blocked) {
     if (!blocked) return '';
+    // The browser will not photograph or record a tab the extension has not
+    // been invoked on. One click on the toolbar button fixes it for the
+    // whole tab, and nothing else will, so it is worth its own sentence.
+    if (blocked.invoke) {
+      return ' No picture or sound yet: click the Torval button in the ' +
+        'toolbar once on this tab, then try again.';
+    }
     if (blocked.image && blocked.audio) {
       return ' No picture or sound: this video is copy-protected. ' +
         'See Settings → Anki.';
