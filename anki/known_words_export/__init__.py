@@ -84,8 +84,29 @@ LIKELY = ["target word", "word", "expression", "vocabulary", "vocab",
           "front", "term", "headword"]
 
 
+# A deck name fit to sit in a filename. Subdecks are Spanish::Verbs, and a
+# colon is not a filename on Windows or a path on anything.
+UNFIT = re.compile(r"[^\w\- ]", re.UNICODE)
+
+
 def quoted(deck_name):
     return deck_name.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def file_slug(deck_name):
+    """
+    A deck's name, as part of a filename.
+
+    Exporting three decks on the same day used to write the same name
+    three times, which means either three overwrites or three files
+    telling you nothing about which deck each holds. Non-Latin names are
+    kept as they are: a deck called 日本語 is called that in the filename
+    too, since every system this runs on writes those perfectly well.
+    """
+    name = deck_name.replace("::", "-").replace("/", "-").replace("\\", "-")
+    name = UNFIT.sub("", name)
+    name = SPACES.sub("-", name.strip())
+    return name[:40].strip("-") or "deck"
 
 
 def tidy(text, strip_article):
@@ -299,7 +320,9 @@ class ExportDialog(QDialog):
         words = self.gather()
         if not words:
             return
-        path = self.ask_where("known-words-%s.txt" % time.strftime("%Y-%m-%d"),
+        path = self.ask_where("known-words-%s-%s.txt"
+                              % (file_slug(self.decks.currentData()),
+                                 time.strftime("%Y-%m-%d")),
                               "Text file", ".txt")
         if path and self.write(path, "\n".join(self.in_order(words)) + "\n"):
             showInfo("%d words written to\n%s" % (len(words), os.path.basename(path)))
@@ -313,15 +336,18 @@ class ExportDialog(QDialog):
         Torval merges rather than replaces and keeps the earlier of the two
         dates, so nothing is overwritten and nothing counted again.
 
-        The file is named for Anki, not for Torval. Torval writes its own
-        backups as torval-words-<date>.json, and two files with one name in
-        one Downloads folder is how somebody ends up loading last week's
-        Anki deck back over a list they meant to restore.
+        The file is named for Anki and for the deck, not for Torval. Torval
+        writes its own backups as torval-words-<date>.json, and two files
+        with one name in one Downloads folder is how somebody ends up
+        loading last week's Anki deck back over a list they meant to
+        restore.
         """
         words = self.gather()
         if not words:
             return
-        path = self.ask_where("anki-known-words-%s.json" % time.strftime("%Y-%m-%d"),
+        path = self.ask_where("anki-known-words-%s-%s.json"
+                              % (file_slug(self.decks.currentData()),
+                                 time.strftime("%Y-%m-%d")),
                               "JSON file", ".json")
         if not path:
             return

@@ -1408,9 +1408,10 @@ Anki already knows.
 
 `anki/known_words_export/` is an Anki add-on that gets that list back out:
 a text file, the clipboard, or JSON in Torval's own format for **Settings
-→ Words → Keeping a copy → Load from a file**. That file is named
-`anki-known-words-<date>.json` rather than `torval-words-<date>.json`, so
-it cannot be mistaken for one of Torval's own backups sitting beside it. Mature, young, learning and
+→ Words → Keeping a copy → Load from a file**. Both files it writes are
+named for the deck and the day, and the JSON is `anki-known-words-…`
+rather than `torval-words-…`, so neither three decks exported in one
+afternoon nor Torval's own backups can be mistaken for each other. Mature, young, learning and
 relearning cards, each a tick box, one deck at a time. Only one of its
 three buttons is about Torval at all; it has a README of its own.
 

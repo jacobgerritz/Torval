@@ -28,9 +28,15 @@ file**.
 
 If the field you pick holds sentences rather than single words, Torval
 breaks each one into the words inside it as it loads, so a sentence deck
-works too. The file is named `anki-known-words-<date>.json`, which is not
-what Torval calls its own backups, so the two never sit in a Downloads
-folder looking like the same thing.
+works too. It keeps only the words the dictionary has for the language
+you are reading, and says how many it left out.
+
+Both files are named for the deck and the day: `known-words-Spanish-
+Verbs-2026-09-21.txt` and `anki-known-words-Spanish-Verbs-2026-09-21.json`.
+The deck is in the name because exporting three decks in one afternoon
+otherwise writes one filename three times, and the JSON does not use
+Torval's own `torval-words-<date>.json`, so the two never sit in a
+Downloads folder looking like the same file.
 
 Nothing here is specific to Torval except that one button. The text file
 and the clipboard are the general case.
@@ -83,5 +89,18 @@ Linux with the Flatpak build that is
 ```
 ~/.var/app/net.ankiweb.Anki/data/Anki2/addons21/
 ```
+
+Anki takes an add-on's name from a `meta.json` it writes itself at
+install time, so a folder copied in by hand is listed under **Tools →
+Add-ons** by its folder name instead. One file fixes that:
+
+```
+echo '{"name": "Export Known Words", "disabled": false}' \
+  > ~/.var/app/net.ankiweb.Anki/data/Anki2/addons21/known_words_export/meta.json
+```
+
+It is not in this repository because Anki owns that file, rewrites it,
+and keeps the add-on's settings in it. Installing from AnkiWeb writes it
+for you and none of this applies.
 
 It is one Python file on purpose.

@@ -26,3 +26,6 @@ dist/
 
 # Python bytecode from the Anki add-on
 __pycache__/
+
+# Anki writes this into an installed add-on and owns it
+anki/*/meta.json
