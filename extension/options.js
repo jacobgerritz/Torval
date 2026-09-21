@@ -48,12 +48,28 @@ showPanel(asked === 'known' ? 'words'
  * of the add-on's own pages, so the popup cannot ask; the most it can do is
  * send somebody here. Landing them on a page of six tabs and leaving them
  * to find it would waste the trip, so the panel opens, the row is scrolled
- * to, and it is marked for a few seconds. Taken out of storage as it is
- * read: it is one trip's worth of instruction, not a setting.
+ * to, and it is marked for a few seconds.
+ *
+ * Both ways in, because openOptionsPage does not always open anything: with
+ * this page already sitting in a tab it focuses that tab and nothing
+ * reloads, so nothing reads storage and the trip ends on whichever panel
+ * was last open. That is what it did, and Words is where it starts.
  */
-api.storage.local.get('showOnOpen').then((stored) => {
-  const wanted = stored && stored.showOnOpen;
+api.storage.local.get('showOnOpen')
+  .then((stored) => pointAt(stored && stored.showOnOpen))
+  .catch(() => {});
+
+if (api.storage.onChanged) {
+  api.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local' || !changes.showOnOpen) return;
+    pointAt(changes.showOnOpen.newValue);
+  });
+}
+
+function pointAt(wanted) {
   if (!wanted) return;
+  // Taken out as it is read: one trip's worth of instruction, not a
+  // setting, and it must not fire again on the next visit.
   api.storage.local.remove('showOnOpen').catch(() => {});
 
   const row = document.getElementById(wanted);
@@ -65,7 +81,7 @@ api.storage.local.get('showOnOpen').then((stored) => {
   marked.scrollIntoView({ block: 'center' });
   marked.classList.add('pointed');
   setTimeout(() => marked.classList.remove('pointed'), 4000);
-}).catch(() => {});
+}
 
 // -------------------------------------------------------------------------
 // Anki
