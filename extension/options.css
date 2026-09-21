@@ -234,6 +234,19 @@ input[type="number"] { flex: 0 0 110px; }
  */
 .row > .note { margin-bottom: 0; }
 
+/*
+ * A card's own spacing comes from its padding, so the first and last things
+ * in it bring none of their own. Without this, a row that starts a card sits
+ * 12 pixels lower than it should and a note that ends one leaves 18 pixels of
+ * nothing under it, which is what made the "Keeping a copy" card look like it
+ * had been assembled by two different people.
+ */
+section > .row:first-child { margin-top: 0; }
+section > .note:last-child { margin-bottom: 0; }
+
+/* A note under a row explains the row, so it needs a gap above it, not none. */
+.row + .note { margin-top: 10px; }
+
 /* Saving is the whole point of the Anki page, so it does not scroll away. */
 .actions {
   position: sticky;
