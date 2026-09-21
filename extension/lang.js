@@ -31,7 +31,23 @@ var TorvalLang = (function () {
   // what is in one.
   var registry = {};
   var order = [];
-  var current = 'ja';  // the language every existing install already has, unasked
+  /*
+   * Which language is being read, and whether anybody ever said so.
+   *
+   * These are two questions and they used to be one. `current` starts at
+   * Japanese because something has to be named before storage answers and
+   * every profile-shaped question needs an answer, but starting there is
+   * not the same as having been chosen, and treating it as though it were
+   * meant a fresh install quietly became a Japanese one: it downloaded and
+   * built a two-hundred-thousand-entry Japanese dictionary, marked up
+   * Japanese on every page, and went looking for Japanese subtitles on
+   * every video, all before being asked a single question.
+   *
+   * So `picked` is asked separately, and the answer on a fresh install is
+   * no. Nothing starts until it is yes.
+   */
+  var current = 'ja';
+  var picked = false;
   var listeners = [];
 
   function register(profile) {
@@ -59,9 +75,16 @@ var TorvalLang = (function () {
   function onChange(fn) { listeners.push(fn); }
 
   function applyStored(value) {
-    var next = (value && registry[value]) ? value : current;
-    if (next === current) return;
+    var known = !!(value && registry[value]);
+    var next = known ? value : current;
+    // Both halves matter. Choosing Japanese on a fresh install does not
+    // change `current`, which was already Japanese, and an earlier version
+    // of this returned here and told nobody: the choice was saved, and
+    // nothing started, because nothing had been notified that anything
+    // had happened.
+    if (next === current && known === picked) return;
     current = next;
+    picked = known;
     listeners.forEach(function (fn) {
       try { fn(current); } catch (err) { /* one bad listener should not sink the rest */ }
     });
@@ -92,6 +115,14 @@ var TorvalLang = (function () {
 
   function ready() { return initPromise; }
 
+  /**
+   * Has anybody chosen a language yet? Synchronous, and only meaningful
+   * once `ready()` has resolved: before that it is no, because nothing has
+   * been read. `chosen()` below asks storage the same question the slow
+   * way, and is what the toolbar panel uses.
+   */
+  function isPicked() { return picked; }
+
   /** Switch language. Writes storage; every open tab picks it up via onChanged. */
   async function set(code) {
     if (!registry[code]) throw new Error('Unknown language: ' + code);
@@ -115,6 +146,7 @@ var TorvalLang = (function () {
     set: set,
     chosen: chosen,
     ready: ready,
+    picked: isPicked,
     // Exposed so the tests can pick a language without waiting on storage.
     _setActive: function (code) { applyStored(code); }
   };

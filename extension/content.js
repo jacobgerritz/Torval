@@ -38,14 +38,22 @@
   /**
    * Is Torval supposed to be doing anything here?
    *
-   * Two questions in one, because they have the same answer everywhere it
-   * is asked: is this frame still the one that owns the page, and is Torval
-   * switched on at all. The switch lives on the toolbar button, and every
-   * page watches it, so turning it off quietens pages that are already open
-   * rather than only the next one.
+   * Three questions in one, because they have the same answer everywhere it
+   * is asked: has anybody said which language they are reading, is this
+   * frame still the one that owns the page, and is Torval switched on at
+   * all. The switch lives on the toolbar button, and every page watches it,
+   * so turning it off quietens pages that are already open rather than only
+   * the next one.
+   *
+   * The first of the three is for a fresh install, where the honest answer
+   * to "which language is this" is that nobody has said. Torval used to
+   * assume Japanese and get on with it, which meant marking up Japanese on
+   * a page in English for somebody who had installed it to read Italian.
+   * Doing nothing is the right answer until the question has been put.
    */
   function isCurrent() {
     if (off) return false;
+    if (TorvalLang.picked && !TorvalLang.picked()) return false;
     if (document.documentElement.getAttribute(OWNER) === instance) return true;
     if (ui) { ui.host.remove(); ui = null; }
     return false;
@@ -157,6 +165,10 @@
   function bringBack() {
     if (typeof TorvalBar !== 'undefined') TorvalBar.visible(true);
     if (typeof TorvalSubtitles !== 'undefined') {
+      // Called again rather than only once at the top of this file,
+      // because on a fresh install the first call found no language and
+      // declined to start. This is the moment one was picked.
+      TorvalSubtitles.enable();
       TorvalSubtitles.suspend(false);
       // A change of language makes every line already fetched the wrong
       // language, and the only thing that used to clear them was opening a
@@ -1040,6 +1052,12 @@
       }
       const state = reply && reply.status;
       if (!state || state.state === 'ready') return;
+      // Nobody has said which language yet, so there is no dictionary to
+      // wait for and never will be until they do. isCurrent() should have
+      // stopped this from being reached at all; this is so that if it ever
+      // does, the answer is to stop rather than to sit here saying
+      // "building the dictionary" about a dictionary nobody asked for.
+      if (state.state === 'unchosen') return;
       if (state.state === 'error') {
         TorvalBar.busy('Torval could not load its dictionary');
         return;

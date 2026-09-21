@@ -513,3 +513,59 @@ if (verbose) {
     .catch(() => {});
   verbose.addEventListener('change', () => TorvalLog.verbose(verbose.checked));
 }
+
+
+// ---------------------------------------------------------------------------
+// A fresh install
+// ---------------------------------------------------------------------------
+
+/*
+ * Until somebody says which language they are reading, that is the only
+ * question this page asks. Everything else here is about a language, and
+ * Torval itself does nothing at all in the meantime, so a settings page
+ * offering to configure Anki for a language that does not exist yet is
+ * offering to configure nothing.
+ *
+ * The background script opens this page on install for exactly this. Once
+ * the choice is made the page turns into the ordinary settings page,
+ * without a reload: TorvalLang tells everything that is listening, which
+ * on this page means the panels come back and on every open tab means
+ * Torval starts working.
+ */
+const firstPanel = document.getElementById('panel-first');
+const firstChoices = document.getElementById('first-languages');
+const layout = document.querySelector('.layout');
+
+function askFirst() {
+  const asking = !TorvalLang.picked();
+  document.querySelector('.sidebar').hidden = asking;
+  if (asking) drawFirstChoices();
+  // showPanel hides every panel but the named one, this one included, so
+  // it is the whole of both directions: into the question, and out of it
+  // once the question has been answered. On an ordinary load the first
+  // panel is already hidden and the panel the address asked for is left
+  // exactly as it was.
+  if (asking) showPanel('first');
+  else if (!firstPanel.hidden) showPanel('words');
+  // Drawn only now, so a fresh install never shows a flash of the settings
+  // it is not ready to have.
+  layout.classList.add('settled');
+}
+
+function drawFirstChoices() {
+  // Redrawn rather than built once, since which languages exist is
+  // TorvalLang's to know and this page should not keep a copy.
+  firstChoices.textContent = '';
+  for (const { code, name } of TorvalLang.list()) {
+    const button = document.createElement('button');
+    button.className = 'first-choice';
+    button.textContent = name;
+    button.addEventListener('click', () => TorvalLang.set(code));
+    firstChoices.appendChild(button);
+  }
+}
+
+if (firstPanel) {
+  TorvalLang.onChange(askFirst);
+  TorvalLang.ready().then(askFirst);
+}

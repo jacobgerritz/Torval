@@ -22,6 +22,31 @@
 
   <main>
 
+  <!--
+    A fresh install, where nobody has said which language they are here
+    for. Everything else on this page is about a language, so until there
+    is one there is nothing else worth showing: the tabs, the panels and
+    the sidebar's own picker are all hidden and this stands in their place.
+    Torval does nothing at all in the meantime, which is the point; see
+    isCurrent in content.js.
+  -->
+  <div class="panel" id="panel-first" hidden>
+    <section class="first-run">
+      <h2>Which language are you reading?</h2>
+      <p class="note">
+        Torval keeps one dictionary, one set of known words and one set of
+        Anki settings per language, and works on one at a time. You can
+        change this whenever you like, and nothing you have marked in one
+        language is lost by switching to another.
+      </p>
+      <p class="note">
+        The first choice downloads that language's dictionary into this
+        browser, which takes a minute and then never happens again.
+      </p>
+      <div id="first-languages" class="first-choices"></div>
+    </section>
+  </div>
+
   <!-- ------------------------------------------------------------------ -->
 
   <div class="panel" id="panel-words">

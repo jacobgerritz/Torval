@@ -3107,6 +3107,38 @@ const run = async () => {
     console.warn = realWarn;
   }
 
+  // --- a fresh install ----------------------------------------------------
+  //
+  // Torval used to answer "which language is this" with Japanese before
+  // anybody had been asked, which is not a default so much as a decision
+  // made on somebody's behalf: it downloaded and built a Japanese
+  // dictionary, marked up Japanese on every page and went looking for
+  // Japanese subtitles on every video, for a reader who had installed it
+  // for Italian. The two questions are separate now.
+  Lang._setActive(null);
+  check('a fresh install has not picked a language', Lang.picked() === false);
+  check('but still has a profile to answer with, so nothing crashes',
+    Lang.profile() && typeof Lang.profile().charClass !== 'undefined');
+
+  let woke = 0;
+  Lang.onChange(() => { woke++; });
+
+  // The case that made this worth testing: choosing Japanese does not
+  // change which language is active, because it already was. An earlier
+  // version returned early on exactly that and told nobody, so the choice
+  // was saved and nothing ever started.
+  Lang._setActive('ja');
+  check('choosing the language that was already the default still counts',
+    Lang.picked() === true && woke === 1, 'woke ' + woke);
+
+  Lang._setActive(null);
+  check('and it can go back to unasked', Lang.picked() === false && woke === 2,
+    'woke ' + woke);
+  Lang._setActive('it');
+  check('choosing a different one counts too',
+    Lang.picked() === true && Lang.active() === 'it' && woke === 3, 'woke ' + woke);
+  Lang._setActive('ja');
+
   console.log(`${passed} passed, ${failures.length} failed`);
   if (failures.length) {
     console.log('\nFailures:');

@@ -89,7 +89,8 @@ function copyKey(key) { return key + 'Copy'; }
 
 let ready = null;              // promise for the open, populated database
 let tagsPromise = null;
-let status = { state: 'starting', progress: 0 };
+// 'unchosen' until a language is picked; see loadIfPicked.
+let status = { state: 'unchosen' };
 let hoverReader = null;        // reassigned per language, see loadLanguage
 
 // ---------------------------------------------------------------------------
@@ -1085,11 +1086,42 @@ function loadLanguage() {
   });
 }
 
-// Waits for the real stored choice before the very first load, so a fresh
-// background-script start never races the 'ja' default against whatever the
-// user actually last picked.
-TorvalLang.ready().then(loadLanguage);
-TorvalLang.onChange(loadLanguage);
+/*
+ * Nothing is loaded until somebody has said what to load.
+ *
+ * Waiting for the stored choice was already here, so that a fresh
+ * background start never races the Japanese default against whatever was
+ * last picked. What was missing is that on a fresh install there is no
+ * stored choice at all, and the default won by walking over: Torval
+ * downloaded and built the whole Japanese dictionary, several minutes and
+ * a couple of hundred megabytes of it, for somebody who had not yet been
+ * asked which language they were here for.
+ *
+ * So an unanswered question is a state of its own, and the content script
+ * knows what to do with it, which is nothing.
+ */
+function loadIfPicked() {
+  if (!TorvalLang.picked()) {
+    status = { state: 'unchosen' };
+    setBadge('');
+    return;
+  }
+  loadLanguage();
+}
+
+TorvalLang.ready().then(loadIfPicked);
+TorvalLang.onChange(loadIfPicked);
+
+// A fresh install opens the settings, because the one thing Torval needs
+// before it can do anything is the one thing it cannot guess.
+if (api.runtime.onInstalled) {
+  api.runtime.onInstalled.addListener(function (details) {
+    if (details.reason !== 'install') return;
+    TorvalLang.ready().then(function () {
+      if (!TorvalLang.picked()) api.runtime.openOptionsPage();
+    });
+  });
+}
 
 async function start() {
   // Before anything else: a list that has gone missing since last time is

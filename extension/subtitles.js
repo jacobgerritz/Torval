@@ -352,14 +352,27 @@ var TorvalSubtitles = (function () {
    * it and did not know.
    */
   function enable() {
-    if (enabled || starting) return;
-    starting = true;
+    if (enabled) return;
     var settled = (typeof TorvalLang !== 'undefined' && TorvalLang.ready)
       ? TorvalLang.ready() : Promise.resolve();
-    settled.then(start, start);
+    settled.then(startIfPicked, startIfPicked);
   }
 
-  var starting = false;
+  /*
+   * And not even then, if nobody has said which language they are reading.
+   * On a fresh install that is the case, and going looking for subtitles
+   * in a language nobody asked for is the same mistake as fetching a
+   * Japanese track on an Italian film, only earlier.
+   *
+   * enable() is called again when a language is picked, from bringBack in
+   * content.js, which is why this may be reached more than once. start()
+   * is what refuses to run twice.
+   */
+  function startIfPicked() {
+    if (typeof TorvalLang !== 'undefined' && TorvalLang.picked &&
+        !TorvalLang.picked()) return;
+    start();
+  }
 
   function start() {
     if (enabled) return;

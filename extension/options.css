@@ -524,3 +524,41 @@ input[type="file"]:focus-visible ~ .pick,
    "this is switched on", so a glance down the page says what is set. */
 .look-choice.on { background: #dba35f; color: #16171a; }
 .look-choice.on:hover { background: #e6b578; color: #16171a; }
+
+/*
+ * The first thing anybody sees, on an install that has not been asked yet.
+ * Big targets and nothing else on the page, because there is exactly one
+ * thing to do here and no reason to make it look like a settings row.
+ */
+.first-run { padding: 30px 32px 32px; }
+.first-run h2 { font-size: 19px; margin-bottom: 10px; }
+
+.first-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.first-choice {
+  flex: 1 1 140px;
+  padding: 16px 18px;
+  background: #1b1d21;
+  border: 1px solid #34373d;
+  border-radius: 9px;
+  color: var(--ink-bright);
+  font: inherit;
+  font-size: 16px;
+  text-align: center;
+}
+
+.first-choice:hover { background: #263a44; border-color: #3c5c6b; }
+
+/*
+ * Nothing is drawn until it is known whether this install has been asked
+ * which language it is for. It is one frame either way, and it is the
+ * difference between a fresh install opening on a question and opening on
+ * a flash of settings that are about to be taken away again.
+ */
+.layout { visibility: hidden; }
+.layout.settled { visibility: visible; }

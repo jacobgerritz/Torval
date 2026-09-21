@@ -1362,6 +1362,21 @@ npx web-ext sign --source-dir extension --channel unlisted \
   --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
 ```
 
+### The first run
+
+Torval does nothing at all until somebody says which language they are
+reading. Installing it opens the settings page on that one question, and
+until it is answered `isCurrent()` in `content.js` returns false
+everywhere, the background script reports its state as `unchosen` and
+loads no dictionary, and the subtitle watcher does not start.
+
+This is not fussiness. The alternative, which is what it used to do, was
+to treat the internal default of Japanese as though it were a choice: a
+fresh install downloaded and built a two-hundred-thousand-entry Japanese
+dictionary, marked up Japanese on every page and went looking for
+Japanese subtitle tracks on every video, for somebody who had installed
+it to read Italian.
+
 ### Asking it what it is doing
 
 Torval says nothing in the browser's console unless there is something you
