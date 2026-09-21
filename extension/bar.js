@@ -341,7 +341,7 @@ var TorvalBar = (function () {
     // every other page it is not a button that does nothing, it is not
     // there at all.
     els.skip = button('»', '', function () { if (onSkip) onSkip(); });
-    els.skip.className = 'skip';
+    els.skip.classList.add('skip');
     els.skip.hidden = true;
 
     var settings = button('⚙', 'Torval settings', function () {
@@ -351,7 +351,7 @@ var TorvalBar = (function () {
     // says, so the pin had no way to look switched on. A plain character
     // takes the colour it is given.
     els.pin = button('◉', '', function () { setPinned(!pinned); });
-    els.pin.className = 'pin';
+    els.pin.classList.add('pin');
 
     els.bar.append(mark, els.score, els.note, els.detail, spacer,
       els.skip, refresh, settings, els.pin);
@@ -596,6 +596,9 @@ var TorvalBar = (function () {
 
   function button(text, title, onClick) {
     var el = document.createElement('button');
+    // Marked as one of the icons, because the handle is a button too and
+    // the square icon box is emphatically not what it wants.
+    el.className = 'icon';
     el.textContent = text;
     el.title = title;
     el.addEventListener('click', onClick);
@@ -615,11 +618,18 @@ var TorvalBar = (function () {
   // finger-sized rather than pointer-sized.
   var CSS = [
     ':host { all: initial; }',
+    // Sized by its own text and never by anything else. This is a button,
+    // and when the icon rule below was written as `button` rather than as
+    // a class it caught this one too and squeezed "Torval" into a 38 pixel
+    // square. Its width is whatever the word needs; nothing wraps it, and
+    // nothing clips it.
     '.handle {',
     '  position: fixed; top: 0; right: 14px; z-index: 2147483645;',
+    '  box-sizing: content-box; width: auto; height: auto;',
     '  padding: 5px 14px; margin: 0; border: 1px solid #292b30; border-top: 0; border-radius: 0 0 8px 8px;',
     '  background: #16171a; font: 13px/1 -apple-system, "Segoe UI", sans-serif;',
     '  letter-spacing: 0.06em; color: #6b7079; cursor: pointer;',
+    '  white-space: nowrap; overflow: visible; text-overflow: clip;',
     '}',
     '.handle:hover { color: #dfe1e5; }',
     // While something is being worked out, the handle is the only part
@@ -638,10 +648,27 @@ var TorvalBar = (function () {
     '  transform: translateY(-100%); transition: transform .22s ease;',
     '}',
     '.bar.expanded { transform: translateY(0); }',
-    '.mark { font-size: 14px; letter-spacing: 0.08em; color: #5a5f67; }',
-    '.score { font-size: 24px; font-weight: 600; color: #f4f5f7; }',
+    // Three pieces of text and a row of buttons in a fixed strip, which is
+    // a layout with one failure mode: a narrow window, a large system font
+    // or a page zoomed in, and the text pushes the buttons off the end.
+    // So the text may shrink and be cut with an ellipsis, the buttons may
+    // not shrink at all, and below a certain width the two pieces that are
+    // decoration rather than information go away entirely. The percentage
+    // is what the bar is for and is the last thing to go.
+    '.mark { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;',
+    '  white-space: nowrap; font-size: 14px; letter-spacing: 0.08em; color: #5a5f67; }',
+    '.score { flex: 0 0 auto; font-size: 24px; font-weight: 600; color: #f4f5f7;',
+    '  font-variant-numeric: tabular-nums; }',
+    '.detail, .note {',
+    '  flex: 0 1 auto; min-width: 0; overflow: hidden;',
+    '  text-overflow: ellipsis; white-space: nowrap;',
+    '}',
     '.detail { color: #767b84; }',
-    '.spacer { flex: 1; }',
+    '.spacer { flex: 1 1 auto; min-width: 0; }',
+    '@media (max-width: 560px) {',
+    '  .mark, .detail { display: none; }',
+    '  .bar { gap: 8px; padding: 0 8px; }',
+    '}',
     // A button is a square box with its glyph centred in it, rather than a
     // line of text with padding round it. ⟳, ⚙, ◉ and » come from whatever
     // font the browser has them in, and those fonts disagree about where in
@@ -649,13 +676,14 @@ var TorvalBar = (function () {
     // that disagreement showed up as every icon riding low. Centring the
     // line box itself, in a box of a known size, is the thing that actually
     // holds still.
-    'button {',
+    '.icon {',
+    '  flex: 0 0 auto;',
     '  display: inline-flex; align-items: center; justify-content: center;',
     '  box-sizing: border-box; width: 38px; height: 38px; padding: 0;',
     '  background: none; border: 0; border-radius: 6px;',
     '  font: inherit; font-size: 22px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
-    'button:hover { background: #24262b; color: #dfe1e5; }',
+    '.icon:hover { background: #24262b; color: #dfe1e5; }',
     '.pin { font-size: 16px; }',
     // Unmistakably switched on, not just a shade different: a pin you
     // cannot tell the state of is a pin you press twice.

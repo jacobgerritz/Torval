@@ -33,7 +33,14 @@
 
 .card {
   box-sizing: border-box;
-  max-width: var(--torval-popup-width, 400px);
+  /*
+   * The width from the appearance settings, but never wider than the
+   * window it has to fit in. `place` can move the card left when it would
+   * run off the right edge, and that is enough on a desktop; it cannot
+   * help when the card is simply wider than the screen, which "Wide" on a
+   * narrow window or a phone-sized browser is.
+   */
+  max-width: min(var(--torval-popup-width, 400px), calc(100vw - 24px));
   max-height: 60vh;
   overflow-y: auto;
   padding: 13px 15px 14px;
