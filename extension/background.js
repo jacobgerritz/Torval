@@ -232,7 +232,17 @@ api.runtime.onMessage.addListener((message, sender) => {
     case 'clearWords':   return guard(() => clearList(message.list === 'ignored' ? IGNORED() : KNOWN()));
     case 'exportWords':  return guard(() => exportWords());
     case 'importWords':  return guard(() => importWords(message.data));
-    case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
+    case 'openOptions':  return guard(async () => {
+      // `focus` names a switch the settings page should open on and point
+      // at. Chrome will not let a permission be asked for from a page
+      // script or from here, only from a click on one of the add-on's own
+      // pages, so the closest thing to asking at the moment it matters is
+      // taking somebody straight to the switch. Left in storage rather
+      // than sent, because the page is not open yet to be told.
+      if (message.focus) await api.storage.local.set({ [SHOW_ON_OPEN]: message.focus });
+      api.runtime.openOptionsPage();
+      return true;
+    });
     case 'tabAudioReady': return guard(() => tabAudioReady());
     case 'tabAudioStart': return guard(() => tabAudioStart(sender && sender.tab && sender.tab.id,
       message.mimeType));
@@ -958,6 +968,9 @@ async function merged(data) {
  * → Anki, and never otherwise: YouTube's audio comes off the element and
  * wants none of this, which is the common case and stays untouched.
  */
+/** Where openOptions leaves the name of a switch for the settings page. */
+const SHOW_ON_OPEN = 'showOnOpen';
+
 const OFFSCREEN = 'offscreen.html';
 let offscreenOpen = null;
 

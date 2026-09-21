@@ -41,6 +41,32 @@ const asked = (location.hash || '').slice(1);
 showPanel(asked === 'known' ? 'words'
   : document.getElementById('panel-' + asked) ? asked : 'words');
 
+/*
+ * Opened to be shown one switch.
+ *
+ * Chrome will not let a permission be asked for anywhere but a click on one
+ * of the add-on's own pages, so the popup cannot ask; the most it can do is
+ * send somebody here. Landing them on a page of six tabs and leaving them
+ * to find it would waste the trip, so the panel opens, the row is scrolled
+ * to, and it is marked for a few seconds. Taken out of storage as it is
+ * read: it is one trip's worth of instruction, not a setting.
+ */
+api.storage.local.get('showOnOpen').then((stored) => {
+  const wanted = stored && stored.showOnOpen;
+  if (!wanted) return;
+  api.storage.local.remove('showOnOpen').catch(() => {});
+
+  const row = document.getElementById(wanted);
+  if (!row) return;
+  const panel = row.closest('.panel');
+  if (panel) showPanel(panel.id.replace(/^panel-/, ''));
+
+  const marked = row.closest('label') || row;
+  marked.scrollIntoView({ block: 'center' });
+  marked.classList.add('pointed');
+  setTimeout(() => marked.classList.remove('pointed'), 4000);
+}).catch(() => {});
+
 // -------------------------------------------------------------------------
 // Anki
 // -------------------------------------------------------------------------

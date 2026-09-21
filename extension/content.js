@@ -1903,6 +1903,36 @@
     return ' No sound: this video is copy-protected. See Settings → Anki.';
   }
 
+  /**
+   * A way to turn tab recording on, put where the sound went missing.
+   *
+   * Chrome will not let a permission be asked for from a page's own script,
+   * nor from the background answering one: it has to be a click on one of
+   * the add-on's own pages. So this is as close to asking as the browser
+   * allows, a button that opens the settings page already pointing at the
+   * switch. It appears only where there is something to turn on: not on
+   * Firefox, which cannot do it at all, and not once it is already on.
+   */
+  async function offerTabAudio(said) {
+    let state = null;
+    try {
+      const reply = await api.runtime.sendMessage({ type: 'tabAudioReady' });
+      if (reply && reply.ok) state = reply.result;
+    } catch (err) { return; }
+    if (!state || !state.can || state.granted) return;
+    if (!said.isConnected) return;   // the message came and went while asking
+
+    const turn = document.createElement('button');
+    turn.className = 'turn-on';
+    turn.textContent = 'Let Torval record this tab';
+    turn.addEventListener('click', () => {
+      api.runtime.sendMessage({ type: 'openOptions', focus: 'tab-audio' }).catch(() => {});
+    });
+    said.appendChild(document.createTextNode(' '));
+    said.appendChild(turn);
+    reflow();
+  }
+
   function saying(entryEl, text) {
     const said = document.createElement('div');
     said.className = 'note doing';
@@ -2038,6 +2068,7 @@
       // looks exactly the same as one that was. So it says so, and then
       // takes itself away again rather than leaving the popup taller.
       const said = saying(entryEl, 'Added to Anki.' + missing(blocked));
+      if (blocked && blocked.audio) offerTabAudio(said);
       said.className = 'note added';
       // Long enough to read. The plain "Added to Anki." is four words and
       // gone; the sentence about copy protection is one somebody has to

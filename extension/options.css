@@ -298,6 +298,17 @@ button:disabled { opacity: 0.45; cursor: default; }
 
 .armed:hover { background: #4a332f; }
 
+/*
+ * A row somebody was sent here to find. It fades out on its own: a mark
+ * that stays is a mark that has to be dismissed, and this one has done its
+ * job the moment it has been seen.
+ */
+.pointed {
+  border-radius: 6px;
+  outline: 2px solid var(--accent);
+  outline-offset: 6px;
+}
+
 /* --- word lists ---------------------------------------------------------- */
 
 /* The heading, the count and the search box are one line of furniture rather

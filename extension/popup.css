@@ -361,6 +361,24 @@
 }
 
 /*
+ * The one thing in this popup that leads somewhere else: a switch that has
+ * to be thrown on the settings page, offered where its absence was noticed.
+ * Underlined rather than boxed, because it is a sentence that happens to be
+ * clickable and a button here would read as a second way to make the card.
+ */
+.turn-on {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: #dba35f;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.turn-on:hover { color: #e8bb84; }
+
+/*
  * Picking senses to mine. Clicking one puts only that meaning on the card;
  * picking none means all of them, so the ordinary case needs no clicks.
  */
