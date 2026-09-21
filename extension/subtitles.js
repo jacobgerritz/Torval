@@ -330,6 +330,11 @@ var TorvalSubtitles = (function () {
     // second while the picture is already the new one.
     document.addEventListener('fullscreenchange', fitLine);
     window.addEventListener('resize', fitLine);
+    // A subtitle that got bigger in the settings gets bigger on the video
+    // that is already playing, rather than on the next one.
+    if (typeof TorvalLook !== 'undefined') {
+      TorvalLook.onChange(function () { paintSkin(); fitLine(); });
+    }
     setInterval(watch, 1000);
     setInterval(renderCue, TICK_SECONDS * 1000);
     if (api.runtime.onMessage) api.runtime.onMessage.addListener(onBackgroundMessage);
@@ -1676,8 +1681,7 @@ var TorvalSubtitles = (function () {
     // clicks meant for the player underneath.
     overlayLine.style.cssText = [
       'pointer-events:auto', 'user-select:text', 'cursor:default', 'max-width:88%',
-      'background:#16171a', 'border:1px solid #292b30', 'border-radius:6px',
-      'box-shadow:0 8px 28px rgba(0,0,0,.5)', 'color:#f4f5f7',
+      'border-radius:6px', 'color:#f4f5f7',
       'padding:9px 22px',
       'font:500 34px/1.5 -apple-system,"Segoe UI","Hiragino Kaku Gothic ProN",' +
         '"Noto Sans JP","Yu Gothic",Meiryo,sans-serif',
@@ -1686,11 +1690,26 @@ var TorvalSubtitles = (function () {
       // cursor away from the words inside it.
       'touch-action:none'
     ].join(';');
+    // Box, shaded or nothing but an outline on the words, from the
+    // appearance settings. Kept out of the cssText above because it is the
+    // one part of this that changes while the page is open.
+    paintSkin();
     overlay.appendChild(overlayLine);
     player.appendChild(overlay);
     dragging(overlayLine);
     overlay.style.bottom = bottom + '%';
     fitLine();
+  }
+
+  /** The background the line sits on, whichever of the three is chosen. */
+  function paintSkin() {
+    if (!overlayLine) return;
+    var skin = typeof TorvalLook !== 'undefined' ? TorvalLook.subtitleSkin() : null;
+    if (!skin) return;
+    overlayLine.style.background = skin.background;
+    overlayLine.style.border = skin.border;
+    overlayLine.style.boxShadow = skin.boxShadow;
+    overlayLine.style.textShadow = skin.textShadow;
   }
 
   // How large the line is, as a fraction of the player it sits in, and the
@@ -1724,8 +1743,12 @@ var TorvalSubtitles = (function () {
     var box = overlay.parentElement;
     var height = box ? box.clientHeight : 0;
     if (!height) return;
-    var size = Math.round(Math.max(LINE_SMALLEST,
-      Math.min(LINE_LARGEST, height * LINE_OF_PLAYER)));
+    // The appearance setting multiplies the share of the player a line
+    // takes, and the floor and ceiling move with it: a reader who asked
+    // for very large subtitles did not mean "up to 48 pixels".
+    var scale = typeof TorvalLook !== 'undefined' ? TorvalLook.subtitleScale() : 1;
+    var size = Math.round(Math.max(LINE_SMALLEST * scale,
+      Math.min(LINE_LARGEST * scale, height * LINE_OF_PLAYER * scale)));
     if (overlayLine.style.fontSize !== size + 'px') {
       overlayLine.style.fontSize = size + 'px';
     }

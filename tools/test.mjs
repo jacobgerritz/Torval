@@ -27,6 +27,7 @@ const Video = require(join(ROOT, 'extension', 'video.js'));
 const Subs = require(join(ROOT, 'extension', 'subtitles.js'));
 const Highlight = require(join(ROOT, 'extension', 'highlight.js'));
 const Lang = require(join(ROOT, 'extension', 'lang.js'));
+const Look = require(join(ROOT, 'extension', 'look.js'));
 const DeinflectEs = require(join(ROOT, 'extension', 'deinflect-es.js'));
 const DeinflectIt = require(join(ROOT, 'extension', 'deinflect-it.js'));
 const LookupLatin = require(join(ROOT, 'extension', 'lookup-latin.js'));
@@ -2873,6 +2874,57 @@ const run = async () => {
     Deinflect.deinflect('食べる')[0].term === '食べる');
   check('deinflect terminates on pathological input',
     Deinflect.deinflect('ってってってってってって').length < 400);
+
+  // --- appearance -------------------------------------------------------
+  //
+  // Four settings, and the thing worth checking is that what the settings
+  // page shows and what the popup and the subtitles read are the same
+  // table: they are, because both go through look.js, and these check the
+  // numbers come out the other end.
+  Look._setAll({});
+  check('appearance starts at its defaults',
+    Look.all().every((s) => s.isDefault),
+    JSON.stringify(Look.all().map((s) => s.value)));
+  check('and the defaults change nothing about the popup',
+    Look.get('popupSize').unit === 1 && Look.get('popupWidth').px === 400);
+  check('nor about the subtitles', Look.subtitleScale() === 1 &&
+    Look.subtitleSkin().background === '#16171a');
+
+  await Look.set('subtitleSize', 'huge');
+  check('a larger subtitle is a larger share of the player',
+    Look.subtitleScale() === 1.5, String(Look.subtitleScale()));
+  await Look.set('subtitleBackdrop', 'none');
+  const bare = Look.subtitleSkin();
+  check('and with no box the words keep an outline instead',
+    bare.background === 'transparent' && bare.boxShadow === 'none' &&
+    /rgba\(0,0,0,\.9\)/.test(bare.textShadow), JSON.stringify(bare));
+
+  await Look.set('popupSize', 'large');
+  check('a larger popup scales every size at once, and none of them twice',
+    Look.get('popupSize').unit === 1.15, String(Look.get('popupSize').unit));
+
+  check('a choice that does not exist is refused',
+    (await Look.set('popupWidth', 'enormous')) === false &&
+    Look.get('popupWidth').value === 'normal');
+  check('and so is a setting that does not exist',
+    (await Look.set('nonsense', 'normal')) === false);
+
+  // A value saved by some older version, whose choice this one no longer
+  // offers, must not leave a caller holding nothing: every one of them is
+  // about to read a number off it.
+  Look._setAll({ popupWidth: 'gigantic' });
+  check('a setting saved under a name this version dropped falls back',
+    Look.get('popupWidth').px === 400, String(Look.get('popupWidth').px));
+
+  let told = 0;
+  Look.onChange(() => { told++; });
+  await Look.set('subtitleSize', 'small');
+  check('and a change is announced, so an open page follows it', told === 1,
+    'told ' + told);
+
+  await Look.reset();
+  check('reset puts every one of them back',
+    Look.all().every((s) => s.isDefault) && Look.subtitleScale() === 1);
 
   console.log(`${passed} passed, ${failures.length} failed`);
   if (failures.length) {

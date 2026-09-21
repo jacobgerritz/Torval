@@ -476,3 +476,51 @@ input[type="file"]:focus-visible ~ .pick,
 /* Not the default any more, which is worth seeing at a glance when a key
    has stopped working and you are wondering what you changed. */
 .shortcut-key.changed { border-color: #4a4034; }
+
+/*
+ * Appearance. One row is one thing to decide and the choices for it, laid
+ * out like the shortcuts above: what it is on the left, the control on the
+ * right, every row the same shape so the page reads as a column.
+ *
+ * Buttons in a strip rather than a dropdown. There are three or four
+ * choices, all of them one word, and a dropdown hides two of them behind a
+ * click to save room this page has plenty of. Which one is on is then
+ * visible without opening anything, which is the whole question somebody
+ * comes to this page to answer.
+ */
+.look-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 0;
+}
+
+.look-row + .look-row { border-top: 1px solid #24262b; }
+
+.look-choices {
+  display: flex;
+  flex: 0 0 auto;
+  border: 1px solid #34373d;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.look-choice {
+  padding: 7px 14px;
+  background: #1b1d21;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink-quiet);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.look-choice + .look-choice { border-left: 1px solid #34373d; }
+.look-choice:hover { background: #24272c; color: var(--ink); }
+
+/* The one in force. The same amber as everywhere else in Torval that means
+   "this is switched on", so a glance down the page says what is set. */
+.look-choice.on { background: #dba35f; color: #16171a; }
+.look-choice.on:hover { background: #e6b578; color: #16171a; }

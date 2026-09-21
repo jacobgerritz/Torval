@@ -414,3 +414,83 @@ if (skipSpeed) {
 // be changed on the Keys page next door.
 const skipKey = document.getElementById('skip-key');
 if (skipKey) TorvalKeys.ready().then(() => { skipKey.textContent = TorvalKeys.label(TorvalKeys.get('skip')); });
+
+
+// ---------------------------------------------------------------------------
+// Appearance
+// ---------------------------------------------------------------------------
+
+/*
+ * The four settings from look.js, grouped under the two things they are
+ * about. Drawn from that table rather than written out again here, so a
+ * setting that is added, renamed or given another choice cannot end up
+ * described one way in the code and another way on this page.
+ *
+ * Saved the moment a choice is clicked, with no Save button: every one of
+ * these is a single value with an immediate, visible effect on the video
+ * or the popup you are about to go back to, and a Save button for that is
+ * a button you forget to press.
+ */
+const appearance = document.getElementById('appearance');
+const lookStatus = document.getElementById('look-status');
+
+function sayAboutLook(message) {
+  if (!lookStatus) return;
+  lookStatus.textContent = message;
+  if (message) setTimeout(() => { lookStatus.textContent = ''; }, 2000);
+}
+
+function drawAppearance() {
+  if (!appearance) return;
+  appearance.textContent = '';
+
+  const settings = TorvalLook.all();
+  for (const where of TorvalLook.groups()) {
+    const section = document.createElement('section');
+    section.appendChild(Object.assign(document.createElement('h2'), {
+      textContent: where
+    }));
+    for (const setting of settings.filter((s) => s.where === where)) {
+      section.appendChild(lookRow(setting));
+    }
+    appearance.appendChild(section);
+  }
+}
+
+function lookRow(setting) {
+  const row = document.createElement('div');
+  row.className = 'look-row';
+  row.appendChild(Object.assign(document.createElement('span'), {
+    textContent: setting.label
+  }));
+
+  const choices = document.createElement('div');
+  choices.className = 'look-choices';
+  for (const choice of setting.choices) {
+    const button = document.createElement('button');
+    button.className = 'look-choice' + (choice.value === setting.value ? ' on' : '');
+    button.textContent = choice.label;
+    button.addEventListener('click', async () => {
+      if (choice.value === setting.value) return;
+      await TorvalLook.set(setting.name, choice.value);
+      drawAppearance();
+      sayAboutLook('Saved.');
+    });
+    choices.appendChild(button);
+  }
+  row.appendChild(choices);
+  return row;
+}
+
+const resetLook = document.getElementById('reset-look');
+if (resetLook) {
+  resetLook.addEventListener('click', async () => {
+    await TorvalLook.reset();
+    drawAppearance();
+    sayAboutLook('Back to the defaults.');
+  });
+}
+
+// Drawn once storage has answered, so the page never shows a default for a
+// moment and then replaces it with what was actually saved.
+if (appearance) TorvalLook.ready().then(drawAppearance);

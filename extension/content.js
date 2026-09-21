@@ -1278,6 +1278,14 @@
 
     root.append(style, card);
     ui = { host, card };
+    // How big and how wide, from the appearance settings. On the host
+    // rather than the card so the properties are inherited by everything
+    // in the shadow root, and re-applied on a change so a popup already
+    // built follows the setting without the page being reloaded.
+    if (typeof TorvalLook !== 'undefined') {
+      TorvalLook.dressPopup(host);
+      TorvalLook.onChange(() => TorvalLook.dressPopup(host));
+    }
     attach();
     watchSize(card);
 

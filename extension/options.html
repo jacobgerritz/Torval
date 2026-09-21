@@ -14,6 +14,7 @@
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="video">Video</button>
     <button class="tab" data-panel="keys">Keys</button>
+    <button class="tab" data-panel="look">Appearance</button>
     <button class="tab" data-panel="about">About</button>
     <span class="sidebar-spacer"></span>
     <button id="open-reader" class="sidebar-action">Open your books</button>
@@ -191,6 +192,22 @@
   <!-- ------------------------------------------------------------------ -->
 
   <!--
+    How the two things Torval draws on top of somebody else's page look.
+    Four settings, grouped by which of the two they are about; the rows are
+    drawn from the one table in look.js rather than written out here.
+  -->
+  <div class="panel" id="panel-look" hidden>
+    <div id="appearance"></div>
+
+    <p class="actions">
+      <button id="reset-look">Reset to defaults</button>
+      <span id="look-status" role="status"></span>
+    </p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <!--
     Where the words come from. This is not decoration: the dictionaries are
     other people's work, shared on terms that ask to be named, and a copy of
     Torval handed to anybody else carries that obligation with it. It is a
@@ -259,6 +276,7 @@
 <script src="spanish-scan.js"></script>
 <script src="lang.js"></script>
 <script src="keys.js"></script>
+<script src="look.js"></script>
 <script src="anki.js"></script>
 <script src="options.js"></script>
 <script src="known.js"></script>
