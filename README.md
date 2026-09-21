@@ -1368,12 +1368,15 @@ They were written as comments in `manifest.json` itself, which was a
 mistake: JSON has no comments, and Firefox reports every key it does not
 recognise as a warning on the add-on. So they live here instead.
 
-**The add-on id still says `lll`.** It is not a name. It is the key Firefox
-files the add-on's storage under, and the known and ignored word lists live
-in that storage. Renaming it would rename nothing a reader ever sees; it
-would hand Torval a different, empty drawer and leave however many months of
-reading in the old one, unreachable. Change it only together with exporting
-the word lists first and importing them afterwards.
+**The add-on id is `torval@jacobgerritz`, and cannot change again.** It is
+not a name and nobody reading ever sees it. It is the key Firefox files the
+add-on's storage under, so changing it hands Torval a different, empty
+drawer and leaves everything in the old one unreachable: the known and
+ignored word lists, the Anki settings, the shortcuts, the imported
+dictionaries. It was `lll@jacobgerritz` until the rename, and was changed
+while Torval was still unpublished, which was the last moment it could be.
+Once an add-on is on AMO the id is its identity there, and a new id is a new
+listing that no existing install will ever update to.
 
 **`strict_min_version` is 128, not 140.** Marking the unknown words on a page
 uses an API that arrived in 140 and is skipped without it, so a reader on 128
