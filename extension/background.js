@@ -229,6 +229,7 @@ api.runtime.onMessage.addListener((message, sender) => {
     case 'setIgnored':   return guard(() => setWordOn(IGNORED(), message.word, message.ignored));
     case 'forgetWords':  return guard(() => forgetFrom(KNOWN(), message.words));
     case 'forgetIgnored': return guard(() => forgetFrom(IGNORED(), message.words));
+    case 'clearWords':   return guard(() => clearList(message.list === 'ignored' ? IGNORED() : KNOWN()));
     case 'exportWords':  return guard(() => exportWords());
     case 'importWords':  return guard(() => importWords(message.data));
     case 'openOptions':  return guard(async () => { api.runtime.openOptionsPage(); return true; });
@@ -826,6 +827,54 @@ async function importWords(data) {
   return inTurn(async () => merged(data));
 }
 
+/**
+ * Break what arrived into words.
+ *
+ * A file Torval wrote holds dictionary forms already, and reading those back
+ * gives the same forms again. A file from somewhere else holds whatever was
+ * in the field it was told to read: the Anki add-on is pointed at a note's
+ * front, and on a sentence deck that front is a whole sentence. Stored as
+ * one "word", a sentence can never match anything on a page, so it would sit
+ * in the list forever doing nothing.
+ *
+ * So every key is read the way the "add from a text" box reads a paragraph,
+ * which also settles the smaller version of the same problem: a front
+ * holding "hablaba" is remembered as hablar, the word a hover on it would
+ * have shown.
+ *
+ * A key the dictionary can make nothing of is kept exactly as it came.
+ * Losing a word on import is worse than keeping an odd one.
+ */
+async function asWords(from) {
+  const out = {};
+  if (!from || typeof from !== 'object') return out;
+
+  let reader = null;
+  try {
+    await requireDictionary();
+    reader = cachingReader();
+  } catch (err) {
+    trace('Torval: importing without the dictionary, words kept as they came');
+  }
+
+  for (const key of Object.keys(from)) {
+    const when = Number(from[key]);
+    if (!key || !Number.isFinite(when)) continue;
+
+    let words = [key];
+    if (reader) {
+      try {
+        const found = await Lookup().extractWords(key, reader);
+        if (found.length) words = found;
+      } catch (err) { /* keep the key as it came */ }
+    }
+    for (const word of words) {
+      if (out[word] === undefined || when < out[word]) out[word] = when;
+    }
+  }
+  return out;
+}
+
 async function merged(data) {
   const known = await wordMap(KNOWN());
   const ignored = await wordMap(IGNORED());
@@ -840,8 +889,8 @@ async function merged(data) {
       else into[word] = Math.min(into[word], when);   // keep the earlier date
     }
   };
-  merge(known, data.known, 'known');
-  merge(ignored, data.ignored, 'ignored');
+  merge(known, await asWords(data.known), 'known');
+  merge(ignored, await asWords(data.ignored), 'ignored');
   for (const word of Object.keys(known)) delete ignored[word];
 
   return {
@@ -893,6 +942,21 @@ async function keepACopy() {
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
+}
+
+/**
+ * Empty one list completely, which is the only way back to nothing once a
+ * list has the wrong language's words in it, or somebody else's.
+ *
+ * Nothing is asked here: the settings page asks twice before sending this,
+ * which is where a question belongs. The copy in Downloads/Torval is not
+ * touched, so today's file is still the list as it was this morning.
+ */
+async function clearList(key) {
+  return inTurn(async () => {
+    const had = Object.keys(await wordMap(key)).length;
+    return { removed: had, total: await saveWords(key, {}) };
+  });
 }
 
 /** Take words back off a list. */

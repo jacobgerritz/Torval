@@ -2582,6 +2582,83 @@ const run = async () => {
     const nonsense = await send({ type: 'importWords', data: { format: 'something-else' } });
     check('and a file that is not one of ours still does not',
       !nonsense.ok, JSON.stringify(nonsense));
+
+    // --- a file from somewhere other than Torval --------------------------
+    // The Anki add-on writes this same format, but it writes whatever was in
+    // the field it was told to read, and on a sentence deck that is a whole
+    // sentence. Stored as one "word" it would never match anything again, so
+    // the import reads every key the way the "add from a text" box does.
+    // There is no dictionary in this sandbox, so a plain splitter stands in
+    // for one: what is being checked is that the import asks at all, and
+    // what it does with the answer.
+    {
+      vm.runInContext(`
+        status = { state: 'ready' };
+        cachingReader = function () { return {}; };
+        Lookup = function () {
+          return {
+            extractWords: async function (text) {
+              if (text === 'no puedo') return [];   // nothing the dictionary knows
+              return text.toLowerCase().replace(/[.,]/g, '').split(' ').filter(Boolean);
+            }
+          };
+        };
+      `, sandbox);
+
+      stored.knownWords = {};
+      stored.ignoredWords = {};
+      stored.wordCounts = {};
+      const WHEN = Date.parse('2026-02-01');
+      const fromAnki = await send({ type: 'importWords', data: {
+        format: 'torval-words', version: 1,
+        known: { 'Decidió pagar tres becas.': WHEN, 'no puedo': WHEN },
+        ignored: {}
+      } });
+
+      check('a sentence in a word list is broken into its words',
+        fromAnki.ok && ['decidió', 'pagar', 'tres', 'becas'].every((w) => w in stored.knownWords),
+        JSON.stringify(Object.keys(stored.knownWords)));
+      check('and the sentence itself is not kept as a word',
+        !('Decidió pagar tres becas.' in stored.knownWords));
+      check('the words get the date the sentence had',
+        stored.knownWords['pagar'] === WHEN, String(stored.knownWords['pagar']));
+      check('a key the dictionary makes nothing of is kept as it came',
+        stored.knownWords['no puedo'] === WHEN, JSON.stringify(Object.keys(stored.knownWords)));
+      check('and the count is of words, not of lines in the file',
+        fromAnki.result.added.known === 5, JSON.stringify(fromAnki.result.added));
+
+      vm.runInContext('status = { state: \'unchosen\' };', sandbox);
+    }
+
+    // --- emptying a list on purpose ---------------------------------------
+    // The way back to nothing, for a list with the wrong language's words in
+    // it. One list at a time: ignored words are names and misreadings, which
+    // are still names and misreadings after a fresh start on the known list.
+    stored.knownWords = { '本': 1, '人': 2 };
+    stored.ignoredWords = { 'ネカフェ': 3 };
+    stored.wordCounts = { knownWords: 2, ignoredWords: 1 };
+
+    const emptied = await send({ type: 'clearWords', list: 'known' });
+    check('emptying the known list takes every word off it',
+      emptied.ok && Object.keys(stored.knownWords).length === 0,
+      JSON.stringify(stored.knownWords));
+    check('and says how many went', emptied.result.removed === 2 && emptied.result.total === 0,
+      JSON.stringify(emptied.result));
+    check('the other list is left alone', 'ネカフェ' in stored.ignoredWords);
+
+    const emptiedToo = await send({ type: 'clearWords', list: 'ignored' });
+    check('and the ignored list empties the same way',
+      emptiedToo.ok && Object.keys(stored.ignoredWords).length === 0,
+      JSON.stringify(stored.ignoredWords));
+
+    // Nothing is put back afterwards: an empty list that was emptied on
+    // purpose looks exactly like one that went missing, and the count is
+    // what tells them apart.
+    await sandbox.rescueLists();
+    check('an emptied list is not filled back in from its copy',
+      Object.keys(stored.knownWords).length === 0 &&
+      Object.keys(stored.ignoredWords).length === 0,
+      JSON.stringify([stored.knownWords, stored.ignoredWords]));
   }
 
   // --- Spanish ----------------------------------------------------------

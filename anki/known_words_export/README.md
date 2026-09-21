@@ -26,6 +26,12 @@ earlier of the two dates, so nothing is overwritten and nothing is counted
 again. Load it under **Settings → Words → Keeping a copy → Load from a
 file**.
 
+If the field you pick holds sentences rather than single words, Torval
+breaks each one into the words inside it as it loads, so a sentence deck
+works too. The file is named `anki-known-words-<date>.json`, which is not
+what Torval calls its own backups, so the two never sit in a Downloads
+folder looking like the same thing.
+
 Nothing here is specific to Torval except that one button. The text file
 and the clipboard are the general case.
 

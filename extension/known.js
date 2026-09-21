@@ -55,6 +55,7 @@
 
   addFromText();
   backupPanel();
+  clearPanel();
 
   // Every browse panel reads its list from background.js by message, and
   // background.js answers 'knownList'/'ignoredList' for whichever language
@@ -225,6 +226,71 @@
         loadInput.value = '';
       }
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Emptying a list
+  // -------------------------------------------------------------------------
+
+  /**
+   * Two buttons that each need pressing twice.
+   *
+   * A known list is months of reading, and a stray click on a button called
+   * "forget everything" is the one mistake here nothing undoes. So the first
+   * press only arms it, saying how many words are about to go, and the
+   * second press is the one that counts. Arming times out, and arming one
+   * button disarms the other, so a button is never left sitting loaded.
+   */
+  function clearPanel() {
+    const noteEl = document.getElementById('clear-note');
+    const buttons = [
+      { el: document.getElementById('clear-known'), list: 'known', label: 'Forget every known word' },
+      { el: document.getElementById('clear-ignored'), list: 'ignored', label: 'Forget every ignored word' }
+    ];
+    if (!buttons[0].el || !buttons[1].el) return;
+
+    let armed = null;
+    let timer = 0;
+
+    function disarm() {
+      clearTimeout(timer);
+      armed = null;
+      for (const button of buttons) {
+        button.el.textContent = button.label;
+        button.el.classList.remove('armed');
+      }
+    }
+
+    for (const button of buttons) {
+      button.el.addEventListener('click', async () => {
+        if (armed !== button) {
+          disarm();
+          armed = button;
+          button.el.textContent = 'Press again to forget them';
+          button.el.classList.add('armed');
+          noteEl.className = 'note';
+          noteEl.textContent = '';
+          timer = setTimeout(disarm, 8000);
+          return;
+        }
+
+        disarm();
+        button.el.disabled = true;
+        const reply = await api.runtime.sendMessage({ type: 'clearWords', list: button.list });
+        button.el.disabled = false;
+
+        if (!reply || !reply.ok) {
+          noteEl.className = 'note error';
+          noteEl.textContent = (reply && reply.error) || 'Could not empty that list.';
+          return;
+        }
+        const gone = reply.result.removed;
+        noteEl.className = 'note';
+        noteEl.textContent = gone.toLocaleString('en-US') +
+          ' ' + button.list + ' word' + (gone === 1 ? '' : 's') + ' forgotten.';
+        refreshAll();
+      });
+    }
   }
 
   function refreshAll() { for (const again of refreshers) again(); }

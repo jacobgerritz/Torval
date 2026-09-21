@@ -312,11 +312,16 @@ class ExportDialog(QDialog):
         The date is what makes loading the same export twice harmless.
         Torval merges rather than replaces and keeps the earlier of the two
         dates, so nothing is overwritten and nothing counted again.
+
+        The file is named for Anki, not for Torval. Torval writes its own
+        backups as torval-words-<date>.json, and two files with one name in
+        one Downloads folder is how somebody ends up loading last week's
+        Anki deck back over a list they meant to restore.
         """
         words = self.gather()
         if not words:
             return
-        path = self.ask_where("torval-words-%s.json" % time.strftime("%Y-%m-%d"),
+        path = self.ask_where("anki-known-words-%s.json" % time.strftime("%Y-%m-%d"),
                               "JSON file", ".json")
         if not path:
             return

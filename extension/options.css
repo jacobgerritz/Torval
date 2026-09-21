@@ -270,6 +270,20 @@ button:disabled { opacity: 0.45; cursor: default; }
 #status { font-size: 13px; color: var(--ink-faint); }
 #status.error { color: var(--warn); }
 #result.error { color: var(--warn); }
+.note.error { color: var(--warn); }
+
+/*
+ * A button that has been pressed once and is waiting for the second press.
+ * It changes colour as well as wording, because the wording is the part
+ * somebody halfway through a click has already stopped reading.
+ */
+.armed {
+  background: #3d2b28;
+  border-color: var(--warn);
+  color: var(--ink-bright);
+}
+
+.armed:hover { background: #4a332f; }
 
 /* --- word lists ---------------------------------------------------------- */
 

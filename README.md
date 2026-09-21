@@ -927,6 +927,17 @@ file between two machines works in either direction. If a word is known on one
 side and ignored on the other, known wins, since the two lists still cannot
 both hold it.
 
+Whatever is in the file is read as words, not taken as given. Torval's own
+files hold dictionary forms already and come back as themselves, but a file
+written by something else holds whatever was in the field it was told to
+read, and on a sentence deck that is a whole sentence. A sentence stored as
+a word can never match anything on a page again, so every key is run through
+the same reading the **Add from a text** box does: segmented, looked up, and
+reduced to the dictionary forms inside it. That settles the smaller version
+of the same problem too, an inflected `hablaba` arriving as `hablar`. A key
+the dictionary can make nothing of is kept exactly as it came, because losing
+a word on import is worse than keeping an odd one.
+
 A file that is not one Torval wrote is refused rather than half-read. Files
 written before this was called Torval say `lll-words` inside and are read
 too: a word list is the one thing here that cannot be rebuilt, and refusing
@@ -934,6 +945,24 @@ last month's copy of it because the program has since been given a different
 name would be the worst possible reason to lose one. They were saved to
 **Downloads/LLL**; new ones go to **Downloads/Torval**, and both load back
 the same way.
+
+### Starting over
+
+Under **Starting over**, at the very bottom of the same page, is a button per
+list that empties it. It is there for the one thing nothing else undoes:
+words in the wrong language, or somebody else's list loaded by mistake, or
+an Anki deck that turned out to be the wrong deck.
+
+Each button has to be pressed twice. The first press only changes it to
+**Press again to forget them** and starts an eight-second clock; the second
+is the one that counts. The known list is months of reading, and a button
+called "forget everything" that works on the first click is a bad button.
+
+The two lists empty separately. Ignored words are names and misreadings,
+which are still names and misreadings after a fresh start on the known list.
+The daily copy in **Downloads/Torval** is not touched either, so today's file
+is still the list as it was this morning, and loading it back is the way out
+of a mistake.
 
 ### A copy is kept for you as well
 
@@ -1370,7 +1399,9 @@ Anki already knows.
 
 `anki/known_words_export/` is an Anki add-on that gets that list back out:
 a text file, the clipboard, or JSON in Torval's own format for **Settings
-→ Words → Keeping a copy → Load from a file**. Mature, young, learning and
+→ Words → Keeping a copy → Load from a file**. That file is named
+`anki-known-words-<date>.json` rather than `torval-words-<date>.json`, so
+it cannot be mistaken for one of Torval's own backups sitting beside it. Mature, young, learning and
 relearning cards, each a tick box, one deck at a time. Only one of its
 three buttons is about Torval at all; it has a README of its own.
 
