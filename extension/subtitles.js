@@ -1282,13 +1282,41 @@ var TorvalSubtitles = (function () {
    * stale afterwards. The HTML is the last resort, and only holds on a first
    * load.
    *
-   * `wrappedJSObject` is Firefox's way of letting a content script reach the
-   * page's own variables and functions, which is what all of this needs.
+   * All of it needs the page's own variables and functions, which only
+   * Firefox lets a content script have. See pageSide.
    */
+  /**
+   * A page object, seen from this content script.
+   *
+   * `wrappedJSObject` is Firefox's way through the Xray wrapper to the
+   * page's own JavaScript. Chrome has no equivalent at all, so on Chrome
+   * every one of these is undefined and every path below it quietly takes
+   * the next branch. That is survivable here, since each of them has a
+   * fallback that reads the page's HTML instead, but it is not obvious
+   * from any one call site, and the same assumption in netflix.js cost an
+   * afternoon: A and D did nothing on Chrome and nothing said why.
+   *
+   * So it is one function, and it says so once per page rather than
+   * failing silently four times.
+   */
+  var saidNoXray = false;
+
+  function pageSide(el) {
+    var side = el && el.wrappedJSObject;
+    if (side) return side;
+    if (!saidNoXray) {
+      saidNoXray = true;
+      trace('Torval: this browser does not let an extension read the page’s ' +
+        'own objects, so YouTube is read from its HTML and from the request ' +
+        'its player makes.');
+    }
+    return null;
+  }
+
   function playerResponse() {
     try {
       var el = document.getElementById('movie_player');
-      var api = el && el.wrappedJSObject;
+      var api = pageSide(el);
       if (api && typeof api.getPlayerResponse === 'function') {
         var live = api.getPlayerResponse();
         if (live) return { from: 'the player', data: live };
@@ -1296,7 +1324,8 @@ var TorvalSubtitles = (function () {
     } catch (err) { /* try the next place */ }
 
     try {
-      var global = window.wrappedJSObject && window.wrappedJSObject.ytInitialPlayerResponse;
+      var page = pageSide(window);
+      var global = page && page.ytInitialPlayerResponse;
       if (global) return { from: 'the page', data: global };
     } catch (err) { /* try the next place */ }
 
@@ -1351,8 +1380,8 @@ var TorvalSubtitles = (function () {
    * Ask YouTube for this video's player data right now, the same call the page
    * itself makes on load, rather than reading a copy that could be minutes
    * old. `ytcfg` is the page's own configuration object, the API key and
-   * client context every request on the page already uses, read the same way
-   * the player object is: through `wrappedJSObject`.
+   * client context every request on the page already uses, read the same
+   * way the player object is, and unavailable in the same browsers.
    */
   async function freshCaptionTracks(id) {
     var cfg = ytConfig();
@@ -1372,7 +1401,8 @@ var TorvalSubtitles = (function () {
    */
   function ytConfig() {
     try {
-      var cfg = window.wrappedJSObject && window.wrappedJSObject.ytcfg;
+      var page = pageSide(window);
+      var cfg = page && page.ytcfg;
       if (cfg && typeof cfg.get === 'function') {
         var key = cfg.get('INNERTUBE_API_KEY');
         if (key) return { key: key, context: cfg.get('INNERTUBE_CONTEXT') };
@@ -1548,17 +1578,17 @@ var TorvalSubtitles = (function () {
    * YouTube's player object takes the same instructions its own settings
    * menu does: `tracklist` is every caption track it knows about and
    * `setOption('captions', 'track', …)` is what the menu itself calls when
-   * a language is picked. `wrappedJSObject` is how a Firefox content script
-   * reaches it, the same way playerResponse() already does; the track
-   * objects handed back are the page's own, so handing one straight back in
-   * needs no cloning across the boundary.
+   * a language is picked. Reached the same way playerResponse() reaches
+   * it, and only where that works; the track objects handed back are the
+   * page's own, so handing one straight back in needs no cloning across
+   * the boundary.
    *
    * Answers true once the right captions are showing, false while there is
    * still reason to try again.
    */
   function ytCaptionsOn(wanted) {
     var el = document.getElementById('movie_player');
-    var player = el && el.wrappedJSObject;
+    var player = pageSide(el);
     if (!player || typeof player.getOption !== 'function') return false;
     try {
       if (typeof player.loadModule === 'function') player.loadModule('captions');
