@@ -828,7 +828,7 @@ async function importWords(data) {
 }
 
 /**
- * Break what arrived into words.
+ * Read what arrived as a text, and keep the words this language has.
  *
  * A file Torval wrote holds dictionary forms already, and reading those back
  * gives the same forms again. A file from somewhere else holds whatever was
@@ -837,64 +837,80 @@ async function importWords(data) {
  * one "word", a sentence can never match anything on a page, so it would sit
  * in the list forever doing nothing.
  *
- * So every key is read the way the "add from a text" box reads a paragraph,
- * which also settles the smaller version of the same problem: a front
- * holding "hablaba" is remembered as hablar, the word a hover on it would
- * have shown.
+ * So a file is read exactly the way a page, a subtitle line or the "add from
+ * a text" box is read: segmented, deinflected, looked up, and reduced to the
+ * dictionary forms found inside it. A sentence becomes its words, and an
+ * inflected "hablaba" becomes hablar, the word a hover on it would have
+ * shown.
  *
- * A key the dictionary can make nothing of is kept exactly as it came.
- * Losing a word on import is worse than keeping an odd one.
+ * What the dictionary does not recognise does not go on the list. A known
+ * list is what a page is measured against, so a word that cannot be met
+ * again while reading cannot do anything there but inflate the count: a
+ * card's speaker name, a line of English on the back of a note, or a whole
+ * deck in a language other than the one being read. Those are counted and
+ * reported rather than kept quiet about.
  */
-async function asWords(from) {
+async function asWords(from, reader) {
   const out = {};
-  if (!from || typeof from !== 'object') return out;
-
-  let reader = null;
-  try {
-    await requireDictionary();
-    reader = cachingReader();
-  } catch (err) {
-    trace('Torval: importing without the dictionary, words kept as they came');
-  }
+  let dropped = 0;
+  if (!from || typeof from !== 'object') return { words: out, dropped };
 
   for (const key of Object.keys(from)) {
     const when = Number(from[key]);
     if (!key || !Number.isFinite(when)) continue;
 
-    let words = [key];
-    if (reader) {
-      try {
-        const found = await Lookup().extractWords(key, reader);
-        if (found.length) words = found;
-      } catch (err) { /* keep the key as it came */ }
-    }
-    for (const word of words) {
+    const found = await Lookup().extractWords(key, reader);
+    if (!found.length) { dropped++; continue; }
+    for (const word of found) {
       if (out[word] === undefined || when < out[word]) out[word] = when;
     }
+  }
+  return { words: out, dropped };
+}
+
+/**
+ * The same, for the ignored list, which is the one place the rule above
+ * would do harm.
+ *
+ * Ignored words are the ones the dictionary has nothing for: names, pieces
+ * of English, things it read wrongly. Asking it to confirm them would throw
+ * away precisely the list, and would make saving and loading Torval's own
+ * file lossy. So these are taken as they come.
+ */
+function asGiven(from) {
+  const out = {};
+  if (!from || typeof from !== 'object') return out;
+  for (const key of Object.keys(from)) {
+    const when = Number(from[key]);
+    if (!key || !Number.isFinite(when)) continue;
+    out[key] = when;
   }
   return out;
 }
 
 async function merged(data) {
+  await requireDictionary();
+  const reader = cachingReader();
+
   const known = await wordMap(KNOWN());
   const ignored = await wordMap(IGNORED());
   const added = { known: 0, ignored: 0 };
 
   const merge = (into, from, count) => {
-    if (!from || typeof from !== 'object') return;
     for (const word of Object.keys(from)) {
-      const when = Number(from[word]);
-      if (!word || !Number.isFinite(when)) continue;
+      const when = from[word];
       if (!into[word]) { into[word] = when; added[count]++; }
       else into[word] = Math.min(into[word], when);   // keep the earlier date
     }
   };
-  merge(known, await asWords(data.known), 'known');
-  merge(ignored, await asWords(data.ignored), 'ignored');
+  const read = await asWords(data.known, reader);
+  merge(known, read.words, 'known');
+  merge(ignored, asGiven(data.ignored), 'ignored');
   for (const word of Object.keys(known)) delete ignored[word];
 
   return {
     added,
+    dropped: read.dropped,
     known: await saveWords(KNOWN(), known),
     ignored: await saveWords(IGNORED(), ignored)
   };

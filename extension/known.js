@@ -215,9 +215,12 @@
 
         const reply = await api.runtime.sendMessage({ type: 'importWords', data });
         if (!reply.ok) throw new Error(reply.error);
-        const { added, known, ignored } = reply.result;
+        const { added, dropped, known, ignored } = reply.result;
         loadNote.textContent = added.known + ' known and ' + added.ignored +
-          ' ignored words added; ' + known + ' and ' + ignored + ' now in all.';
+          ' ignored words added; ' + known + ' and ' + ignored + ' now in all.' +
+          // Words left out are said out loud. A file in the wrong language
+          // adds nothing at all, and silence about that looks like a bug.
+          (dropped ? ' ' + dropped + ' not in the dictionary, left out.' : '');
         refreshAll();
       } catch (err) {
         loadNote.className = 'note error';

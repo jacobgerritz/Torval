@@ -2472,6 +2472,37 @@ const run = async () => {
         report.everything === true);
     }
 
+    // Loading a word list reads it the way a page is read, so it needs a
+    // dictionary, and the real one cannot open in here. A small one stands
+    // in: a handful of words, two inflected forms and a splitter. What is
+    // checked below is what the import does with the answers; the answers
+    // themselves are the business of the deinflection tests.
+    vm.runInContext(`
+      status = { state: 'ready' };
+      cachingReader = function () { return {}; };
+      var VOCAB = new Set(['\u672c', '\u8aad\u3080', 'decidir', 'pagar', 'tres', 'beca']);
+      var FORMS = { 'decidi\u00f3': 'decidir', 'becas': 'beca' };
+      Lookup = function () {
+        return {
+          extractWords: async function (text) {
+            var out = [];
+            var pieces = String(text).toLowerCase().replace(/[.,\\[\\]]/g, ' ').split(/\\s+/);
+            for (var i = 0; i < pieces.length; i++) {
+              var word = FORMS[pieces[i]] || pieces[i];
+              if (VOCAB.has(word) && out.indexOf(word) === -1) out.push(word);
+            }
+            return out;
+          }
+        };
+      };
+    `, sandbox);
+
+    // background.js is still starting up in there, and its start-up ends by
+    // finding no language chosen and saying so. Let that land before saying
+    // otherwise, or it lands in the middle of the checks below.
+    await new Promise((settled) => setTimeout(settled, 20));
+    vm.runInContext("status = { state: 'ready' };", sandbox);
+
     const send = (message) => listener(message);
     const OLD = 1000, NEW = 9000;
     stored.knownWords = { '本': NEW };
@@ -2585,49 +2616,62 @@ const run = async () => {
 
     // --- a file from somewhere other than Torval --------------------------
     // The Anki add-on writes this same format, but it writes whatever was in
-    // the field it was told to read, and on a sentence deck that is a whole
-    // sentence. Stored as one "word" it would never match anything again, so
-    // the import reads every key the way the "add from a text" box does.
-    // There is no dictionary in this sandbox, so a plain splitter stands in
-    // for one: what is being checked is that the import asks at all, and
-    // what it does with the answer.
+    // the field it was told to read: a whole sentence on a sentence deck, a
+    // speaker's name, a line of English, or a deck in a language other than
+    // the one being read. So the file is read rather than copied in.
     {
-      vm.runInContext(`
-        status = { state: 'ready' };
-        cachingReader = function () { return {}; };
-        Lookup = function () {
-          return {
-            extractWords: async function (text) {
-              if (text === 'no puedo') return [];   // nothing the dictionary knows
-              return text.toLowerCase().replace(/[.,]/g, '').split(' ').filter(Boolean);
-            }
-          };
-        };
-      `, sandbox);
-
       stored.knownWords = {};
       stored.ignoredWords = {};
       stored.wordCounts = {};
       const WHEN = Date.parse('2026-02-01');
       const fromAnki = await send({ type: 'importWords', data: {
         format: 'torval-words', version: 1,
-        known: { 'Decidió pagar tres becas.': WHEN, 'no puedo': WHEN },
+        known: {
+          '[Samu] Decidió pagar tres becas.': WHEN,   // a whole line off a card
+          'pagar': WHEN,                              // a word, already a word
+          'kitchen sink': WHEN                        // nothing this language has
+        },
         ignored: {}
       } });
 
       check('a sentence in a word list is broken into its words',
-        fromAnki.ok && ['decidió', 'pagar', 'tres', 'becas'].every((w) => w in stored.knownWords),
+        fromAnki.ok && ['decidir', 'pagar', 'tres', 'beca'].every((w) => w in stored.knownWords),
         JSON.stringify(Object.keys(stored.knownWords)));
       check('and the sentence itself is not kept as a word',
-        !('Decidió pagar tres becas.' in stored.knownWords));
-      check('the words get the date the sentence had',
-        stored.knownWords['pagar'] === WHEN, String(stored.knownWords['pagar']));
-      check('a key the dictionary makes nothing of is kept as it came',
-        stored.knownWords['no puedo'] === WHEN, JSON.stringify(Object.keys(stored.knownWords)));
-      check('and the count is of words, not of lines in the file',
-        fromAnki.result.added.known === 5, JSON.stringify(fromAnki.result.added));
+        !('[Samu] Decidió pagar tres becas.' in stored.knownWords));
+      check('words are deinflected on the way in, as anywhere else',
+        'decidir' in stored.knownWords && !('decidió' in stored.knownWords));
+      check('what is in the line but not in the dictionary is left out',
+        !('samu' in stored.knownWords) && !('[samu]' in stored.knownWords),
+        JSON.stringify(Object.keys(stored.knownWords)));
+      check('a key the dictionary has nothing for does not go on the list',
+        !('kitchen sink' in stored.knownWords));
+      check('and is counted and said out loud rather than dropped quietly',
+        fromAnki.result.dropped === 1, JSON.stringify(fromAnki.result));
+      check('the words get the date the line they came from had',
+        stored.knownWords['beca'] === WHEN, String(stored.knownWords['beca']));
+      check('the count is of words, not of lines in the file',
+        fromAnki.result.added.known === 4, JSON.stringify(fromAnki.result.added));
 
-      vm.runInContext('status = { state: \'unchosen\' };', sandbox);
+      // The ignored list is the one place that rule would do harm: these are
+      // the words the dictionary has nothing for, which is why they are on
+      // it. Asking it to confirm them would throw away the whole list.
+      const names = await send({ type: 'importWords', data: {
+        format: 'torval-words', version: 1,
+        known: {}, ignored: { 'Samu': WHEN, 'ネカフェ': WHEN }
+      } });
+      check('an ignored word the dictionary has never heard of still arrives',
+        names.ok && 'Samu' in stored.ignoredWords && 'ネカフェ' in stored.ignoredWords,
+        JSON.stringify(Object.keys(stored.ignoredWords)));
+
+      // And with no dictionary there is no reading, so there is no import
+      // either: half a list is worse than none.
+      vm.runInContext("status = { state: 'starting' };", sandbox);
+      const tooSoon = await send({ type: 'importWords', data: {
+        format: 'torval-words', known: { 'pagar': WHEN }, ignored: {} } });
+      vm.runInContext("status = { state: 'ready' };", sandbox);
+      check('a file loaded before the dictionary is ready is refused outright',
+        !tooSoon.ok, JSON.stringify(tooSoon));
     }
 
     // --- emptying a list on purpose ---------------------------------------

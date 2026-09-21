@@ -927,16 +927,25 @@ file between two machines works in either direction. If a word is known on one
 side and ignored on the other, known wins, since the two lists still cannot
 both hold it.
 
-Whatever is in the file is read as words, not taken as given. Torval's own
-files hold dictionary forms already and come back as themselves, but a file
-written by something else holds whatever was in the field it was told to
-read, and on a sentence deck that is a whole sentence. A sentence stored as
-a word can never match anything on a page again, so every key is run through
-the same reading the **Add from a text** box does: segmented, looked up, and
-reduced to the dictionary forms inside it. That settles the smaller version
-of the same problem too, an inflected `hablaba` arriving as `hablar`. A key
-the dictionary can make nothing of is kept exactly as it came, because losing
-a word on import is worse than keeping an odd one.
+A file is read, not copied in. Torval's own files hold dictionary forms
+already and come back as themselves, but a file written by something else
+holds whatever was in the field it was told to read: a whole sentence on a
+sentence deck, a speaker's name, a line of English on the back of a note.
+So every key goes through exactly the reading a page, a subtitle line or the
+**Add from a text** box gets, segmented and deinflected and looked up, and
+what comes out is the dictionary forms found inside it. A sentence becomes
+its words and an inflected `hablaba` becomes `hablar`.
+
+What the dictionary does not recognise does not go on the list. The known
+list is what a page is measured against, and a word that can never be met
+again while reading cannot do anything there except inflate the number; a
+whole deck in the wrong language would inflate it enormously. The count of
+what was left out is shown beside the count of what went in, so a file that
+added nothing says why.
+
+The ignored list is the exception, and is taken exactly as it comes. Those
+are the words the dictionary has nothing for, which is the reason they are
+on that list. Asking it to confirm them would throw away precisely the list.
 
 A file that is not one Torval wrote is refused rather than half-read. Files
 written before this was called Torval say `lll-words` inside and are read
