@@ -25,7 +25,7 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/es/es_full.txt',
   out: 'data-es',
   // Bumping this makes the extension rebuild its Spanish database on next start.
-  version: 3,
+  version: 4,
   // Where recorded pronunciations come from. The category is walked
   // once at build time; the id and ISO code are the two constants a
   // Lingua Libre filename is built from. See build-audio.mjs.

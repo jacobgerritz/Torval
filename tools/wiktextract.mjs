@@ -230,7 +230,9 @@ function toEntry(row, lang, recordings) {
   const from = lemmaIn(row.senses || []);
   if (from) {
     const lemma = defining ? from.split(' ')[0] : from;
-    if (lemma && lemma !== row.word) entry.b = lemma;
+    if (lemma && lemma !== row.word && pointsTheRightWay(row.word, lemma)) {
+      entry.b = lemma;
+    }
   }
   const stress = lang.stressIndex(row);
   if (stress !== null) entry.st = stress;
@@ -331,6 +333,41 @@ function lemmaIn(senses) {
     if (link && link[0]) return String(link[0]);
   }
   return null;
+}
+
+/**
+ * Is "X is built from Y" the right way round, or the wrong one?
+ *
+ * Wiktionary uses the same field for two opposite relations. One is the
+ * one this is for: capirne is capire with ne stuck on it, nella is in
+ * with an article welded to it, and saying so gives the reader somewhere
+ * to go next. The other is a clipping, where a word is short for a longer
+ * phrase: one sense of Spanish "luna" is short for "pez luna", one sense
+ * of "aire" is short for "aire acondicionado".
+ *
+ * Both arrive as form_of or alt_of, so Wiktionary cannot be asked which
+ * is which. What separates them is that the backwards ones all point at a
+ * phrase. That is not a coincidence: a clipping is short for something
+ * longer, and what gets clipped in practice is a compound of several
+ * words. Meanwhile "built from" is a statement about how one word was put
+ * together out of another, and no word is put together out of a phrase.
+ *
+ * Deliberately not a test of whether the lemma contains the word, which
+ * was the first thing tried and looks right until it is tried on "bici",
+ * short for "bicicleta", or "foto" for "fotografía". Those are clippings
+ * too, and for them "built from" happens to read perfectly well, so there
+ * is no harm in keeping them and no rule that can tell them from "luna"
+ * except that one points at a word and the other at a phrase.
+ *
+ * This showed itself on "hacer", which is the sixty-eighth commonest word
+ * in Spanish, sixteen senses, one of which is a set phrase. The popup said
+ * hacer was built from "hacerse el tonto", which reads as though the
+ * commonest verb in the language were a piece of a joke about playing
+ * dumb. Thirty-two Italian entries and fifty-five Spanish ones said
+ * something equally backwards, and nearly every one was a common word.
+ */
+function pointsTheRightWay(word, lemma) {
+  return !/\s/.test(lemma);
 }
 
 /** The lemma an entry-less row belongs to, or null if it belongs to none. */

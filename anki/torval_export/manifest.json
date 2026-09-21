@@ -1,0 +1,10 @@
+{
+  "package": "torval_export",
+  "name": "Export words to Torval",
+  "description": "Hand the words you already know from Anki to Torval, the pop-up dictionary, as a file or on the clipboard. Mature, young, learning and relearning cards.",
+  "author": "Jacob Gerritz",
+  "homepage": "https://github.com/jacobgerritz/Torval",
+  "version": "1.0.0",
+  "manifest_version": 2,
+  "anki_version_min": "2.1.50"
+}

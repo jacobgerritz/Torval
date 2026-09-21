@@ -43,7 +43,7 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/it/it_full.txt',
   out: 'data-it',
   // Bumping this makes the extension rebuild its Italian database on next start.
-  version: 6,
+  version: 7,
   // Where recorded pronunciations come from. The category is walked
   // once at build time; the id and ISO code are the two constants a
   // Lingua Libre filename is built from. See build-audio.mjs.

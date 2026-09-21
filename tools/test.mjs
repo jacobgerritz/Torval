@@ -2745,6 +2745,21 @@ const run = async () => {
     check('and the stress mark comes with the entry',
       casa.groups[0].hits[0].entry.st === 1,
       JSON.stringify(casa.groups[0].hits[0].entry.st));
+
+    // hacer is the sixty-eighth commonest word in Spanish and used to say
+    // it was built from "hacerse el tonto", because one of its sixteen
+    // senses is that set phrase. See pointsTheRightWay in wiktextract.mjs.
+    const hacer = (await LookupLatin.hover('hacer', 0, esDb)).groups[0].hits[0].entry;
+    check('hacer is not built from a joke about playing dumb', !hacer.b,
+      String(hacer.b));
+    let wrongWay = 0;
+    for (const word of ['luna', 'aire', 'pasta', 'nave', 'comunidad']) {
+      const found = await LookupLatin.hover(word, 0, esDb);
+      const hit = found.groups[0] && found.groups[0].hits[0];
+      if (hit && hit.entry.b && /\s/.test(hit.entry.b)) wrongWay++;
+    }
+    check('nor does any other Spanish word point at a phrase', wrongWay === 0,
+      wrongWay + ' still do');
     Lang._setActive('ja');
   } else {
     console.log('  (no Spanish dictionary built; skipping its lookup checks. ' +
@@ -2783,6 +2798,19 @@ const run = async () => {
     check('a contraction is glossed as one', /contraction of in la/.test(nella.s[0].g[0]),
       nella.s[0].g[0]);
     check('and points at the preposition it contains', nella.b === 'in', nella.b);
+
+    // "Built from" has to point the right way. Wiktionary files a clipping
+    // with the same field, so one sense of "candela" being short for
+    // "candela di accensione" made the whole word claim to be built from a
+    // spark plug. Nothing points at a phrase now.
+    let backwards = 0;
+    for (const word of ['candela', 'matto', 'capo', 'razzo', 'striscia']) {
+      const found = await LookupLatin.hover(word, 0, itDb);
+      const hit = found.groups[0] && found.groups[0].hits[0];
+      if (hit && hit.entry.b && /\s/.test(hit.entry.b)) backwards++;
+    }
+    check('no Italian word claims to be built from a phrase', backwards === 0,
+      backwards + ' still do');
 
     // Recordings, folded in at build time. `a` is the two hex characters of
     // the Commons shard and whoever read the word; the address is rebuilt

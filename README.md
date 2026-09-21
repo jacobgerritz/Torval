@@ -1362,6 +1362,18 @@ npx web-ext sign --source-dir extension --channel unlisted \
   --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
 ```
 
+### Bringing known words in from Anki
+
+`anki/torval_export/` is an Anki add-on that hands the words you already
+know to Torval, as a file for **Settings → Words → Keeping a copy → Load
+from a file**, or on the clipboard for **Add from a text**. Mature, young,
+learning and relearning cards, each a tick box. It has a README of its
+own.
+
+Torval learns what you know from what you mark while reading, which is
+fine from the day you install it and useless about the years before that.
+Anki already knows.
+
 ### The first run
 
 Torval does nothing at all until somebody says which language they are
