@@ -103,4 +103,20 @@ It is not in this repository because Anki owns that file, rewrites it,
 and keeps the add-on's settings in it. Installing from AnkiWeb writes it
 for you and none of this applies.
 
+## Packaging it for AnkiWeb
+
+A `.ankiaddon` file is a plain zip of this folder's *contents*, without the
+folder itself and without the two things Anki writes into an installed copy:
+
+```
+cd anki/known_words_export
+zip -qXr ../known-words-export.ankiaddon . -x "meta.json" "__pycache__/*"
+```
+
+AnkiWeb rejects an archive containing `__pycache__`, and `meta.json` is the
+file it writes for itself at install time. Upload with the button on
+<https://ankiweb.net/shared/addons/>. The name and description shown to
+people come from that page, not from `manifest.json`: Anki only reads the
+`conflicts` key out of a manifest it downloaded.
+
 It is one Python file on purpose.
