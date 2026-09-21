@@ -749,8 +749,10 @@ tainted, and what would go on the card is a black JPEG, which is worse than no
 picture because it looks like a card that worked. Whether that happens is not
 up to the protection alone but to who decoded the frame. With the browser's
 hardware acceleration on, the frame lives in a GPU texture on the protected
-path and comes back black; with it off, the browser decodes in ordinary memory
-and the same frame draws as itself. So Torval takes the frame, then looks at
+path and comes back black; with it off, the browser usually decodes in
+ordinary memory and the same frame draws as itself. Usually, not always:
+Chrome on some machines keeps the protected path whatever the setting says,
+and then there is nothing to be done. So Torval takes the frame, then looks at
 it: a frame that is one single value across its whole area is not a frame, and
 is thrown away rather than put on a card. A real picture is never that flat,
 however dark, and the one thing that is, a deliberate fade to black, is a
@@ -789,7 +791,9 @@ avoid. The seek to the start of the line goes through the site's own player,
 the same way A and D do, for the same F7375 reason.
 
 Whichever half is missing, the card is still made, and the popup says which
-and why, naming hardware acceleration where that is the fix. Torval asks the
+and why, and sends anybody who wants the longer answer to Settings → Anki.
+It does not name hardware acceleration there: the popup line has to stay
+short, and on Chrome that advice is as often wrong as right. Torval asks the
 video element whether it is decrypting rather than keeping a list of sites:
 the page sets `mediaKeys` on it when it starts, which stays right on the day
 a fourth service launches and on the day one of these three plays an

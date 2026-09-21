@@ -1919,13 +1919,11 @@
   function missing(blocked) {
     if (!blocked) return '';
     if (blocked.image && blocked.audio) {
-      return ' No picture or sound: this video is copy-protected. Turning off ' +
-        "your browser's hardware acceleration gets the picture back; " +
-        'Settings → Anki has the rest.';
+      return ' No picture or sound: this video is copy-protected. ' +
+        'See Settings → Anki.';
     }
     if (blocked.image) {
-      return " No picture: turning off your browser's hardware acceleration " +
-        'gets it back.';
+      return ' No picture: this video is copy-protected. See Settings → Anki.';
     }
     // Deliberately not spelling out the rest here. Whether anything can be
     // done depends on the browser and on a permission, and the panel that

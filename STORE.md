@@ -60,9 +60,9 @@ a little HTML. This is written to read correctly as plain text.
 > through AnkiConnect, into whatever note type you already use: the
 > dictionary form, the sentence with the word in bold, the definitions, the
 > frame on screen, and the line as it was spoken. A copy-protected service
-> such as Netflix asks two things of you: the picture needs your browser's
-> hardware acceleration turned off, and the sound needs Chrome, which is the
-> only browser that will hand a tab's audio to an add-on. Torval says which
+> such as Netflix asks two things of you: the picture usually needs your
+> browser's hardware acceleration turned off, and the sound needs Chrome,
+> which is the only browser that will hand a tab's audio to an add-on. Torval says which
 > is missing and why rather than leaving you to notice. Japanese cards can carry
 > a pitch-accent diagram; Italian and Spanish mark the stressed vowel, and
 > nouns come with their article, because "il cane" is the thing to learn
