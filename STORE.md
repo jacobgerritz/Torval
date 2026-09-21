@@ -227,8 +227,8 @@ looks like obfuscation if it is not explained. Say this:
       the comprehension bar on a YouTube video, a subtitle line with the
       popup open over it, the Anki field mapping, the known-words page.
       Chrome wants 1280×800 or 640×400.
-- [ ] Version. Still 0.1.0. Decide whether the public debut is 1.0.0 before
-      uploading, because a store version number cannot be reused.
+- [x] Version is 1.0.0. A store version number cannot be reused, so if
+      anything changes before the first upload, bump it again.
 - [ ] Privacy policy is actually live at the URL above (GitHub Pages must
       be switched on first, Settings → Pages → main /docs).
 - [ ] The two builds install and run: `node tools/package.mjs`, then load
@@ -236,3 +236,7 @@ looks like obfuscation if it is not explained. Say this:
       declarativeNetRequest rule have no Firefox equivalent and are the two
       things most likely to be wrong.
 - [ ] Chrome's one-time $5 developer registration is paid.
+- [ ] Nothing in the console. Torval says nothing on an ordinary page now,
+      and narrates itself only when the box on the About panel is ticked.
+      Worth confirming on a YouTube video, since that is the one path that
+      used to talk the whole way through.

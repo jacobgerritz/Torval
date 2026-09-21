@@ -61,6 +61,18 @@ var TorvalSubtitles = (function () {
   'use strict';
 
   var api = globalThis.browser || globalThis.chrome;
+
+  /*
+   * The running commentary, off unless somebody asks for it. Deliberately
+   * not called `say`: that name is already taken all over this codebase
+   * for the progress callback threaded through the lookup, and in
+   * background.js it is a parameter of two functions this would sit
+   * inside. Guarded rather than assumed, because the tests load these
+   * files without log.js.
+   */
+  function trace() {
+    if (typeof TorvalLog !== 'undefined') TorvalLog.say.apply(null, arguments);
+  }
   // Which tracks to fetch, from the language being read rather than fixed
   // here: this used to be a Japanese-only list, so an Italian video was
   // reported as having no subtitle track no matter how many Italian tracks
@@ -372,7 +384,7 @@ var TorvalSubtitles = (function () {
     setInterval(renderCue, TICK_SECONDS * 1000);
     if (api.runtime.onMessage) api.runtime.onMessage.addListener(onBackgroundMessage);
     watch();
-    console.log('Torval: watching for subtitles');
+    trace('Torval: watching for subtitles');
   }
 
   /**
@@ -420,7 +432,7 @@ var TorvalSubtitles = (function () {
 
   async function loadSeenTrack(url) {
     var id = videoId;
-    console.log('Torval: caught YouTube’s own subtitle request, trying it directly');
+    trace('Torval: caught YouTube’s own subtitle request, trying it directly');
     // Tagged so the background script's own listener recognises this as Torval's
     // re-fetch of the address rather than a second genuine request, and does
     // not forward it straight back here again.
@@ -429,9 +441,9 @@ var TorvalSubtitles = (function () {
     if (loaded && loaded.length) {
       cues = loaded;
       state = 'ready';
-      console.log('Torval:', cues.length, 'subtitle lines ready. YouTube’s own request, reused directly');
+      trace('Torval:', cues.length, 'subtitle lines ready. YouTube’s own request, reused directly');
     } else {
-      console.warn('Torval: YouTube’s own subtitle address did not answer either, something deeper is blocking it.');
+      trace('Torval: YouTube’s own subtitle address did not answer either, something deeper is blocking it.');
     }
   }
 
@@ -562,7 +574,7 @@ var TorvalSubtitles = (function () {
       attempts = 0;
       caughtFile = '';
       caughtWrong = '';
-      console.log('Torval: video is now', id || '(none, not a watch page)');
+      trace('Torval: video is now', id || '(none, not a watch page)');
     }
 
     // A site that hands its subtitles over does so whenever it pleases, so
@@ -613,7 +625,7 @@ var TorvalSubtitles = (function () {
       // episode.
       if (caughtWrong !== (caught.text || caught.vtt)) {
         caughtWrong = caught.text || caught.vtt;
-        console.log('Torval: Netflix handed over subtitles for', caught.movie,
+        trace('Torval: Netflix handed over subtitles for', caught.movie,
           'but', id, 'is playing, so they are being left alone.');
       }
       return;
@@ -626,7 +638,7 @@ var TorvalSubtitles = (function () {
     index = 0;
     openCue = null;
     state = 'ready';
-    console.log('Torval:', cues.length, 'subtitle lines ready, from the file Netflix',
+    trace('Torval:', cues.length, 'subtitle lines ready, from the file Netflix',
       'gave its own player');
   }
 
@@ -819,7 +831,7 @@ var TorvalSubtitles = (function () {
     try {
       tracks = await captionTracks(id);
     } catch (err) {
-      console.warn('Torval: could not read the track list:', err && err.message);
+      trace('Torval: could not read the track list:', err && err.message);
     }
     if (videoId !== id) return;         // navigated away while fetching
 
@@ -828,7 +840,7 @@ var TorvalSubtitles = (function () {
       // Likely just early, the player has not finished setting itself up yet.
       // Worth waiting out: this script starts before the player exists.
       if (attempts < MAX_LOOKUP_ATTEMPTS) { state = 'idle'; return; }
-      console.warn('Torval: gave up looking for subtitle tracks in this page’s player data. ' +
+      trace('Torval: gave up looking for subtitle tracks in this page’s player data. ' +
         'Trying the transcript panel blind, in whatever language it opens on.');
     } else {
       track = pickTrack(tracks);
@@ -844,25 +856,25 @@ var TorvalSubtitles = (function () {
     try {
       panel = await fetchViaTranscriptPanel(id, track, tracks);
     } catch (err) {
-      console.warn('Torval: could not read the transcript panel:', err && err.message);
+      trace('Torval: could not read the transcript panel:', err && err.message);
     }
     if (videoId !== id) return;         // navigated away while fetching
     if (panel && panel.length) {
       cues = panel;
       state = 'ready';
-      console.log('Torval:', cues.length, 'subtitle lines ready, via the transcript panel');
+      trace('Torval:', cues.length, 'subtitle lines ready, via the transcript panel');
       return;
     }
     if (!track) return fallBackToWatching();
 
     try {
-      console.log('Torval: fetching the', track.languageCode, 'subtitle track');
+      trace('Torval: fetching the', track.languageCode, 'subtitle track');
       var loaded = await fetchTrack(track);
       if (videoId !== id) return;         // navigated away while fetching
       if (loaded && loaded.length) {
         cues = loaded;
         state = 'ready';
-        console.log('Torval:', cues.length, 'subtitle lines ready, direct from YouTube');
+        trace('Torval:', cues.length, 'subtitle lines ready, direct from YouTube');
         return;
       }
       console.warn('Torval: YouTube would not hand over subtitle data for this video, ' +
@@ -901,7 +913,7 @@ var TorvalSubtitles = (function () {
     var params = findKey(page, 'getTranscriptEndpoint');
     params = params && params.params;
     if (!params) {
-      console.log('Torval: this video offers no transcript panel.');
+      trace('Torval: this video offers no transcript panel.');
       return null;
     }
 
@@ -914,13 +926,13 @@ var TorvalSubtitles = (function () {
     if (wanted) {
       var again = await ytPost('get_transcript', cfg.key, context, { params: wanted.params });
       if (!again) return null;
-      console.log('Torval: asked the transcript panel for', wanted.title, 'instead');
+      trace('Torval: asked the transcript panel for', wanted.title, 'instead');
       data = again;
     }
 
     var segments = findAllKey(data, 'transcriptSegmentRenderer');
     if (!segments.length) {
-      console.warn('Torval: the transcript panel answered with no lines in it.');
+      trace('Torval: the transcript panel answered with no lines in it.');
       return null;
     }
 
@@ -967,14 +979,14 @@ var TorvalSubtitles = (function () {
       // video only has one track, that is necessarily the one already
       // matched; otherwise there is no telling which it is.
       if (tracks && tracks.length === 1) return null;
-      console.warn('Torval: the transcript panel has no language menu on it, ' +
+      trace('Torval: the transcript panel has no language menu on it, ' +
         'so there is no telling which language it answered in.');
       return REJECT;
     }
 
     var match = matchItem(items, track);
     if (!match) {
-      console.warn('Torval: the transcript panel does not offer ' +
+      trace('Torval: the transcript panel does not offer ' +
         (track.name || track.languageCode) + '. Offered:',
         items.map(function (i) { return i.title; }).join(', '));
       return REJECT;
@@ -1054,17 +1066,17 @@ var TorvalSubtitles = (function () {
         body: JSON.stringify(Object.assign({ context: context }, body))
       });
     } catch (err) {
-      console.warn('Torval:', endpoint, 'request failed:', err && err.message);
+      trace('Torval:', endpoint, 'request failed:', err && err.message);
       return null;
     }
     if (!res.ok) {
-      console.warn('Torval:', endpoint, 'request came back', res.status);
+      trace('Torval:', endpoint, 'request came back', res.status);
       return null;
     }
     try {
       return await res.json();
     } catch (err) {
-      console.warn('Torval:', endpoint, 'response was not valid JSON:', err && err.message);
+      trace('Torval:', endpoint, 'response was not valid JSON:', err && err.message);
       return null;
     }
   }
@@ -1119,18 +1131,18 @@ var TorvalSubtitles = (function () {
     ];
     for (var i = 0; i < formats.length; i++) {
       var a = formats[i];
-      console.log('Torval: trying the', a.label, 'format');
+      trace('Torval: trying the', a.label, 'format');
       var text = await request(a.url);
       if (!text) continue;
       try {
         var cues = a.parse(text);
         if (cues.length) {
-          console.log('Torval: the', a.label, 'format answered:', cues.length, 'lines');
+          trace('Torval: the', a.label, 'format answered:', cues.length, 'lines');
           return cues;
         }
-        console.warn('Torval: the', a.label, 'format answered but had no lines in it.');
+        trace('Torval: the', a.label, 'format answered but had no lines in it.');
       } catch (err) {
-        console.warn('Torval: could not read the', a.label, 'response:', err && err.message);
+        trace('Torval: could not read the', a.label, 'response:', err && err.message);
       }
     }
     return null;
@@ -1168,20 +1180,20 @@ var TorvalSubtitles = (function () {
     try {
       res = await fetch(url);
     } catch (err) {
-      console.warn('Torval: subtitle request failed:', err && err.message);
+      trace('Torval: subtitle request failed:', err && err.message);
       return '';
     }
     if (!res.ok) {
-      console.warn('Torval: subtitle request came back', res.status);
+      trace('Torval: subtitle request came back', res.status);
       return '';
     }
     var text = await res.text();
     if (!text) {
       if (res.redirected || res.url !== url) {
-        console.warn('Torval: the request was redirected to', res.url,
+        trace('Torval: the request was redirected to', res.url,
           ',  something on this machine is very likely intercepting it, not YouTube.');
       } else {
-        console.warn('Torval: subtitle request succeeded but the body was empty',
+        trace('Torval: subtitle request succeeded but the body was empty',
           '(no redirect, this is YouTube itself, not a blocker).');
       }
     }
@@ -1255,7 +1267,7 @@ var TorvalSubtitles = (function () {
           auto: t.kind === 'asr'
         };
       });
-      console.log('Torval: found', fromHtml.length, 'subtitle tracks in the page source');
+      trace('Torval: found', fromHtml.length, 'subtitle tracks in the page source');
       return fromHtml;
     } catch (err) {
       return null;
@@ -1293,7 +1305,7 @@ var TorvalSubtitles = (function () {
         if (key) return { key: key, context: cfg.get('INNERTUBE_CONTEXT') };
       }
     } catch (err) {
-      console.warn('Torval: could not read ytcfg:', err && err.message);
+      trace('Torval: could not read ytcfg:', err && err.message);
     }
 
     // ytcfg was not reachable as a live object, or did not have a key on it.
@@ -1302,7 +1314,7 @@ var TorvalSubtitles = (function () {
     var match = document.documentElement.innerHTML.match(/"INNERTUBE_API_KEY":"([^"]+)"/);
     if (match) return { key: match[1], context: null };
 
-    console.warn('Torval: could not find an API key anywhere on this page, cannot make a fresh request.');
+    trace('Torval: could not find an API key anywhere on this page, cannot make a fresh request.');
     return null;
   }
 
@@ -1324,7 +1336,7 @@ var TorvalSubtitles = (function () {
           auto: list[i].kind === 'asr'
         });
       }
-      console.log('Torval: found', out.length, 'subtitle tracks via', from);
+      trace('Torval: found', out.length, 'subtitle tracks via', from);
       return out;
     } catch (err) {
       return null;
@@ -1416,7 +1428,7 @@ var TorvalSubtitles = (function () {
 
   function fallBackToWatching() {
     state = 'watching';
-    console.log('Torval: reading captions off the screen instead of asking for the file.');
+    trace('Torval: reading captions off the screen instead of asking for the file.');
     startObserving();
   }
 
@@ -1485,7 +1497,7 @@ var TorvalSubtitles = (function () {
         if (wanted.indexOf(String(list[i].languageCode)) !== -1) pick = list[i];
       }
       if (!pick) {
-        console.log('Torval: the player offers no ' + TorvalLang.profile().name +
+        trace('Torval: the player offers no ' + TorvalLang.profile().name +
           ' captions to turn on either, so there is nothing on screen to read.');
         return true;   // nothing to wait for; asking again would say the same
       }
@@ -1493,12 +1505,12 @@ var TorvalSubtitles = (function () {
       var now = player.getOption('captions', 'track');
       if (now && String(now.languageCode) === String(pick.languageCode)) return true;
       player.setOption('captions', 'track', pick);
-      console.log('Torval: turned the player\u2019s own', pick.languageCode,
+      trace('Torval: turned the player\u2019s own', pick.languageCode,
         'captions on, since reading them off the screen is the only way left ' +
         'to time this video.');
       return true;
     } catch (err) {
-      console.warn('Torval: could not turn the player\u2019s captions on:', err && err.message);
+      trace('Torval: could not turn the player\u2019s captions on:', err && err.message);
       return false;
     }
   }
@@ -1573,7 +1585,7 @@ var TorvalSubtitles = (function () {
   function withoutFurniture(text) {
     var at = text.indexOf(SETTINGS_LABEL);
     if (at === -1) return text;
-    console.log('Torval: left the caption window\u2019s own furniture out of the line.');
+    trace('Torval: left the caption window\u2019s own furniture out of the line.');
     return text.slice(at + SETTINGS_LABEL.length).trim();
   }
 
@@ -1973,7 +1985,7 @@ var TorvalSubtitles = (function () {
     var able = !!(enabled && !suspended && video && state === 'ready' && cues.length);
     if (!able && videoId && state === 'watching' && saidWhyNot !== videoId) {
       saidWhyNot = videoId;
-      console.log('Torval: no skipping on this video. Its subtitles are being read ' +
+      trace('Torval: no skipping on this video. Its subtitles are being read ' +
         'off the screen, so what has not been played yet is not known.');
     }
     return able;

@@ -25,6 +25,18 @@
 var TorvalHighlight = (function () {
   'use strict';
 
+  /*
+   * The running commentary, off unless somebody asks for it. Deliberately
+   * not called `say`: that name is already taken all over this codebase
+   * for the progress callback threaded through the lookup, and in
+   * background.js it is a parameter of two functions this would sit
+   * inside. Guarded rather than assumed, because the tests load these
+   * files without log.js.
+   */
+  function trace() {
+    if (typeof TorvalLog !== 'undefined') TorvalLog.say.apply(null, arguments);
+  }
+
   var api = globalThis.browser || globalThis.chrome;
 
   // Two registrations for the page, two for the line, rather than one of
@@ -82,7 +94,7 @@ var TorvalHighlight = (function () {
     if (started) return supported();
     started = true;
     if (!supported()) {
-      console.log('Torval: this Firefox cannot colour words without rewriting the page ' +
+      trace('Torval: this Firefox cannot colour words without rewriting the page ' +
         '(needs Firefox 140 or newer), everything else still works.');
       return false;
     }

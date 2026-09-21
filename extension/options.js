@@ -494,3 +494,22 @@ if (resetLook) {
 // Drawn once storage has answered, so the page never shows a default for a
 // moment and then replaces it with what was actually saved.
 if (appearance) TorvalLook.ready().then(drawAppearance);
+
+
+// ---------------------------------------------------------------------------
+// The console
+// ---------------------------------------------------------------------------
+
+/*
+ * Whether Torval narrates itself. Off by default, because the console
+ * belongs to the page and most of what it would say is a step failing on
+ * the way to a step succeeding. On, it is the first thing to ask for when
+ * somebody reports that a video's subtitles never arrived. See log.js.
+ */
+const verbose = document.getElementById('verbose');
+if (verbose) {
+  api.storage.local.get('verboseLog')
+    .then((stored) => { verbose.checked = !!stored.verboseLog; })
+    .catch(() => {});
+  verbose.addEventListener('change', () => TorvalLog.verbose(verbose.checked));
+}

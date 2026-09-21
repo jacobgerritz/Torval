@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Torval",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Hold Shift and hover any word (Japanese, Italian or Spanish) to see what it means.",
   "author": "Jacob Gerritz",
   "homepage_url": "https://jacobgerritz.github.io/Torval/",
@@ -16,7 +16,9 @@
       "id": "torval@jacobgerritz",
       "strict_min_version": "128.0",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
   },
@@ -41,6 +43,7 @@
   "background": {
     "service_worker": "sw.js",
     "scripts": [
+      "log.js",
       "japanese.js",
       "scan.js",
       "italian.js",
@@ -71,7 +74,6 @@
       ],
       "run_at": "document_start"
     },
-
     {
       "matches": [
         "<all_urls>"
@@ -84,6 +86,7 @@
         "spanish.js",
         "spanish-scan.js",
         "lang.js",
+        "log.js",
         "keys.js",
         "look.js",
         "stress.js",

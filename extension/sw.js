@@ -18,6 +18,7 @@
  */
 
 importScripts(
+  'log.js',
   'japanese.js',
   'scan.js',
   'italian.js',

@@ -27,6 +27,11 @@ var TorvalBar = (function () {
   var root = null;
   var els = {};
   var data = null;        // the last reading: { total, known, counts, model }
+  // Whether Torval has ever had anything to say in this tab. Not reset by
+  // forget(): the question is not "does this page have a score" but "is
+  // this somebody who is using Torval here", and the answer to that does
+  // not stop being yes when they open the next video. See quiet().
+  var everShown = false;
   var read = null;        // that reading's occurrences, for recounting
   var onRefresh = null;
 
@@ -92,6 +97,7 @@ var TorvalBar = (function () {
     // is the reading as it arrived.
     read = (data.model && typeof TorvalLookupCommon !== 'undefined')
       ? TorvalLookupCommon.expand(data.model) : null;
+    everShown = true;
     build();
     idle();
     render();
@@ -197,6 +203,16 @@ var TorvalBar = (function () {
    *
    * So now the bar tucks itself away, which is a state it already has: the
    * handle stays, the room goes back, and pinning means what it says.
+   *
+   * Tucking away rather than disappearing is right wherever Torval is
+   * being used, and wrong everywhere else. readPage() says "Reading this
+   * page…" on every page it touches, which builds the bar, so on an
+   * English news site the bar would appear, find nothing, and leave a
+   * handle sitting in the corner for ever. That is precisely what busy()
+   * waits 400ms to avoid. So the handle is kept only once there has been
+   * something to keep it for: on a tab where Torval has shown a number at
+   * least once, it has earned its corner, and on a tab where it never has,
+   * it takes itself off the page exactly as before.
    */
   function quiet() {
     stopWaiting();
@@ -214,6 +230,9 @@ var TorvalBar = (function () {
     }
     els.detail.textContent = '';
     setExpanded(false);
+    // Never asked for here, so not wanted here. The room goes back either
+    // way, which is the part that was actually broken.
+    if (!everShown) host.style.display = 'none';
   }
 
   /**
@@ -266,6 +285,8 @@ var TorvalBar = (function () {
       data.total.toLocaleString('en-US') + ' words known';
     // A colour is read at a glance where a number has to be thought about.
     els.score.style.color = colourFor(percent);
+    // Back on the page if quiet() had taken it off, which it does on a tab
+    // that had never shown anything until this moment.
     host.style.display = document.fullscreenElement ? 'none' : 'block';
   }
 

@@ -17,6 +17,18 @@
 
 const api = globalThis.browser || globalThis.chrome;
 
+/*
+ * The running commentary, off unless somebody asks for it. Deliberately
+ * not called `say`: that name is already taken all over this codebase
+ * for the progress callback threaded through the lookup, and in
+ * background.js it is a parameter of two functions this would sit
+ * inside. Guarded rather than assumed, because the tests load these
+ * files without log.js.
+ */
+function trace() {
+  if (typeof TorvalLog !== 'undefined') TorvalLog.say.apply(null, arguments);
+}
+
 // One dictionary database per language, so switching does not touch what the
 // other language already has imported. 'torval-dictionary' unsuffixed is the
 // Japanese one, which is why TorvalLang's 'ja' profile keeps an empty
@@ -47,7 +59,7 @@ async function dropFormerDatabases() {
     } catch (err) { /* nothing there, which is the ordinary case */ }
   }
   await api.storage.local.set({ droppedFormerDatabases: true }).catch(() => {});
-  console.log('Torval: dropped the dictionary databases left behind by the old name.');
+  trace('Torval: dropped the dictionary databases left behind by the old name.');
 }
 const DB_VERSION = 1;
 const ENTRIES = 'entries';
@@ -158,7 +170,7 @@ if (api.webRequest && api.webRequest.onHeadersReceived) {
     // Chrome, where rules.json is doing this instead. Worth one line rather
     // than silence: if it ever throws in Firefox, subtitles stop working and
     // this is the only thing that would say why.
-    console.log('Torval: this browser does not take a blocking listener, ' +
+    trace('Torval: this browser does not take a blocking listener, ' +
       'so the caption rewrite is coming from its own rule file instead.');
   }
 }
@@ -874,7 +886,7 @@ async function keepACopy() {
       saveAs: false
     });
     await api.storage.local.set({ [LAST_COPY]: today });
-    console.log('Torval: kept a copy of your words in Downloads/Torval');
+    trace('Torval: kept a copy of your words in Downloads/Torval');
   } catch (err) {
     console.warn('Torval: could not keep a copy of your words:', err && err.message);
   } finally {
@@ -993,7 +1005,7 @@ async function learnWhatIsKnown(db, generation) {
     for (let i = 0; i < keys.length; i++) marks[i] = fingerprint(String(keys[i]));
     marks.sort();
     fingerprints = marks;
-    console.log('Torval:', keys.length, 'words fingerprinted, so most of reading a page ' +
+    trace('Torval:', keys.length, 'words fingerprinted, so most of reading a page ' +
       'now needs no database at all.');
   } catch (err) {
     // Not being able to do this costs speed and nothing else.
@@ -1167,9 +1179,9 @@ async function importDictionary(db, meta) {
     await run(db, INDEX, 'readwrite', (store) => store.clear());
     progress = { version: meta.version, entries: 0, index: 0, nextId: 0 };
     await save();
-    console.log('Torval: building the dictionary');
+    trace('Torval: building the dictionary');
   } else {
-    console.log(`Torval: resuming, ${progress.entries}/${meta.entryChunks} entry chunks,` +
+    trace(`Torval: resuming, ${progress.entries}/${meta.entryChunks} entry chunks,` +
       ` ${progress.index}/${meta.indexChunks} index chunks already in`);
   }
 
@@ -1200,7 +1212,7 @@ async function importDictionary(db, meta) {
   await run(db, STATE, 'readwrite', (store) => store.delete('import'));
   status = { state: 'ready', progress: 1 };
   setBadge('');
-  console.log(`Torval: dictionary ready, ${meta.entries} entries, ${meta.terms} forms`);
+  trace(`Torval: dictionary ready, ${meta.entries} entries, ${meta.terms} forms`);
 
   function save() {
     return run(db, STATE, 'readwrite', (store) => store.put(progress, 'import'));

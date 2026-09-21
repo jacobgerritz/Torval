@@ -1362,6 +1362,19 @@ npx web-ext sign --source-dir extension --channel unlisted \
   --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET"
 ```
 
+### Asking it what it is doing
+
+Torval says nothing in the browser's console unless there is something you
+could act on: the dictionary would not load, this video has no Italian
+subtitles, the word lists could not be saved. Getting subtitles out of
+YouTube is a chain of four or five attempts, each tried until one answers,
+and narrating all of it by default fills the console of a page that is
+working perfectly.
+
+**Settings → About → Say what it is doing in the console** turns the rest
+back on, and it stays on across reloads. It is the first thing to ask for
+in a bug report about subtitles. See `extension/log.js`.
+
 ### Three things in the manifest that look wrong
 
 They were written as comments in `manifest.json` itself, which was a

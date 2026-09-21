@@ -28,6 +28,7 @@ const Subs = require(join(ROOT, 'extension', 'subtitles.js'));
 const Highlight = require(join(ROOT, 'extension', 'highlight.js'));
 const Lang = require(join(ROOT, 'extension', 'lang.js'));
 const Look = require(join(ROOT, 'extension', 'look.js'));
+const Log = require(join(ROOT, 'extension', 'log.js'));
 const DeinflectEs = require(join(ROOT, 'extension', 'deinflect-es.js'));
 const DeinflectIt = require(join(ROOT, 'extension', 'deinflect-it.js'));
 const LookupLatin = require(join(ROOT, 'extension', 'lookup-latin.js'));
@@ -3071,6 +3072,40 @@ const run = async () => {
   await Look.reset();
   check('reset puts every one of them back',
     Look.all().every((s) => s.isDefault) && Look.subtitleScale() === 1);
+
+  // --- what it says out loud ---------------------------------------------
+  //
+  // The console belongs to the page. Torval's subtitle chain is four or
+  // five attempts tried in turn, and it used to narrate every one, so a
+  // video where the first three failed and the fourth worked, which is an
+  // ordinary video, filled the console before anything appeared. What is
+  // left by default is what somebody could act on.
+  const spoke = [];
+  const realLog = console.log;
+  const realWarn = console.warn;
+  console.log = (...a) => spoke.push(['log', a.join(' ')]);
+  console.warn = (...a) => spoke.push(['warn', a.join(' ')]);
+  try {
+    Log.verbose(false);
+    Log.say('a step on the way to a step that worked');
+    check('the running commentary is silent by default', spoke.length === 0,
+      JSON.stringify(spoke));
+
+    Log.warn('this video has no Italian subtitles');
+    check('and a real problem is said anyway',
+      spoke.length === 1 && spoke[0][0] === 'warn', JSON.stringify(spoke));
+
+    Log.verbose(true);
+    Log.say('now narrating');
+    check('turned on, the commentary comes back',
+      spoke.length === 2 && spoke[1][0] === 'log', JSON.stringify(spoke));
+    check('and the switch reports where it stands', Log.isVerbose() === true);
+    Log.verbose(false);
+    check('and back off again', Log.isVerbose() === false);
+  } finally {
+    console.log = realLog;
+    console.warn = realWarn;
+  }
 
   console.log(`${passed} passed, ${failures.length} failed`);
   if (failures.length) {
