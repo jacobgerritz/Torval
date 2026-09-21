@@ -113,6 +113,96 @@
 </section>
 
 <section>
+  <h2>Getting started</h2>
+
+  <ol class="steps">
+    <li>
+      <h3>Say what you are learning</h3>
+      <p>
+        Torval does nothing at all until it knows. The first screen asks,
+        and the answer downloads that language's dictionary into your
+        browser: a minute once, then never again. You can change language
+        later from the toolbar button, and nothing is lost by switching, as
+        each language keeps its own word list.
+      </p>
+    </li>
+    <li>
+      <h3>Hold <kbd>Shift</kbd> and hover a word</h3>
+      <p>
+        That is the whole of it. There is no clicking, no selecting and no
+        button to press first. Let go of Shift and the popup goes away.
+        Anywhere there is text: an article, a forum, a subtitle.
+      </p>
+    </li>
+    <li>
+      <h3>Tell it what you already know</h3>
+      <p>
+        Press <kbd>2</kbd>, or the ✓ in the popup, on a word you know.
+        Press <kbd>3</kbd>, or ⊘, on one you never want to be told about
+        again: a name, a piece of English, something the dictionary read
+        wrongly. The percentage across the top of the page is measured
+        against that list, so it means little on your first day and a great
+        deal by your second week. If you already have an Anki deck, the
+        add-on in <code>anki/</code> hands its words over in one go, so you
+        do not start from nothing.
+      </p>
+    </li>
+    <li>
+      <h3>On a video, step between the lines</h3>
+      <p>
+        <kbd>A</kbd> back, <kbd>D</kbd> forward. Torval fetches the subtitle
+        file itself and works out where every line begins and ends, so it
+        can take you to the start of one and play it again. The percentage
+        on a video is measured against the whole transcript before you
+        start, which is what actually decides whether it is worth your
+        evening.
+      </p>
+    </li>
+    <li>
+      <h3>Send a word to Anki</h3>
+      <p>
+        Install <a href="https://ankiweb.net/shared/info/2055492159">AnkiConnect</a>,
+        leave Anki open, and map your note type's fields once under
+        <b>Settings → Anki</b>. After that, <b>+</b> on any word makes the
+        card: the dictionary form, the sentence with the word in bold, the
+        definitions, and on a video the frame and the line as it was spoken.
+      </p>
+    </li>
+  </ol>
+
+  <div class="claim aside">
+    <strong>One thing to know about Netflix</strong>
+    <p>
+      Netflix, Prime Video and Disney+ hand their video to the browser's
+      copy-protection layer, and that changes what a card can carry. The
+      subtitles are unaffected: timing, stepping and looking words up all
+      work normally. The picture and the sound do not come for free.
+    </p>
+    <p>
+      <b>The screenshot comes out black</b> unless you turn hardware
+      acceleration off, because with it on the frame never leaves the
+      graphics card. In Firefox: <b>Settings → General → Performance</b>,
+      untick both boxes. In Chrome: <b>Settings → System</b>. Restart the
+      browser afterwards, and expect it to work the processor harder.
+    </p>
+    <p>
+      <b>The sound needs Chrome.</b> It has to be recorded from the tab
+      rather than from the video, and Chrome is the only browser that will
+      hand a tab's audio to an add-on. Firefox has no such API, and its
+      <code>getDisplayMedia</code> ignores audio entirely
+      (<a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1541425">Mozilla
+      bug 1541425</a>, open since 2019). There is no way around it. On
+      Chrome, tick the box under <b>Settings → Anki</b>; Torval asks for the
+      permission then and at no other time.
+    </p>
+    <p class="note" style="margin-top:14px">
+      Torval says which of the two is missing on the card itself, so you
+      are never left wondering.
+    </p>
+  </div>
+</section>
+
+<section>
   <h2>Privacy</h2>
   <div class="claim">
     <strong>Torval collects nothing.</strong>
