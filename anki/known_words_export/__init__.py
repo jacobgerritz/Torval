@@ -1,33 +1,33 @@
 """
-Torval, the way back out of Anki.
+Export Known Words.
 
-Torval learns which words you know from what you mark while reading, which
-is fine from the day you install it and useless about the years before
-that. Anki already knows: every card you have matured is a word you have
-decided you know, and the whole point of having built that deck is not to
-be asked about those words again.
+Your collection already knows which words you know. Every card you have
+matured is a word you decided on, and the whole point of having built the
+deck is never to be asked about those words again. This gets that list
+back out, in whatever shape the thing you are feeding it wants.
 
-So this walks the collection and hands the words back in the two shapes
-Torval will take them in.
+Three ways out, and none of them is more official than the others:
 
-  Save a file          torval-words-<date>.json, which goes into
-                       Settings -> Words -> Keeping a copy -> Load from a
-                       file. It carries a date per word, taken from when
-                       the card was made, and Torval merges rather than
-                       replaces, so loading it twice changes nothing.
+  Text file     one word per line. What most things read.
+  Clipboard     the same, for pasting straight into something.
+  Torval JSON   for Torval, a pop-up dictionary that keeps a list of the
+                words you already know and uses it to say how much of a
+                page you will understand. Its format is the plain list
+                plus a date per word, which a text file cannot carry.
+                https://github.com/jacobgerritz/Torval
 
-  Copy to clipboard    one word per line, for the "Add from a text" box on
-                       the same page. Simpler, and loses the dates.
+One deck at a time, and no option to do the whole collection. A
+collection is usually more than one language, and a known-words list with
+two languages in it is not a known-words list, it is a mess that
+something downstream will quietly believe.
 
 Mature cards are the obvious thing to export and, on their own, the wrong
 thing. A word you are three days into learning is still a word you know
-when you meet it in a subtitle, and counting it as unknown makes the
-comprehension score say a page is harder than it is. So learning,
+when you meet it in a subtitle, and counting it as unknown makes any
+comprehension estimate say a text is harder than it is. So learning,
 relearning and young cards come too, and each is a tick box in case you
-disagree.
-
-New cards are not offered. A card you have never seen is a word you have
-never studied, and there is nothing to export about it.
+disagree. New cards are not offered: a card you have never seen is a word
+you have never studied.
 
 Install by copying this folder into Anki's addons21 directory. It is one
 file on purpose.
@@ -43,7 +43,7 @@ from aqt import mw
 from aqt.qt import *
 from aqt.utils import getSaveFile, qconnect, showInfo, showWarning
 
-MENU_ITEM = "Export words to Torval"
+MENU_ITEM = "Export Known Words…"
 
 # Anki's own definition, and the one the scheduler uses: a review card is
 # mature once its interval reaches three weeks.
@@ -69,14 +69,23 @@ TAG = re.compile(r"<[^>]+>")
 CLOZE = re.compile(r"\{\{c\d+::(.*?)(?:::.*?)?\}\}")
 SPACES = re.compile(r"\s+")
 
-# The article Torval puts on an Italian or Spanish noun when it makes the
-# card, which is not part of the word and would not be found in a text.
-# Apostrophes are both kinds, because Anki holds whichever one was typed.
+# The article many decks put on a Romance noun, because the gender is half
+# of what there is to know about one. It is not part of the word, and no
+# text would ever be searched for it. Both apostrophes, because Anki holds
+# whichever one was typed.
 ARTICLE = re.compile(
-    r"^(?:il|lo|la|i|gli|le|un|uno|una|el|los|las|un|unos|unas)\s+"
+    r"^(?:il|lo|la|i|gli|le|un|uno|una|el|los|las|unos|unas)\s+"
     r"|^(?:l|un|d|dell|all|nell)['’]",
     re.IGNORECASE,
 )
+
+# Field names worth guessing at, best first, matched without regard to case.
+LIKELY = ["target word", "word", "expression", "vocabulary", "vocab",
+          "front", "term", "headword"]
+
+
+def quoted(deck_name):
+    return deck_name.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def tidy(text, strip_article):
@@ -99,11 +108,7 @@ def search_for(deck_name, states):
     wanted = " OR ".join(query for key, _, query in STATES if key in states)
     if not wanted:
         return None
-    where = "(%s)" % wanted
-    if deck_name:
-        safe = deck_name.replace("\\", "\\\\").replace('"', '\\"')
-        return 'deck:"%s" %s' % (safe, where)
-    return where
+    return 'deck:"%s" (%s)' % (quoted(deck_name), wanted)
 
 
 def collect(deck_name, states, field_name, strip_article):
@@ -111,9 +116,8 @@ def collect(deck_name, states, field_name, strip_article):
     Every word found, as word -> when its earliest card was made.
 
     Anki's card ids are the millisecond the card was created, which is the
-    closest thing in the collection to "when did you start knowing this"
-    and is exactly the shape Torval stores. Where a word has several cards,
-    the oldest wins, which is what Torval does with its own duplicates too.
+    closest thing in the collection to "when did you start knowing this".
+    Where a word has several cards the oldest wins.
     """
     query = search_for(deck_name, states)
     if query is None:
@@ -156,21 +160,17 @@ def collect(deck_name, states, field_name, strip_article):
 
 
 def field_names(deck_name):
-    """Every field name in play, so the chooser offers real answers only."""
+    """Every field name in this deck, so the chooser offers real answers."""
     names = []
     seen = set()
-    query = 'deck:"%s"' % deck_name.replace("\\", "\\\\").replace('"', '\\"') \
-        if deck_name else ""
     try:
-        note_ids = mw.col.find_notes(query)
+        note_ids = mw.col.find_notes('deck:"%s"' % quoted(deck_name))
     except Exception:
-        note_ids = []
+        return names
 
     mids = set()
-    for note_id in note_ids[:2000]:      # enough to see every note type in a deck
+    for note_id in note_ids[:2000]:   # enough to meet every note type in a deck
         mids.add(mw.col.get_note(note_id).mid)
-    if not mids:
-        mids = {m.id for m in mw.col.models.all_names_and_ids()}
 
     for mid in mids:
         model = mw.col.models.get(mid)
@@ -181,11 +181,6 @@ def field_names(deck_name):
                 seen.add(field["name"])
                 names.append(field["name"])
     return names
-
-
-# Field names worth guessing at, best first, matched case-insensitively.
-LIKELY = ["target word", "word", "expression", "vocabulary", "vocab",
-          "front", "term", "headword"]
 
 
 def best_guess(names):
@@ -199,25 +194,22 @@ def best_guess(names):
 class ExportDialog(QDialog):
     def __init__(self, parent):
         QDialog.__init__(self, parent)
-        self.setWindowTitle(MENU_ITEM)
-        self.setMinimumWidth(460)
+        self.setWindowTitle("Export Known Words")
+        self.setMinimumWidth(440)
 
         layout = QVBoxLayout(self)
 
-        blurb = QLabel(
-            "Words you already know, for Torval's known-words list.\n"
-            "Save a file and load it under Settings → Words → Keeping a copy,\n"
-            "or copy the words and paste them into “Add from a text”."
-        )
-        blurb.setWordWrap(True)
-        layout.addWidget(blurb)
-        layout.addSpacing(8)
-
         form = QFormLayout()
         self.decks = QComboBox()
-        self.decks.addItem("Whole collection", "")
         for deck in sorted(mw.col.decks.all_names_and_ids(), key=lambda d: d.name):
             self.decks.addItem(deck.name, deck.name)
+        # Whichever deck is open in Anki, which is nearly always the one
+        # somebody came here about.
+        current = (mw.col.decks.current() or {}).get("name")
+        if current:
+            at = self.decks.findData(current)
+            if at >= 0:
+                self.decks.setCurrentIndex(at)
         qconnect(self.decks.currentIndexChanged, self.fill_fields)
         form.addRow("Deck", self.decks)
 
@@ -225,7 +217,7 @@ class ExportDialog(QDialog):
         form.addRow("Word field", self.fields)
         layout.addLayout(form)
 
-        layout.addSpacing(8)
+        layout.addSpacing(10)
         layout.addWidget(QLabel("Include"))
         self.states = {}
         for key, label, _ in STATES:
@@ -234,33 +226,27 @@ class ExportDialog(QDialog):
             self.states[key] = box
             layout.addWidget(box)
 
-        layout.addSpacing(8)
-        self.tidy_article = QCheckBox(
-            "Drop a leading article (il cane → cane)")
+        layout.addSpacing(10)
+        self.tidy_article = QCheckBox("Drop a leading article (il cane → cane)")
         self.tidy_article.setChecked(True)
-        self.tidy_article.setToolTip(
-            "Torval writes the article onto Italian and Spanish cards, "
-            "because it is half of what there is to know about a noun. "
-            "It is not part of the word, so it comes off again here.")
         layout.addWidget(self.tidy_article)
 
-        self.note = QLabel("")
-        self.note.setWordWrap(True)
-        layout.addSpacing(6)
-        layout.addWidget(self.note)
-
+        layout.addSpacing(12)
         buttons = QHBoxLayout()
-        self.count_button = QPushButton("Count them")
-        qconnect(self.count_button.clicked, self.count)
-        buttons.addWidget(self.count_button)
         buttons.addStretch(1)
-        copy_button = QPushButton("Copy to clipboard")
-        qconnect(copy_button.clicked, self.to_clipboard)
-        buttons.addWidget(copy_button)
-        save_button = QPushButton("Save a file…")
-        save_button.setDefault(True)
-        qconnect(save_button.clicked, self.to_file)
-        buttons.addWidget(save_button)
+        for label, tip, slot, default in [
+            ("Copy", "One word per line, on the clipboard.", self.to_clipboard, False),
+            ("Save as text…", "One word per line. What most things read.",
+             self.to_text, True),
+            ("Save for Torval…",
+             "Torval’s own format, which also carries the date each word "
+             "was first studied.", self.to_torval, False),
+        ]:
+            button = QPushButton(label)
+            button.setToolTip(tip)
+            button.setDefault(default)
+            qconnect(button.clicked, slot)
+            buttons.addWidget(button)
         layout.addLayout(buttons)
 
         self.fill_fields()
@@ -273,54 +259,65 @@ class ExportDialog(QDialog):
         if guess:
             self.fields.setCurrentText(guess)
 
-    def chosen_states(self):
-        return {key for key, box in self.states.items() if box.isChecked()}
-
     def gather(self):
-        states = self.chosen_states()
+        states = {key for key, box in self.states.items() if box.isChecked()}
         if not states:
             showWarning("Tick at least one kind of card to export.")
             return None
         field = self.fields.currentText()
         if not field:
-            showWarning("No field chosen. Is the deck empty?")
+            showWarning("No field chosen. Is that deck empty?")
             return None
-        mw.progress.start(label="Reading the collection…")
+        mw.progress.start(label="Reading the deck…")
         try:
-            words, looked_at = collect(
-                self.decks.currentData(), states, field,
-                self.tidy_article.isChecked())
+            words, _ = collect(self.decks.currentData(), states, field,
+                               self.tidy_article.isChecked())
         finally:
             mw.progress.finish()
         if not words:
-            showInfo(
-                "Nothing to export.\n\nNo cards matched, or the field "
-                "“%s” is empty on the ones that did." % field)
+            showInfo("Nothing to export.\n\nNo cards matched, or the field "
+                     "“%s” is empty on the ones that did." % field)
             return None
-        self.note.setText(
-            "%d cards read, %d different words." % (looked_at, len(words)))
         return words
+
+    @staticmethod
+    def in_order(words):
+        """
+        Oldest first, which is the order they were learned in. Not
+        alphabetical, which is an order nobody learned anything in.
+        """
+        return sorted(words, key=lambda word: words[word])
 
     def to_clipboard(self):
         words = self.gather()
         if not words:
             return
-        # Oldest first, which is the order they were learned in and the
-        # order that reads most sensibly if anybody opens the list.
-        ordered = sorted(words, key=lambda word: words[word])
-        QApplication.clipboard().setText("\n".join(ordered))
-        showInfo(
-            "%d words copied.\n\nIn Torval: Settings → Words → "
-            "Add from a text, paste, then Add these words." % len(words))
+        QApplication.clipboard().setText("\n".join(self.in_order(words)))
+        showInfo("%d words copied, one per line." % len(words))
 
-    def to_file(self):
+    def to_text(self):
         words = self.gather()
         if not words:
             return
-        day = time.strftime("%Y-%m-%d")
-        path = getSaveFile(
-            self, "Save the words for Torval", "torval-export",
-            "JSON file", ".json", fname="torval-words-%s.json" % day)
+        path = self.ask_where("known-words-%s.txt" % time.strftime("%Y-%m-%d"),
+                              "Text file", ".txt")
+        if path and self.write(path, "\n".join(self.in_order(words)) + "\n"):
+            showInfo("%d words written to\n%s" % (len(words), os.path.basename(path)))
+
+    def to_torval(self):
+        """
+        Torval's own format: the same list, plus the date each word was
+        first studied.
+
+        The date is what makes loading the same export twice harmless.
+        Torval merges rather than replaces and keeps the earlier of the two
+        dates, so nothing is overwritten and nothing counted again.
+        """
+        words = self.gather()
+        if not words:
+            return
+        path = self.ask_where("torval-words-%s.json" % time.strftime("%Y-%m-%d"),
+                              "JSON file", ".json")
         if not path:
             return
         payload = {
@@ -330,21 +327,24 @@ class ExportDialog(QDialog):
             "known": words,
             "ignored": {},
         }
+        if self.write(path, json.dumps(payload, ensure_ascii=False, indent=2)):
+            showInfo("%d words written to\n%s\n\nIn Torval: Settings → Words "
+                     "→ Keeping a copy → Load from a file."
+                     % (len(words), os.path.basename(path)))
+
+    def ask_where(self, suggested, description, ext):
+        return getSaveFile(self, "Save the words", "known-words-export",
+                           description, ext, fname=suggested)
+
+    @staticmethod
+    def write(path, body):
         try:
             with open(path, "w", encoding="utf-8") as out:
-                json.dump(payload, out, ensure_ascii=False, indent=2)
+                out.write(body)
         except OSError as err:
             showWarning("Could not write that file:\n\n%s" % err)
-            return
-        showInfo(
-            "%d words written to\n%s\n\nIn Torval: Settings → Words "
-            "→ Keeping a copy → Load from a file."
-            % (len(words), os.path.basename(path)))
-
-    def count(self):
-        words = self.gather()
-        if words:
-            showInfo("%d different words would be exported." % len(words))
+            return False
+        return True
 
 
 def run():

@@ -238,6 +238,19 @@ var TorvalSubtitles = (function () {
   };
   var site = null;
 
+  /**
+   * The site's own subtitle box, where it has one and Torval is not drawing
+   * over it. Wanted by highlight.js, which has to mark whichever box the
+   * words are actually in: Torval's own line when there is one, and the
+   * player's own when there is not, which is what happens whenever the
+   * subtitle file could not be had and the lines are being read off the
+   * screen instead.
+   */
+  function captionBox() {
+    if (!site || !site.captions) return null;
+    try { return document.querySelector(site.captions); } catch (err) { return null; }
+  }
+
   /** Which of the sites above this address belongs to, if any. */
   function siteFor(hostname) {
     for (var name in SITES) if (SITES[name].host.test(hostname)) return name;
@@ -2269,6 +2282,7 @@ var TorvalSubtitles = (function () {
     isContinuation: isContinuation,
     wholeLine: wholeLine,
     siteFor: siteFor,
+    captionBox: captionBox,
     parseVtt: parseVtt,
     parseTtml: parseTtml,
     status: function () { return state; },

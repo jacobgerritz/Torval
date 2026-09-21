@@ -75,6 +75,38 @@ var TorvalHighlight = (function () {
   var unknown = new Set();      // every word seen so far that is not known
   var lastLine = null;
   var lineOverlay = null;   // the subtitle box, once it exists
+
+  /**
+   * Which box holds the line being read right now.
+   *
+   * Torval's own overlay when it is drawing one, and otherwise the player's
+   * own subtitle box. That second half was missing, and it is the half that
+   * matters whenever the subtitle file could not be had: Torval falls back
+   * to reading the lines off the screen, draws nothing of its own, and the
+   * words being read are then in the site's element like any other text on
+   * the page.
+   *
+   * Which sounds fine, and is how the bug got in. The page path reads the
+   * whole document at once and asks one question about all of it, "is this
+   * even the language being read", so that an English article with a few
+   * words that happen to spell Italian ones is left alone. A streaming site
+   * is a poor thing to ask that about: its shell is menus, show titles and
+   * interface in whatever language the account is in, and one Spanish
+   * subtitle in the middle of it does not move the verdict. The verdict
+   * came back no, every mark came off the page, and the one line the
+   * reader was actually reading came off with them, silently, while
+   * hovering the very same words still answered.
+   *
+   * Asked about on its own, a subtitle is never in doubt, which is why the
+   * line path asks in the first place and why it is trusted. So the line
+   * gets that treatment wherever it is drawn, not only where Torval drew it.
+   */
+  function lineBox() {
+    var own = document.querySelector('[data-torval-subtitle]');
+    if (own) return own;
+    if (typeof TorvalSubtitles === 'undefined' || !TorvalSubtitles.captionBox) return null;
+    return TorvalSubtitles.captionBox();
+  }
   var nearby = false;       // was the last read only of what was on screen
   var lastRead = '';        // and what it said, so as not to read it again
   var rereading = null;
@@ -216,6 +248,7 @@ var TorvalHighlight = (function () {
    */
   function gather(root, skipSubtitle, nearOnly) {
     var reach = nearOnly ? (window.innerHeight || 800) : 0;
+    var lineHolder = skipSubtitle ? lineBox() : null;
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
       acceptNode: function (node) {
         var parent = node.parentElement;
@@ -225,9 +258,12 @@ var TorvalHighlight = (function () {
         // worth asking about those. Read fresh each call, not cached, so a
         // language switch takes effect on the very next gather().
         if (!TorvalLang.profile().charClass.test(node.data)) return NodeFilter.FILTER_REJECT;
-        // Torval's own subtitle line is painted on its own, every time it
-        // changes; leaving it in here as well would mark it twice.
-        if (skipSubtitle && parent.closest('[data-torval-subtitle]')) return NodeFilter.FILTER_REJECT;
+        // The subtitle line is painted on its own, every time it changes;
+        // leaving it in here as well would mark it twice. Whichever box it
+        // is in, since it is not always Torval's own.
+        if (skipSubtitle && lineHolder && lineHolder.contains(node)) {
+          return NodeFilter.FILTER_REJECT;
+        }
         if (parent.checkVisibility && !parent.checkVisibility()) return NodeFilter.FILTER_REJECT;
         if (nearOnly && !nearScreen(parent, reach)) return NodeFilter.FILTER_REJECT;
         return NodeFilter.FILTER_ACCEPT;
@@ -398,20 +434,26 @@ var TorvalHighlight = (function () {
   function watchLine() {
     var observer = null;
 
-    // The overlay is created once, lazily, the first time a line is drawn, 
-    // this waits for it to exist and then never has to look again.
-    var attach = setInterval(function () {
-      var overlay = document.querySelector('[data-torval-subtitle]');
-      if (!overlay) return;
-      clearInterval(attach);
+    // Going fullscreen moves the player about, and the marks on the line
+    // are ranges into text that is no longer where they were made. There is
+    // no mutation to notice, so the change of screen is the signal. Once,
+    // out here, rather than once per box: registered inside the loop below
+    // it would be added again every time the box changed.
+    document.addEventListener('fullscreenchange', function () {
+      setTimeout(refreshLine, 60);
+      setTimeout(refreshLine, 500);
+    });
+
+    // The box is not there when the page loads and may be replaced later:
+    // a player rebuilt on a new episode brings a new one, and Torval's own
+    // overlay appears part way through and takes over from the site's. So
+    // this keeps looking rather than attaching once and stopping.
+    setInterval(function () {
+      var overlay = lineBox();
+      if (!overlay || overlay === lineOverlay) return;
+      if (observer) observer.disconnect();
       lineOverlay = overlay;
-      // Going fullscreen moves the player about, and the marks on the line
-      // are ranges into text that is no longer where they were made. There
-      // is no mutation to notice, so the change of screen is the signal.
-      document.addEventListener('fullscreenchange', function () {
-        setTimeout(refreshLine, 60);
-        setTimeout(refreshLine, 500);
-      });
+      lastLine = null;      // a new box is a new line, whatever it says
       observer = new MutationObserver(function () { checkLine(overlay); });
       observer.observe(overlay, { characterData: true, childList: true, subtree: true });
       checkLine(overlay);

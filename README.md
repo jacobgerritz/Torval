@@ -1364,15 +1364,15 @@ npx web-ext sign --source-dir extension --channel unlisted \
 
 ### Bringing known words in from Anki
 
-`anki/torval_export/` is an Anki add-on that hands the words you already
-know to Torval, as a file for **Settings → Words → Keeping a copy → Load
-from a file**, or on the clipboard for **Add from a text**. Mature, young,
-learning and relearning cards, each a tick box. It has a README of its
-own.
-
 Torval learns what you know from what you mark while reading, which is
 fine from the day you install it and useless about the years before that.
 Anki already knows.
+
+`anki/known_words_export/` is an Anki add-on that gets that list back out:
+a text file, the clipboard, or JSON in Torval's own format for **Settings
+→ Words → Keeping a copy → Load from a file**. Mature, young, learning and
+relearning cards, each a tick box, one deck at a time. Only one of its
+three buttons is about Torval at all; it has a README of its own.
 
 ### The first run
 

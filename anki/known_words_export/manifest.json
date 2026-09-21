@@ -1,0 +1,10 @@
+{
+  "package": "known_words_export",
+  "name": "Export Known Words",
+  "description": "Export every word you already know as a text file, to the clipboard, or as JSON for Torval. Mature, young, learning and relearning cards, with the field cleaned of HTML, furigana, sound tags and cloze markers.",
+  "author": "Jacob Gerritz",
+  "homepage": "https://github.com/jacobgerritz/Torval/tree/main/anki/known_words_export",
+  "version": "1.0.0",
+  "manifest_version": 2,
+  "anki_version_min": "2.1.50"
+}
