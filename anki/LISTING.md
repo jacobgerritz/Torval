@@ -39,8 +39,11 @@ tried.
 
 ## Description
 
-Markdown and basic HTML both work in this field. Everything below the line is
-the description, ready to paste.
+Markdown and basic HTML both work in this field, but not all of markdown:
+**tables do not render**, and a table pasted in comes out as a row of pipes
+and dashes in the middle of a paragraph. Lists, headings, bold, italics,
+`code` and links are all fine. Everything below the line is the description,
+ready to paste.
 
 ---
 
@@ -77,12 +80,10 @@ case; the JSON exists because a text file cannot carry a date.
 
 Four kinds of card, each a tick box, all on by default:
 
-| | |
-|---|---|
-| **Mature** | a review card at 21 days or more, Anki's own definition |
-| **Young** | a review card under 21 days |
-| **Learning** | a card you are part way through learning |
-| **Relearning** | one you forgot and are learning again |
+* **Mature**: a review card at 21 days or more, Anki's own definition.
+* **Young**: a review card under 21 days.
+* **Learning**: a card you are part way through learning.
+* **Relearning**: one you forgot and are learning again.
 
 Mature cards on their own are the obvious thing to export and the wrong
 thing. A word you are three days into learning is still a word you know when
