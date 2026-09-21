@@ -41,11 +41,16 @@ a little HTML. This is written to read correctly as plain text.
 >
 > It does three more things that a dictionary usually leaves to you.
 >
-> IT SAYS HOW MUCH YOU ALREADY KNOW. One number across the top of the page:
+> IT SAYS HOW MUCH YOU ALREADY KNOW, IF YOU WANT IT TO. One number across
+> the top of the page:
 > the share of what is in front of you that is built from words you have
 > marked as known. On a video, that is measured against the whole
 > transcript before you start watching, which is what actually decides
-> whether a video is worth your evening.
+> whether a video is worth your evening. This half is optional and starts
+> switched off, because a word list begins empty and a percentage built on
+> an empty list is no use to anybody for the first fortnight. Left off,
+> Torval is a pop-up dictionary that makes Anki cards, with nothing to set
+> up at all.
 >
 > IT TIMES SUBTITLES. On YouTube and Netflix, Torval works out where every
 > line begins and ends. Step between lines with A and D, replay the one you
@@ -98,7 +103,7 @@ permission does and where in the source it is used, which is what turns a
 justification from a claim into something checkable.
 
 **`storage`**
-> Your known and ignored word lists, your Anki deck and field settings,
+> Your known and ignored word lists, where you have asked for those, your Anki deck and field settings,
 > which language you are reading, any keyboard shortcut you have changed,
 > how fast to play the quiet parts of a video, and where you dragged the
 > subtitle overlay. All of it local to the browser profile; none of it is sent

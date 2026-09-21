@@ -800,6 +800,33 @@ unprotected trailer.
 
 ## Known words
 
+### It is off until you ask for it
+
+Torval does two things and only one of them is a dictionary. The other is the
+counting: marking a word known or ignored, colouring what is left, and the
+percentage across the top saying how much of a page is built from words you
+have. That half is what makes Torval more than a dictionary, and it is also
+the half that asks something of you first. A word list starts empty, so the
+number is wrong until a few hundred words are in it, and somebody who only
+wanted to know what a word means has been handed a chore they did not ask for
+and a percentage that lies to them for a fortnight.
+
+So it is off on a fresh install, and the switch is the first thing on the
+**Words** panel. With it off Torval is a pop-up dictionary that makes Anki
+cards: hover, read, press +. No bar across the page, no colours, no ✓ and ⊘
+in the popup, those keys do nothing, no page is read at all, and no daily
+copy of a list that does not exist. Nothing to set up and nothing to explain.
+
+It is never turned off under anybody. An install that already has words in
+its list has answered this question already, so `wakeTracking` in
+`background.js` looks at the counts once on the way past and turns it on;
+after that the switch is the only thing that moves it, including back off
+again. The answer lives in storage rather than being passed around, because
+a content script, the background and the settings page all need it at once
+and storage is the only thing all three share. See `track.js`.
+
+### The lists themselves
+
 The list of words you already know, kept under **Words** in Torval's settings,
 alongside the ignored list: they are the same decision with different answers,
 and a word moves between them, so they sit on one page. Words get on the known

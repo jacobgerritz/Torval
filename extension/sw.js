@@ -19,6 +19,7 @@
 
 importScripts(
   'log.js',
+  'track.js',
   'japanese.js',
   'scan.js',
   'italian.js',

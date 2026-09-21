@@ -2386,6 +2386,73 @@ const run = async () => {
   check('every position inside a node is found, whichever it is',
     [0, 1, 2, 3, 4, 6, 7, 8, 9].every((i) => at(i) !== null));
 
+  // --- keeping score, or not ---------------------------------------------
+  // Marking words is off until asked for: a word list starts empty, so the
+  // percentage is wrong until a few hundred words are in it, and somebody
+  // who wanted a dictionary should not be handed a chore and a number that
+  // lies to them for a fortnight. The real track.js, against a Map standing
+  // in for storage.
+  {
+    const loadTrack = (stored) => {
+      let heard = null;
+      const box = stored || {};
+      const sandbox = {
+        console: { log() {}, warn() {}, error() {} },
+        chrome: {
+          storage: {
+            onChanged: { addListener(fn) { heard = fn; } },
+            local: {
+              async get(keys) {
+                const names = typeof keys === 'string' ? [keys]
+                  : Array.isArray(keys) ? keys : Object.keys(keys || box);
+                const out = {};
+                for (const n of names) if (n in box) out[n] = box[n];
+                return out;
+              },
+              async set(values) {
+                const changes = {};
+                for (const k of Object.keys(values)) {
+                  changes[k] = { newValue: values[k], oldValue: box[k] };
+                  box[k] = values[k];
+                }
+                if (heard) heard(changes, 'local');
+              }
+            }
+          }
+        }
+      };
+      sandbox.globalThis = sandbox;
+      vm.createContext(sandbox);
+      vm.runInContext(readFileSync(join(ROOT, 'extension', 'track.js'), 'utf8'),
+        sandbox, { filename: 'track.js' });
+      return { track: sandbox.TorvalTrack, box, tell: (c) => heard && heard(c, 'local') };
+    };
+
+    const fresh = loadTrack({});
+    check('a fresh install keeps no score', (await fresh.track.ready()) === false);
+
+    const asked = loadTrack({ trackWords: true });
+    check('an install that asked for it does', (await asked.track.ready()) === true);
+
+    // The switch is on the settings page and the answer is wanted on every
+    // page already open, so it travels through storage rather than being
+    // passed around.
+    let heardOn = null;
+    fresh.track.onChange((on) => { heardOn = on; });
+    await fresh.track.set(true);
+    check('turning it on is remembered', fresh.box.trackWords === true);
+    check('and everything watching is told', heardOn === true && fresh.track.on() === true);
+
+    heardOn = null;
+    fresh.tell({ trackWords: { newValue: false } });
+    check('a switch thrown in another tab reaches this one',
+      heardOn === false && fresh.track.on() === false);
+
+    heardOn = null;
+    fresh.tell({ trackWords: { newValue: false } });
+    check('and saying the same thing twice says nothing', heardOn === null);
+  }
+
   // --- the one thing that is Chrome's alone ------------------------------
   // Recording a copy-protected video's sound is the only ability in Torval
   // that one browser has and the other does not: Firefox has no tabCapture
@@ -2497,7 +2564,7 @@ const run = async () => {
     // so the sandbox needs the same language-registry files the manifest
     // loads before background.js in the real extension.
     for (const f of ['japanese.js', 'scan.js', 'italian.js', 'italian-scan.js',
-      'spanish.js', 'spanish-scan.js', 'lang.js']) {
+      'spanish.js', 'spanish-scan.js', 'lang.js', 'track.js']) {
       vm.runInContext(readFileSync(join(ROOT, 'extension', f), 'utf8'), sandbox, { filename: f });
     }
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
@@ -2794,6 +2861,32 @@ const run = async () => {
     check('and can be taken off it again',
       forgotten.ok && !('constructor' in stored.knownWords) &&
       forgotten.result.removed === 1, JSON.stringify(forgotten.result));
+
+    // --- an install that already keeps score goes on keeping score --------
+    // Marking words is off for anybody installing today, and taking it away
+    // from somebody who has been marking words for a year would be theft:
+    // the switch did not exist when they started, so they have not answered
+    // the question, and their list is the answer. Asked once, written down,
+    // and never asked again, including after they turn it off on purpose.
+    {
+      delete stored.trackWords;
+      stored.wordCounts = {};
+      await sandbox.wakeTracking();
+      check('a fresh install is left keeping no score', stored.trackWords === false,
+        JSON.stringify(stored.trackWords));
+
+      delete stored.trackWords;
+      stored.wordCounts = { knownWords: 4312 };
+      await sandbox.wakeTracking();
+      check('an install with a word list behind it keeps score',
+        stored.trackWords === true, JSON.stringify(stored.trackWords));
+
+      stored.trackWords = false;
+      stored.wordCounts = { knownWords: 4312 };
+      await sandbox.wakeTracking();
+      check('and turning it off on purpose is not undone on the next start',
+        stored.trackWords === false, JSON.stringify(stored.trackWords));
+    }
 
     // Back to the two lists the emptying checks are written against.
     stored.knownWords = { '本': 1, '人': 2 };

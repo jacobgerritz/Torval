@@ -152,6 +152,16 @@
     if (!off) bringBack();
   });
 
+  // Thrown on the settings page, felt on every page already open. Turned
+  // off, the colours come off and the bar goes; turned on, the page is read
+  // for the first time. An open popup is left alone and picks up its two
+  // extra buttons the next time it is drawn, which is the next hover.
+  TorvalTrack.onChange((on) => {
+    if (typeof TorvalHighlight !== 'undefined' && !on) TorvalHighlight.clear();
+    lastTranscript = '';
+    if (!off) readPage();
+  });
+
   /** Everything Torval had put on this page, taken off it again. */
   function putAway() {
     hide();
@@ -209,9 +219,12 @@
       hide();
       return;
     }
-    if (TorvalKeys.matches('unknown', e) && markHover(e, 'unknown')) return;
-    if (TorvalKeys.matches('known', e) && markHover(e, 'known')) return;
-    if (TorvalKeys.matches('ignored', e) && markHover(e, 'ignored')) return;
+    // The same three as the buttons above, and absent for the same reason.
+    if (TorvalTrack.on()) {
+      if (TorvalKeys.matches('unknown', e) && markHover(e, 'unknown')) return;
+      if (TorvalKeys.matches('known', e) && markHover(e, 'known')) return;
+      if (TorvalKeys.matches('ignored', e) && markHover(e, 'ignored')) return;
+    }
     if (TorvalKeys.matches('browse', e) && browseInAnki(e)) return;
     if (!TorvalKeys.matches('lookup', e) || shiftDown || !isCurrent()) return;
     shiftDown = true;
@@ -1101,6 +1114,12 @@
    */
   async function readPage(options) {
     if (!isCurrent()) return;
+    // Nothing to read a page for. The percentage and the colours are the
+    // only two reasons this runs, and with neither wanted the whole thing
+    // is skipped: no message to the background, no thousands of words
+    // looked up, and no bar across a page that has nothing to say on it.
+    // The popup is untouched, which is the point of the switch.
+    if (!TorvalTrack.on()) { TorvalBar.quiet(noSubtitlesHere()); return; }
     // A read already running is not a reason to drop this one. Reading a
     // long page takes seconds, and the commonest moment to ask for another
     // is a second after the address changed, which is very often still
@@ -1586,10 +1605,13 @@
     // looked up, none of them the same: ⊘ means "never mention this again",
     // ✓ means "I already have this", + means "teach me this". The first two
     // are what the comprehension percentage is built out of, so either one
-    // moves the bar at the top of the page immediately.
+    // moves the bar at the top of the page immediately, and neither is here
+    // at all where nothing is being counted: a tick that feeds no number is
+    // a button whose only effect is to make you wonder what it did.
     const buttons = document.createElement('span');
     buttons.className = 'buttons';
-    buttons.append(stateButton(hit, 'ignore'), stateButton(hit, 'know'), add);
+    if (TorvalTrack.on()) buttons.append(stateButton(hit, 'ignore'), stateButton(hit, 'know'));
+    buttons.append(add);
     head.appendChild(buttons);
     el.appendChild(head);
 

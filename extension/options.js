@@ -523,6 +523,36 @@ if (appearance) TorvalLook.ready().then(drawAppearance);
 
 
 // ---------------------------------------------------------------------------
+// Keeping score, or not
+// ---------------------------------------------------------------------------
+
+/*
+ * The switch that decides whether Torval is a dictionary or a dictionary
+ * that keeps a record of you. See track.js for why it is off until asked
+ * for, and for why an install that already has words keeps it on.
+ *
+ * Everything else on this panel is about lists that only exist when it is
+ * on, so it all goes away with it rather than sit there being about
+ * nothing. The switch itself stays, because a tab that empties completely
+ * would leave nowhere to turn it back on from.
+ */
+const track = document.getElementById('track');
+const wordsRest = document.getElementById('words-rest');
+
+if (track && wordsRest) {
+  paintTrack(TorvalTrack.on());
+  TorvalTrack.ready().then(paintTrack);
+  TorvalTrack.onChange(paintTrack);
+  track.addEventListener('change', () => TorvalTrack.set(track.checked));
+}
+
+function paintTrack(on) {
+  track.checked = !!on;
+  wordsRest.hidden = !on;
+}
+
+
+// ---------------------------------------------------------------------------
 // Recording a copy-protected video's sound
 // ---------------------------------------------------------------------------
 

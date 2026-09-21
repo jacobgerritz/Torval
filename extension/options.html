@@ -50,7 +50,23 @@
   <!-- ------------------------------------------------------------------ -->
 
   <div class="panel" id="panel-words">
-    <div class="parting first"><h2>Known words</h2><span class="count" id="count">…</span></div>
+    <section>
+      <h2>Keeping score</h2>
+      <p class="note">
+        Marking words is what the percentage across the top of a page is
+        measured against, and what decides which words get coloured. It is
+        off until you want it: a word list starts empty, so the number is
+        wrong until a few hundred words are in it. With it off, Torval is a
+        pop-up dictionary that makes Anki cards, and nothing else.
+      </p>
+      <label class="check">
+        <input type="checkbox" id="track">
+        <span>Keep track of the words I know</span>
+      </label>
+    </section>
+
+    <div id="words-rest">
+    <div class="parting"><h2>Known words</h2><span class="count" id="count">…</span></div>
     <p class="note count-note">
       What a page is measured against. Press ✓ in the popup, or 2.
     </p>
@@ -142,6 +158,7 @@
         <button id="clear-ignored">Forget all ignored words</button>
       </p>
     </section>
+    </div>
   </div>
 
   <!-- ------------------------------------------------------------------ -->
@@ -357,6 +374,7 @@
 <script src="spanish-scan.js"></script>
 <script src="lang.js"></script>
 <script src="log.js"></script>
+<script src="track.js"></script>
 <script src="keys.js"></script>
 <script src="look.js"></script>
 <script src="anki.js"></script>

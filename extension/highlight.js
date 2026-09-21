@@ -519,6 +519,14 @@ var TorvalHighlight = (function () {
   }
 
   async function checkLine(overlay) {
+    // A subtitle line is the one thing that colours itself without the page
+    // being read, so it needs telling separately that nothing is being
+    // counted. Without this the words on a video stayed marked while every
+    // other page went plain.
+    if (typeof TorvalTrack !== 'undefined' && !TorvalTrack.on()) {
+      if (lineRanges.size) { lineRanges = new Map(); apply(); }
+      return;
+    }
     var text = overlay.textContent;
     if (text === lastLine && stillOnThePage()) return;
     lastLine = text;

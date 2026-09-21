@@ -48,6 +48,7 @@
     "service_worker": "sw.js",
     "scripts": [
       "log.js",
+      "track.js",
       "japanese.js",
       "scan.js",
       "italian.js",
@@ -91,6 +92,7 @@
         "spanish-scan.js",
         "lang.js",
         "log.js",
+        "track.js",
         "keys.js",
         "look.js",
         "stress.js",

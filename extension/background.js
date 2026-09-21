@@ -1063,6 +1063,10 @@ const LAST_COPY = 'wordsCopiedOn';
 
 async function keepACopy() {
   if (!api.downloads || !api.downloads.download) return;
+  // Nothing to keep a copy of, and nothing to explain either: a file
+  // appearing in Downloads once a day is hard to account for on an install
+  // that was never asked to remember a single word.
+  if (!TorvalTrack.on()) return;
   const today = new Date().toISOString().slice(0, 10);
   const stored = await api.storage.local.get([LAST_COPY, COUNTS]);
   if (stored[LAST_COPY] === today) return;
@@ -1332,11 +1336,37 @@ if (api.runtime.onInstalled) {
   });
 }
 
+/**
+ * An install that already keeps score goes on keeping score.
+ *
+ * Marking words is off until asked for, which is right for somebody
+ * installing Torval today and would be theft from somebody who has been
+ * using it for a year: the switch did not exist when they started, so
+ * nobody has answered the question, and defaulting their answer to no would
+ * take the bar, the colours and the point of their word list away in an
+ * update. A list with anything in it is the answer.
+ *
+ * Written down rather than worked out each time, so that every page, the
+ * settings and the background all read one stored value and cannot disagree
+ * about it. Once only: after this the switch on the settings page is the
+ * only thing that moves it, including back off again.
+ */
+async function wakeTracking() {
+  const stored = await api.storage.local.get([TorvalTrack.KEY, COUNTS]);
+  if (typeof stored[TorvalTrack.KEY] === 'boolean') return;
+
+  const counts = stored[COUNTS] || {};
+  const anyWords = Object.keys(counts).some((key) => counts[key] > 0);
+  await TorvalTrack.set(anyWords);
+  if (anyWords) trace('Torval: word lists found, so marking words stays on');
+}
+
 async function start() {
   // Before anything else: a list that has gone missing since last time is
   // put back, and a copy of both is written somewhere the extension cannot
   // lose. Neither depends on the dictionary, and both matter most in exactly
   // the case where the dictionary is about to be rebuilt from nothing.
+  await wakeTracking().catch(() => {});
   await rescueLists().catch((err) => console.warn('Torval: could not check the word lists:', err && err.message));
   keepACopy().catch(() => {});
 
