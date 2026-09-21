@@ -1573,6 +1573,62 @@ const run = async () => {
   }
 
   // --- asking Netflix for a format that can be read -------------------------
+  // --- and the content script's half of the same seek --------------------
+  // This is the bug that made A and D do nothing on Netflix in Chrome, and
+  // made a mined clip come out as the second half of a sentence: the seek
+  // silently failed, so the recorder taped from wherever playback already
+  // was. wrappedJSObject is Firefox's way through to a page's own
+  // JavaScript and Chrome has no equivalent, so the fallback is not a
+  // nicety, it is the only route that browser has.
+  {
+    const heard = [];
+    const sandbox = {
+      console: { log() {}, warn() {}, error() {} },
+      window: {
+        postMessage: (message) => heard.push(message),
+        addEventListener() {},
+        // Firefox puts the page's real objects here. Chrome does not.
+        wrappedJSObject: undefined
+      },
+      document: { addEventListener() {}, querySelector: () => null },
+      location: { href: 'https://www.netflix.com/watch/81234567',
+        pathname: '/watch/81234567' },
+      setTimeout: (fn, ms) => { const t = setTimeout(fn, ms); if (t.unref) t.unref(); return t; },
+      clearTimeout,
+      setInterval: (fn, ms) => { const t = setInterval(fn, ms); if (t.unref) t.unref(); return t; },
+      clearInterval
+    };
+    sandbox.globalThis = sandbox;
+    vm.createContext(sandbox);
+    vm.runInContext(readFileSync(join(ROOT, 'extension', 'netflix.js'), 'utf8'),
+      sandbox, { filename: 'netflix.js' });
+
+    sandbox.TorvalNetflix.seek(12.5);
+    const asked = heard.filter((m) => m && m.torval === 'torval-netflix-seek');
+    check('with no way through to the page, the seek is asked for by message',
+      asked.length === 1, JSON.stringify(heard));
+    check('in milliseconds, which is what the player takes',
+      asked[0] && asked[0].ms === 12500, JSON.stringify(asked[0]));
+
+    heard.length = 0;
+    sandbox.TorvalNetflix.seek(-3);
+    check('and never before the start of the video',
+      heard[0] && heard[0].ms === 0, JSON.stringify(heard[0]));
+
+    // Firefox, where the player is right there: no message, just the call.
+    let direct = null;
+    sandbox.window.wrappedJSObject = {
+      netflix: { appContext: { state: { playerApp: { getAPI: () => ({ videoPlayer: {
+        getAllPlayerSessionIds: () => ['watch-9'],
+        getVideoPlayerBySessionId: () => ({ seek: (ms) => { direct = ms; } })
+      } }) } } } }
+    };
+    heard.length = 0;
+    sandbox.TorvalNetflix.seek(4);
+    check('where the page can be reached, it is reached directly',
+      direct === 4000 && heard.length === 0, direct + ' / ' + JSON.stringify(heard));
+  }
+
   // netflix-page.js runs as page code, so its whole world is the page: two
   // hooks on JSON and a fetch. A sandbox with a JSON of its own is therefore
   // the entire test rig it needs, and what runs here is what runs there.
@@ -1636,6 +1692,34 @@ const run = async () => {
     /** The content script answering, which is a message from the same window. */
     const fromContentScript = (message) =>
       listeners.forEach((fn) => fn({ source: sandbox.window, data: message }));
+
+    // --- moving the video on behalf of a content script that cannot ------
+    // Setting currentTime on Netflix's element ends the session with error
+    // F7375, so A and D go through the player's own seek. On Firefox the
+    // content script reaches that player through wrappedJSObject; Chrome
+    // has nothing of the kind, so the call has to be made in here.
+    {
+      let askedFor = null;
+      sandbox.window.netflix = {
+        appContext: { state: { playerApp: { getAPI: () => ({ videoPlayer: {
+          getAllPlayerSessionIds: () => ['preview-1', 'watch-9'],
+          getVideoPlayerBySessionId: (id) => id === 'watch-9'
+            ? { seek: (ms) => { askedFor = ms; } } : null
+        } }) } } }
+      };
+      fromContentScript({ torval: 'torval-netflix-seek', ms: 12500 });
+      check('the page script seeks when the content script asks it to',
+        askedFor === 12500, String(askedFor));
+      check('and it is the episode it moves, not the trailer beside it',
+        askedFor !== null);
+
+      askedFor = null;
+      fromContentScript({ torval: 'torval-netflix-seek', ms: -5 });
+      fromContentScript({ torval: 'torval-netflix-seek', ms: 'soon' });
+      fromContentScript({ torval: 'torval-netflix-seek' });
+      check('and nonsense moves nothing', askedFor === null, String(askedFor));
+      delete sandbox.window.netflix;
+    }
 
     const request = { url: '/nq/msl_v1/cadmium/pbo_manifests',
       manifest: { profiles: ['playready-h264'] } };

@@ -31,6 +31,16 @@ var TorvalNetflix = (function () {
   }
 
   /** The page's own window, as against the extension's view of it. */
+  /**
+   * The page's own objects, seen from this content script.
+   *
+   * Firefox only. `wrappedJSObject` is its way through the Xray wrapper
+   * that otherwise hides a page's real JavaScript from an add-on, and
+   * Chrome has no equivalent at all: its isolated world is a wall with no
+   * door in it. So this returns null there, and everything below that
+   * needs the page has to go the long way round, through netflix-page.js,
+   * which lives in the page world and can just reach out and touch things.
+   */
   function pageWindow() {
     try {
       return window.wrappedJSObject || null;
@@ -240,15 +250,25 @@ var TorvalNetflix = (function () {
     /** See describePlayer. Called by subtitles.js when nothing was caught. */
     describe: describePlayer,
 
-    /** Ask Netflix's own player to move. Its video element must not be. */
+    /**
+     * Ask Netflix's own player to move. Its video element must not be.
+     *
+     * Two routes to the same call. On Firefox the player object is right
+     * there through wrappedJSObject. On Chrome it is not there at all, and
+     * this quietly did nothing: A and D dead, and the recorder taping
+     * whatever was already playing instead of the line it had been asked
+     * for, which came out as the second half of a sentence. So Chrome goes
+     * the way everything else here goes, by message to the page script.
+     */
     seek: function (seconds) {
+      var ms = Math.max(0, Math.round(seconds * 1000));
       try {
         var moving = player();
-        if (moving) moving.seek(Math.max(0, Math.round(seconds * 1000)));
-        else say('the player would not say where it is, so A and D cannot move it');
+        if (moving) { moving.seek(ms); return; }
       } catch (err) {
-        say('seeking failed:', err && err.message);
+        say('the page object would not seek:', err && err.message);
       }
+      window.postMessage({ torval: 'torval-netflix-seek', ms: ms }, '*');
     }
   };
 })();

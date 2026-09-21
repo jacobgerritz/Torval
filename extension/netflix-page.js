@@ -563,6 +563,26 @@
     arrange();
   });
 
+  /*
+   * Moving the video, on behalf of a content script that cannot.
+   *
+   * Setting currentTime on the element ends a Netflix session with error
+   * F7375, so A and D have always gone through the player's own seek. On
+   * Firefox the content script reaches that player directly, through
+   * wrappedJSObject. Chrome has nothing of the kind, so the same call has
+   * to be made from in here, where the player is simply a variable.
+   */
+  window.addEventListener('message', function (e) {
+    if (e.source !== window) return;
+    var data = e.data;
+    if (!data || data.torval !== 'torval-netflix-seek') return;
+    var ms = Number(data.ms);
+    if (!isFinite(ms) || ms < 0) return;
+    var moving = playing();
+    if (!moving) return;
+    try { moving.seek(Math.round(ms)); } catch (err) { /* the player went away */ }
+  });
+
   /** The player for whatever is playing, which is page code's to reach. */
   function playing() {
     try {
