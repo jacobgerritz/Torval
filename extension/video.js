@@ -171,20 +171,23 @@ var TorvalVideo = (function () {
   async function capture(sentence, cue, options) {
     var video = currentVideo();
     if (!video) return {};
-    // Nothing to attempt on a video the browser is decrypting: the frame
-    // comes back black or refused and the audio comes back empty, which is
-    // what the protection is for. Saying so is the point of stopping here.
-    // Before, both attempts quietly returned nothing and the card arrived
-    // without a picture or a sound and without a word about why.
-    if (contentProtected(video)) return { blocked: true };
     var out = {};
     var lead = leadFrom(options);
+    var sealed = contentProtected(video);
 
-    // Before anything moves: the picture you were actually looking at.
+    // Before anything moves: the picture you were actually looking at. This
+    // is attempted on a protected video too, because whether it works there
+    // is not up to the protection alone, see grabFrame.
     var frame = grabFrame(video);
     if (frame) out.image = { filename: name(sentence, 'jpg'), data: frame };
 
-    if (cue && cue.end > cue.start) {
+    // The sound is a different matter, and there are two reasons not to try
+    // for it here rather than one. The stream a protected element hands over
+    // is empty, and getting to the start of the line means setting
+    // currentTime, which on Netflix ends the playback session outright with
+    // its error F7375. So the line is not replayed at all: no seek, no
+    // recording, and no announcement of a recording that cannot happen.
+    if (!sealed && cue && cue.end > cue.start) {
       var key = clipKey(video, sentence, cue, lead);
       if (lastClip && lastClip.key === key) {
         out.sentenceAudio = lastClip.audio;
@@ -204,6 +207,13 @@ var TorvalVideo = (function () {
       // to be allowed to be tried again.
       if (out.sentenceAudio) lastClip = { key: key, audio: out.sentenceAudio };
     }
+
+    // What could not be had, and separately, because the two have different
+    // answers: the sound cannot be had from a protected video at all, and
+    // the picture usually can, once the browser stops decoding on the GPU.
+    var lostImage = !!(video.videoWidth && !out.image);
+    var lostAudio = !!(sealed && cue && cue.end > cue.start);
+    if (lostImage || lostAudio) out.blocked = { image: lostImage, audio: lostAudio };
     return out;
   }
 
@@ -304,6 +314,32 @@ var TorvalVideo = (function () {
     return !!(video && video.mediaKeys);
   }
 
+  /**
+   * Is there a picture in here, or a black rectangle?
+   *
+   * A frame decoded on the GPU behind content protection does not refuse to
+   * be drawn: it draws as one flat colour, nothing throws, the canvas is not
+   * tainted, and what lands on the card is a black JPEG. That is worse than
+   * no picture, because a black picture looks like a card that worked.
+   *
+   * A real frame is never one single value across the whole of it, however
+   * dark it is; sensor noise and compression see to that. A deliberate fade
+   * to black is the exception, and being told a fade was copy-protected is
+   * a cheap thing to be wrong about once in a while.
+   */
+  function allOneColour(data) {
+    if (!data || data.length < 4) return true;
+    // Every hundredth pixel is plenty: a frame that differs anywhere differs
+    // in far more places than that, and this runs while somebody waits.
+    var step = 4 * 97;
+    for (var i = 4; i < data.length; i += step) {
+      if (data[i] !== data[0] || data[i + 1] !== data[1] || data[i + 2] !== data[2]) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   function grabFrame(video) {
     if (!video.videoWidth) return null;
     var scale = Math.min(1, MAX_WIDTH / video.videoWidth);
@@ -311,10 +347,13 @@ var TorvalVideo = (function () {
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
     try {
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (allOneColour(pixels.data)) return null;
       return canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1];
     } catch (err) {
-      return null;   // content-protected: the canvas will not give it up
+      return null;   // the canvas was tainted and will not be read at all
     }
   }
 
@@ -452,7 +491,9 @@ var TorvalVideo = (function () {
     // Exposed for the tests: what counts as the same recording.
     _clipKey: clipKey, _forgetClip: function () { lastClip = null; },
     // Exposed for the tests: the file the card actually carries.
-    _toMono: toMono, _wavFile: wavFile
+    _toMono: toMono, _wavFile: wavFile,
+    // Exposed for the tests: telling a picture from a black rectangle.
+    _allOneColour: allOneColour
   };
 })();
 

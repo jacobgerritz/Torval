@@ -2234,6 +2234,36 @@ const run = async () => {
   check('and no video at all is not a protected video',
     Video.contentProtected(null) === false);
 
+  // The protection does not refuse to be drawn, it draws black. Nothing
+  // throws, the canvas is not tainted, and what would have gone on the card
+  // is a black JPEG, which is worse than no picture because it looks like a
+  // card that worked. Whether it happens at all is not up to the protection
+  // alone: with the browser decoding rather than the GPU, the same frame
+  // draws as itself, which is why Torval tries and then looks.
+  const oneColour = (r, g, b, n) => {
+    const out = new Uint8ClampedArray(n * 4);
+    for (let i = 0; i < n; i++) { out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b; out[i * 4 + 3] = 255; }
+    return out;
+  };
+  check('a frame that is black all the way across is not a frame',
+    Video._allOneColour(oneColour(0, 0, 0, 5000)) === true);
+  check('nor is one that is flat any other colour',
+    Video._allOneColour(oneColour(17, 17, 17, 5000)) === true);
+
+  // Nearly flat, and very dark, which is the hardest real frame to tell from
+  // a blank one: a night scene, or a shot fading out.
+  const dark = oneColour(3, 3, 4, 5000);
+  for (let i = 0; i < 5000; i += 11) dark[i * 4] = 5;
+  check('a dark picture with anything in it is a picture',
+    Video._allOneColour(dark) === false);
+
+  const noisy = oneColour(0, 0, 0, 5000);
+  for (let i = 0; i < 5000; i++) noisy[i * 4 + 1] = i % 251;
+  check('and an ordinary one certainly is', Video._allOneColour(noisy) === false);
+  check('an empty canvas counts as nothing drawn',
+    Video._allOneColour(new Uint8ClampedArray(0)) === true &&
+    Video._allOneColour(null) === true);
+
   // --- how long a line actually lasts ---------------------------------------
   // An automatic caption revises itself as the recogniser hears more, and
   // every revision is filed as a cue of its own. What you read as one line is

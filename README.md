@@ -735,17 +735,39 @@ MP3 encoder, which is a large piece of somebody else’s code for a problem
 that only exists on a phone. 24 kHz carries everything a voice does and keeps
 it in proportion.
 
-**Content-protected video cannot be captured.** Netflix, Prime Video and Disney+
-hand their video to the browser's DRM layer, and both the frame and the audio
-come back empty, that is what the protection is for, not a limitation to be
-worked around. Where capture is refused the card is still made, without media.
+**Content-protected video, and what that actually stops.** Netflix, Prime Video
+and Disney+ hand their video to the browser's DRM layer. The two halves of
+mining fail there for different reasons and only one of them is fixed, which
+is worth separating, because "DRM, nothing to be done" is both the easy answer
+and the wrong one. Other mining tools do get pictures off Netflix.
 
-Torval asks the video element rather than keeping a list of sites: the page
-sets `mediaKeys` on it when it starts decrypting, which stays right on the day
+*The picture usually can be had.* A protected frame does not refuse to be
+drawn. It draws as one flat black rectangle: nothing throws, the canvas is not
+tainted, and what would go on the card is a black JPEG, which is worse than no
+picture because it looks like a card that worked. Whether that happens is not
+up to the protection alone but to who decoded the frame. With the browser's
+hardware acceleration on, the frame lives in a GPU texture on the protected
+path and comes back black; with it off, the browser decodes in ordinary memory
+and the same frame draws as itself. So Torval takes the frame, then looks at
+it: a frame that is one single value across its whole area is not a frame, and
+is thrown away rather than put on a card. A real picture is never that flat,
+however dark, and the one thing that is, a deliberate fade to black, is a
+cheap thing to be wrong about.
+
+*The sound cannot, not this way.* Two separate walls. `captureStream()` on a
+decrypting element hands over no audio track at all, and getting to the start
+of the line means setting `currentTime`, which on Netflix ends the playback
+session outright with its error F7375. So nothing is attempted: no seek, no
+recording, and no announcement of a recording that cannot happen. Taking it
+from the tab's own audio output instead, which is what asbplayer and Migaku
+do, is a different mechanism from the one here and is not built.
+
+Whichever half is missing, the card is still made, and the popup says which
+and why, naming hardware acceleration where that is the fix. Torval asks the
+video element whether it is decrypting rather than keeping a list of sites:
+the page sets `mediaKeys` on it when it starts, which stays right on the day
 a fourth service launches and on the day one of these three plays an
-unprotected trailer. Nothing is attempted on such a video, so the line is not
-replayed for a recording that cannot happen, and the card says why it has no
-picture and no sound instead of arriving short and silent about it.
+unprotected trailer.
 
 
 ---

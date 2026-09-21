@@ -1875,6 +1875,29 @@
    * anything else could happen. The + then sat on a dot for ever, since
    * nobody was listening for the failure.
    */
+  /**
+   * What the video would not give up, said where it happened.
+   *
+   * The sound and the picture fail for related but different reasons, and
+   * only one of them is something the reader can do anything about, so they
+   * are not run together into one apology. Hardware acceleration is named
+   * because it is the whole of the fix for the picture: with the GPU
+   * decoding, a protected frame draws as a black rectangle; with the
+   * browser decoding, it draws as itself.
+   */
+  function missing(blocked) {
+    if (!blocked) return '';
+    if (blocked.image && blocked.audio) {
+      return ' No picture or sound: this video is copy-protected. Turning off ' +
+        "your browser's hardware acceleration gets the picture back.";
+    }
+    if (blocked.image) {
+      return " No picture: turning off your browser's hardware acceleration " +
+        'gets it back.';
+    }
+    return ' No sound: a copy-protected video will not hand it over.';
+  }
+
   function saying(entryEl, text) {
     const said = document.createElement('div');
     said.className = 'note doing';
@@ -1932,7 +1955,7 @@
     // A video the browser is decrypting gives up neither its picture nor its
     // sound. The card is still worth making, but the reason it arrives
     // without them belongs on the screen, not only in the README.
-    let blocked = false;
+    let blocked = null;
     if (fromVideo && typeof TorvalVideo !== 'undefined') {
       // Only say it when it is true. A second word out of the same subtitle
       // reuses the line already recorded, so nothing is played back and
@@ -1948,7 +1971,7 @@
       } finally {
         if (doing) doing.remove();
       }
-      blocked = !!media.blocked;
+      blocked = media.blocked || null;
       delete media.blocked;   // not a file, and nothing past here wants it
     }
 
@@ -2009,14 +2032,12 @@
       // The tick alone is easy to miss, and a card quietly not being made
       // looks exactly the same as one that was. So it says so, and then
       // takes itself away again rather than leaving the popup taller.
-      const said = saying(entryEl, blocked
-        ? 'Added to Anki, without the picture or the sound: this video is copy-protected.'
-        : 'Added to Anki.');
+      const said = saying(entryEl, 'Added to Anki.' + missing(blocked));
       said.className = 'note added';
       // Long enough to read. The plain "Added to Anki." is four words and
       // gone; the sentence about copy protection is one somebody has to
       // finish before it takes itself away.
-      setTimeout(function () { said.remove(); }, blocked ? 6000 : 2500);
+      setTimeout(function () { said.remove(); }, blocked ? 8000 : 2500);
       return;
     }
     button.classList.remove('working');
