@@ -152,10 +152,16 @@ if (api.webRequest && api.webRequest.onBeforeRequest) {
  * the same thing, declared up front rather than decided per request, which
  * is the whole of what Chrome took blocking listeners away for. The two
  * never both apply, since only one of them is in any given browser's
- * manifest, and the registration below is wrapped because a browser that
- * will not have it says so by throwing.
+ * manifest, and the registration below asks the manifest rather than the
+ * browser. Chrome does not quietly refuse a blocking listener: it writes a
+ * paragraph into the service worker console about ExtensionInstallForcelist,
+ * every start, whatever the call is wrapped in. Asking first is the only way
+ * to not be told, and it is the exact question, since package.mjs takes the
+ * permission out of the Chrome manifest and leaves it in the Firefox one.
  */
-if (api.webRequest && api.webRequest.onHeadersReceived) {
+const CAN_BLOCK = ((api.runtime.getManifest().permissions) || []).includes('webRequestBlocking');
+
+if (CAN_BLOCK && api.webRequest && api.webRequest.onHeadersReceived) {
   try {
     api.webRequest.onHeadersReceived.addListener(
       (details) => {
@@ -168,12 +174,13 @@ if (api.webRequest && api.webRequest.onHeadersReceived) {
       ['blocking', 'responseHeaders']
     );
   } catch (err) {
-    // Chrome, where rules.json is doing this instead. Worth one line rather
-    // than silence: if it ever throws in Firefox, subtitles stop working and
-    // this is the only thing that would say why.
-    trace('Torval: this browser does not take a blocking listener, ' +
-      'so the caption rewrite is coming from its own rule file instead.');
+    // Declared and still refused, which should not happen. Worth a line:
+    // subtitles stop working and this is the only thing that would say why.
+    console.warn('Torval: the caption header rewrite was refused:', err && err.message);
   }
+} else {
+  trace('Torval: no blocking listener here, so the caption rewrite comes ' +
+    'from rules.json instead.');
 }
 
 // ---------------------------------------------------------------------------

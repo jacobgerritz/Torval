@@ -2576,6 +2576,21 @@ const run = async () => {
     check('and the Firefox package leaves both files out',
       leaveOut.includes("'offscreen.html'") && leaveOut.includes("'offscreen.js'"),
       leaveOut);
+
+    // The other half of the same split, and the one that was noisy about
+    // it. Chrome does not quietly refuse a blocking webRequest listener; it
+    // writes a paragraph about ExtensionInstallForcelist into the service
+    // worker console on every start, whatever the call is wrapped in. So
+    // the listener is not offered there at all, and the question asked is
+    // the manifest's own, not a guess about which browser this is.
+    check('the shared manifest keeps the blocking permission for Firefox',
+      shared.permissions.includes('webRequestBlocking'));
+    check('and the Chrome build takes it out',
+      /p !== 'webRequestBlocking'/.test(packaging));
+    const background = readFileSync(join(ROOT, 'extension', 'background.js'), 'utf8');
+    check('the background asks the manifest before registering one',
+      /getManifest\(\)\.permissions[\s\S]{0,60}webRequestBlocking/.test(background) &&
+      /if \(CAN_BLOCK &&/.test(background));
   }
 
   // --- every message has somewhere to go ---------------------------------
@@ -2633,7 +2648,12 @@ const run = async () => {
       runtime: {
         onMessage: { addListener(fn) { listener = fn; } },
         getURL: (path) => path,
-        openOptionsPage() {}
+        openOptionsPage() {},
+        // Read at load now, to decide whether a blocking webRequest listener
+        // may be registered at all. The Firefox manifest, since that is the
+        // one that has the permission.
+        getManifest: () => JSON.parse(
+          readFileSync(join(ROOT, 'extension', 'manifest.json'), 'utf8'))
       }
     };
     const sandbox = {
