@@ -26,6 +26,14 @@ import { build } from './wiktextract.mjs';
 const VOWEL = 'aeiouàèéìòóùAEIOUÀÈÉÌÒÓÙ';
 const ACCENTED = 'àèéìòóùÀÈÉÌÒÓÙ';
 
+// A vowel as Italian writes one, and as the IPA hears one. Up here with
+// the others rather than beside stressFromIpa, because build() below runs
+// the moment this module is evaluated and a const declared further down
+// is not initialised yet when it does.
+const SPELLED_VOWEL = /[aeiouàáèéêìíîòóôùúû]/i;
+const HEARD_GLIDE = 'jw';
+const HEARD_VOWEL = 'aeiouɛɔəɑæøyɨ';
+
 await build({
   code: 'it',
   name: 'Italian',
@@ -35,7 +43,7 @@ await build({
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/it/it_full.txt',
   out: 'data-it',
   // Bumping this makes the extension rebuild its Italian database on next start.
-  version: 5,
+  version: 6,
   // Where recorded pronunciations come from. The category is walked
   // once at build time; the id and ISO code are the two constants a
   // Lingua Libre filename is built from. See build-audio.mjs.
@@ -53,20 +61,11 @@ await build({
  *                        with an accent mark added purely to show the
  *                        stress (parlare -> parlàre); comparing the two
  *                        finds exactly which vowel it moved onto.
- *   the IPA transcription   /parˈla.re/'s ˈ marks the start of the stressed
- *                        syllable; counted from the end of the syllables and
- *                        matched against the same count of vowel clusters in
- *                        the spelling. This is the fallback for the many
- *                        entries (most nouns and adjectives) with no
- *                        accented canonical form, and it is an approximation
- *                        rather than a parse: Italian spelling and Italian
- *                        pronunciation do not divide into syllables quite
- *                        the same way, a diphthong is one spoken syllable
- *                        but can be two written vowels, so this can be
- *                        wrong for a word whose spelling and pronunciation
- *                        disagree about that. Nothing downstream trusts it
- *                        as more than a best guess: it is a bold letter in a
- *                        popup, not a citation.
+ *   the IPA transcription   /parˈla.re/'s ˈ marks the stressed syllable.
+ *                        This is the fallback for the many entries (most
+ *                        nouns and adjectives) with no accented canonical
+ *                        form, and it is now a proper alignment rather
+ *                        than a count. See stressFromIpa.
  *
  * A word with neither is guessed at with Italian's default pattern, stressed
  * on the next-to-last syllable (parola piana), which is right far more
@@ -91,24 +90,80 @@ function stressIndex(row) {
   return null;
 }
 
+/*
+ * Which letter the ˈ in the IPA is pointing at.
+ *
+ * This used to count syllables from the end of the transcription and then
+ * count the same number of vowel clusters back from the end of the
+ * spelling. That works whenever the two agree about how many syllables
+ * there are, and they often do not, because a written run of vowels can be
+ * one spoken syllable or two and the spelling does not say which.
+ * "scorciatoia" is the case that showed it: /skor.t͡ʃaˈto.ja/ is four
+ * syllables, "oia" is one run of vowels but two of them, so the count came
+ * up one short and the mark landed on the first a instead of the second o.
+ * The same arithmetic put the stress in the wrong place in sequoia, utopia,
+ * panacea, eresia, alopecia and about five thousand others.
+ *
+ * So the two are lined up against each other instead. Italian spells its
+ * vowels one symbol each, so the vowels of the transcription and the vowel
+ * letters of the spelling are the same list in the same order, and once
+ * they are paired the answer is simply whichever letter the stressed vowel
+ * is paired with. Nothing has to be counted, and nothing has to be assumed
+ * about syllables at all.
+ *
+ * The one complication is the i that is not a vowel: in cia, cio, ciu, cie
+ * and their g equivalents it is there to soften the consonant and is not
+ * pronounced, so it has nothing to pair with. Dropping it is tried first
+ * and keeping it second, because the rule has exceptions in both
+ * directions, farmacia being one where the i really is a vowel. Whichever
+ * reading makes the two lists the same length is the one that has lined
+ * up, and if neither does, this declines and the caller guesses.
+ */
 function stressFromIpa(word, ipa) {
   if (!ipa) return null;
-  const clean = ipa.replace(/^\/+|\/+$/g, '');
-  // A syllable boundary is written as '.', except right before a stress
-  // mark, where the mark itself is the boundary and the dot is left out.
-  const syllables = clean.split(/\.|(?=[ˈˌ])/).filter(Boolean);
-  const stressed = syllables.findIndex((s) => s.includes('ˈ'));
-  if (stressed === -1) return null;
-  const fromEnd = syllables.length - stressed;   // 1 = last syllable
+  const heard = heardVowels(ipa);
+  if (heard.stressed === -1) return null;
+  for (const dropSilentI of [true, false]) {
+    const letters = spelledVowels(word, dropSilentI);
+    if (letters.length === heard.count) return letters[heard.stressed];
+  }
+  return null;
+}
 
-  const runs = vowelRuns(word);
-  if (!runs.length) return null;
-  const target = runs.length - fromEnd;
-  const run = runs[target >= 0 ? target : 0];
-  // The last vowel in a written cluster is usually the nucleus of a rising
-  // diphthong (piède, buòno), which is the common case; not universally
-  // true, which is exactly why this whole function is a fallback.
-  return run.end - 1;
+/**
+ * The vowels and glides of a transcription, in order, and which of them
+ * carries the stress. The stressed one is the first vowel after the ˈ that
+ * is not a glide: /ˈpjɛ.de/ is stressed on the ɛ, not on the j.
+ */
+function heardVowels(ipa) {
+  const clean = ipa.replace(/^[/[]+|[/\]]+$/g, '');
+  let count = 0;
+  let stressed = -1;
+  let after = false;
+  for (const ch of clean) {
+    if (ch === 'ˈ') { after = true; continue; }
+    if (ch === 'ˌ') continue;               // secondary stress is not the question
+    const glide = HEARD_GLIDE.includes(ch);
+    if (!glide && !HEARD_VOWEL.includes(ch)) continue;
+    if (after && !glide && stressed === -1) stressed = count;
+    count++;
+  }
+  return { count, stressed };
+}
+
+/** Where each vowel letter is, optionally skipping the silent i of ciao. */
+function spelledVowels(word, dropSilentI) {
+  const at = [];
+  for (let i = 0; i < word.length; i++) {
+    if (!SPELLED_VOWEL.test(word[i])) continue;
+    if (dropSilentI && word[i].toLowerCase() === 'i') {
+      const before = (word[i - 1] || '').toLowerCase();
+      const after = (word[i + 1] || '').toLowerCase();
+      if ((before === 'c' || before === 'g') && 'aeou'.includes(after)) continue;
+    }
+    at.push(i);
+  }
+  return at;
 }
 
 /** Maximal runs of vowel letters, the closest cheap proxy for syllable nuclei. */

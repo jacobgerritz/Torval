@@ -88,6 +88,9 @@ function loadDictionary(dir) {
     }
   }
   return {
+    // Every form the index knows, which the coverage check reads directly
+    // rather than asking about five thousand words one at a time.
+    terms,
     async getEntries(asked) {
       const out = new Map();
       for (const term of asked) {
@@ -2627,6 +2630,44 @@ const run = async () => {
   // mie and tue, Wiktionary never wrote it down as a page of its own, so
   // with the rules stopping at nouns and adjectives it was a word with no
   // answer at all.
+  // Pronouns stuck on the end of the verb. These looked covered because
+  // the commonest ones are listed in the dictionary as forms of their own:
+  // lavandomi and alzandosi are Wiktionary pages, so no rule was needed
+  // and none was missed. The enclitic is productive, though, and the first
+  // verb Wiktionary had not enumerated fell straight through the gap.
+  for (const [word, lemma] of [
+    ['approcciandomi', 'approcciare'],
+    ['approcciarmi', 'approcciare'],
+    ['approcciarsi', 'approcciare'],     // a reflexive infinitive is this too
+    ['portarglielo', 'portare'],
+    ['mangiarne', 'mangiare'],
+    ['svegliarmi', 'svegliare'],
+    ['chiedendoglielo', 'chiedere'],
+    ['facendolo', 'fare'],               // an irregular gerund needs its own
+    ['dicendomi', 'dire'],
+    ['andandosene', 'andare'],
+    ['essendosi', 'essere']
+  ]) {
+    check('Italian enclitic: ' + word + ' -> ' + lemma,
+      DeinflectIt.deinflect(word).map((r) => r.term).includes(lemma),
+      JSON.stringify(DeinflectIt.deinflect(word).map((r) => r.term).slice(0, 8)));
+  }
+
+  // The accent nobody typed. Italian writes one only on a final stressed
+  // vowel, which is exactly the one that gets left off, and subtitles are
+  // full of it.
+  for (const [written, meant] of [
+    ['piu', 'più'], ['puo', 'può'], ['sara', 'sarà'], ['cio', 'ciò'],
+    ['cioe', 'cioè'], ['perche', 'perché'], ['verita', 'verità'],
+    ['citta', 'città'], ["piu'", 'più']
+  ]) {
+    check('Italian accent: ' + written + ' -> ' + meant,
+      DeinflectIt.deinflect(written).map((r) => r.term).includes(meant),
+      JSON.stringify(DeinflectIt.deinflect(written).map((r) => r.term).slice(0, 8)));
+  }
+  check('and the untouched word is still offered first',
+    DeinflectIt.deinflect('e')[0].term === 'e');
+
   check('an Italian possessive is reached by the agreement rules',
     DeinflectIt.deinflect('sue').map((r) => r.term).includes('suo'));
   check('and a Spanish one is too',
@@ -2711,6 +2752,23 @@ const run = async () => {
     const cane = (await LookupLatin.hover('cane', 0, itDb)).groups[0].hits[0].entry;
     check('a recorded word carries where to find the recording',
       typeof cane.a === 'string' && /^[0-9a-f]{2}\|.+/.test(cane.a), String(cane.a));
+
+    // Where the stress falls. These are the words that were wrong while
+    // the mark was placed by counting syllables from the end: a written
+    // run of vowels can be one spoken syllable or two, so the count came
+    // up short and the mark landed a syllable early.
+    for (const [word, at] of [
+      ['scorciatoia', 8],   // scorciatOia, not scorciAtoia
+      ['sequoia', 4],
+      ['utopia', 4],
+      ['farmacia', 6],
+      ['parola', 3],
+      ['piede', 2]
+    ]) {
+      const entry = (await LookupLatin.hover(word, 0, itDb)).groups[0].hits[0].entry;
+      check('Italian stress: ' + word.slice(0, at) + '[' + word[at] + ']' + word.slice(at + 1),
+        entry.st === at, 'marked at ' + entry.st);
+    }
     Lang._setActive('ja');
   } else {
     console.log('  (no Italian dictionary built; skipping its lookup checks. ' +
@@ -2874,6 +2932,57 @@ const run = async () => {
     Deinflect.deinflect('食べる')[0].term === '食べる');
   check('deinflect terminates on pathological input',
     Deinflect.deinflect('ってってってってってって').length < 400);
+
+  // --- how much of the language is actually reachable --------------------
+  //
+  // The point of this one is not the number, it is that there is a number.
+  // Every hole found in Italian so far was found by somebody hovering a
+  // word and getting nothing: the articulated prepositions, the possessive
+  // "sue", the enclitic pronouns, the missing accents. Each was invisible
+  // beforehand because the tests asked about words somebody had already
+  // thought of, and each was obvious the moment the question was asked the
+  // other way round: of the words people actually use, how many can Torval
+  // answer for at all?
+  //
+  // So it asks that, against the frequency list, which is the only
+  // inventory of "the words people actually use" in the repository. What
+  // is left unreachable is now nearly all names and English, which is
+  // correct: an Italian dictionary should not answer for Michael.
+  //
+  // The floor is set a little under where it stands rather than at it,
+  // because rebuilding from a newer Wiktionary dump moves it by a fraction
+  // either way and a test that fails on that is a test people learn to
+  // ignore. It is here to catch a whole class of word going missing.
+  for (const [code, dir, freqFile, floor, deinflector] of [
+    ['it', 'data-it', 'it-frequency.txt', 0.9, DeinflectIt],
+    ['es', 'data-es', 'es-frequency.txt', 0.9, DeinflectEs]
+  ]) {
+    const built = join(ROOT, 'extension', dir);
+    const freq = join(ROOT, 'data', freqFile);
+    if (!existsSync(join(built, 'meta.json')) || !existsSync(freq)) {
+      console.log(`  (no ${code} dictionary or frequency list; skipping its coverage check)`);
+      continue;
+    }
+    const known = loadDictionary(built).terms;
+
+    const forms = [];
+    for (const line of readFileSync(freq, 'utf8').split('\n')) {
+      const space = line.lastIndexOf(' ');
+      if (space <= 0) continue;
+      forms.push(line.slice(0, space));
+      if (forms.length >= 5000) break;
+    }
+
+    let reached = 0;
+    for (const word of forms) {
+      if (known.has(word) ||
+          deinflector.deinflect(word).some((r) => known.has(r.term))) reached++;
+    }
+    const share = reached / forms.length;
+    check(`${code}: most of the 5,000 commonest forms can be looked up ` +
+      `(${(share * 100).toFixed(1)}%)`, share >= floor,
+      `only ${(share * 100).toFixed(1)}%, floor is ${(floor * 100).toFixed(0)}%`);
+  }
 
   // --- appearance -------------------------------------------------------
   //

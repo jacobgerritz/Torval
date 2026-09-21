@@ -36,10 +36,11 @@
  *
  * v1 covers regular -are/-ere/-ire conjugation (presente, imperfetto, futuro
  * semplice, condizionale presente, participio passato, gerundio) across the
- * dozen most common irregular verbs, and regular noun/adjective pluralization.
- * Reflexive verbs, clitic pronoun attachment (mandarglielo), passato remoto
- * and the subjunctive are not attempted: a word using them simply will not
- * match, the same as any word outside deinflect.js's own coverage.
+ * dozen most common irregular verbs, regular noun/adjective pluralization,
+ * and pronouns stuck on the end of an infinitive or a gerund (approcciarmi,
+ * approcciandomi, andarsene). Passato remoto and the subjunctive are not
+ * attempted: a word using them simply will not match, the same as any word
+ * outside deinflect.js's own coverage.
  */
 
 if (typeof TorvalDeinflectLatin === 'undefined' && typeof require !== 'undefined') {
@@ -95,6 +96,53 @@ var TorvalDeinflectIt = TorvalDeinflectLatin.build(function (rule) {
     c.cond.forEach(function (e) { rule(e, c.inf, [], T, 'conditional'); });
     rule(c.pp, c.inf, [], T, 'past participle');
     rule(c.ger, c.inf, [], T, 'gerund');
+  });
+
+  // ---------------------------------------------------------------------
+  // Pronouns stuck on the end of the verb.
+  //
+  // This was the largest hole left in Italian, and it did not look like a
+  // hole, because the commonest examples all worked: lavandomi, alzandosi
+  // and parlandogli were in the dictionary as forms of their own, listed
+  // by Wiktionary, and an exact match needs no rule. So the rules were
+  // never missed until a verb Wiktionary had not enumerated came along.
+  // "approcciandomi" is one, and there is no shortage of others: the
+  // enclitic is productive, every verb in the language takes one, and no
+  // dictionary can list them all.
+  //
+  // Italian sticks them onto the infinitive with its final e dropped
+  // (approcciare -> approcciarmi), onto the gerund as it stands
+  // (approcciandomi), and onto the affirmative imperative (dimmi). The
+  // first two are rules; the third is left to the dictionary's index, the
+  // same decision Spanish made in deinflect-es.js and for the same reason,
+  // that an imperative is often irregular before any pronoun reaches it.
+  //
+  // A reflexive infinitive falls out of this for free: approcciarsi is
+  // approcciare with si on the end, and Wiktionary has no page for it.
+  // ---------------------------------------------------------------------
+  var ONE = ['mi', 'ti', 'si', 'ci', 'vi', 'gli', 'le', 'ne', 'lo', 'la', 'li'];
+
+  // Two of them together, and the first one changes its vowel when it
+  // does: mi lo is melo, gli lo is glielo. Both pronouns always come in
+  // this order, indirect before direct, so there is no second list.
+  var TWO = [];
+  ['me', 'te', 'se', 'ce', 've', 'glie'].forEach(function (indirect) {
+    ['lo', 'la', 'li', 'le', 'ne'].forEach(function (direct) {
+      TWO.push(indirect + direct);
+    });
+  });
+
+  var CLITICS = ONE.concat(TWO);
+
+  Object.keys(REGULAR).forEach(function (type) {
+    var c = REGULAR[type];
+    var T = ['v'];
+    // The infinitive drops its final e before a pronoun: are -> ar.
+    var shortened = c.inf.slice(0, -1);
+    CLITICS.forEach(function (p) {
+      rule(shortened + p, c.inf, [], T, 'with pronoun');
+      rule(c.ger + p, c.inf, [], T, 'gerund with pronoun');
+    });
   });
 
   // ---------------------------------------------------------------------
@@ -204,6 +252,14 @@ var TorvalDeinflectIt = TorvalDeinflectLatin.build(function (rule) {
     });
     rule(v.pp, infinitive, [], T, 'past participle');
     rule(v.ger, infinitive, [], T, 'gerund');
+    // The irregular gerunds need the pronoun rules spelled out, unlike the
+    // irregular infinitives: farmi and dirlo already come out right,
+    // because fare and dire end in -are and -ire and the regular rules
+    // above reach them, while facendomi under the regular rule would give
+    // "facere".
+    CLITICS.forEach(function (p) {
+      rule(v.ger + p, infinitive, [], T, 'gerund with pronoun');
+    });
   });
 
   // ---------------------------------------------------------------------
@@ -223,6 +279,46 @@ var TorvalDeinflectIt = TorvalDeinflectLatin.build(function (rule) {
   rule('i', 'o', [], NA, 'plural');
   rule('i', 'e', [], NA, 'plural');
   rule('e', 'a', [], NA, 'plural');
+
+  // ---------------------------------------------------------------------
+  // The accent somebody did not type.
+  //
+  // Italian only writes an accent on a final stressed vowel, and that is
+  // exactly the accent people leave off: subtitles in particular are full
+  // of "piu", "puo", "sara", "perche", "cioe" and "verita", and every one
+  // of those was a word Torval found nothing at all for. They are not
+  // obscure. In the five thousand commonest forms in the language, the
+  // unaccented spellings were the largest group of misses that were
+  // actually Italian rather than somebody's name.
+  //
+  // So a final vowel may also be that vowel with its accent. One extra
+  // candidate per word, since only the vowel actually on the end can
+  // match, and a wrong guess costs nothing: "casà" is not in any
+  // dictionary and quietly finds nothing. The apostrophe forms are here
+  // for the same reason, since a keyboard without accents writes "piu'".
+  //
+  // e gets both, because Italian uses both and the writer who left the
+  // accent off was not choosing between them: perché takes é, cioè takes
+  // è. This does mean "e" now also offers "è", and "da" offers "dà",
+  // which is right: in text written without accents they really are
+  // ambiguous, and the untouched word is still ranked first.
+  //
+  // Every part of speech, because this is a spelling, not a grammar.
+  var ANY = ['v', 'n', 'adj', 'adv', 'prep', 'conj', 'intj', 'pron', 'num',
+    'art', 'prt', 'pref', 'suf', 'abbr', 'contr', 'det', 'phrase'];
+  var ACCENTS = {
+    a: ['à'], e: ['è', 'é'], i: ['ì'], o: ['ò'], u: ['ù']
+  };
+  Object.keys(ACCENTS).forEach(function (plain) {
+    ACCENTS[plain].forEach(function (accented) {
+      rule(plain, accented, [], ANY, 'accent');
+      rule(plain + "'", accented, [], ANY, 'accent');
+      rule(plain + '\u2019', accented, [], ANY, 'accent');
+    });
+  });
+  // And the one that is written with an accent, just the wrong one.
+  rule('é', 'è', [], ANY, 'accent');
+  rule('è', 'é', [], ANY, 'accent');
 
   // Agreement, which is the other half of what happens to an Italian
   // adjective and was missing entirely: a dictionary lists intero, and the
