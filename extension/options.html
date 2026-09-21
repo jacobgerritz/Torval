@@ -53,11 +53,9 @@
     <section>
       <h2>Keeping score</h2>
       <p class="note">
-        Marking words is what the percentage across the top of a page is
-        measured against, and what decides which words get coloured. It is
-        off until you want it: a word list starts empty, so the number is
-        wrong until a few hundred words are in it. With it off, Torval is a
-        pop-up dictionary that makes Anki cards, and nothing else.
+        On, Torval colours what you have not marked and says what share of a
+        page you know. Off, it is a pop-up dictionary that makes Anki cards,
+        with nothing to set up.
       </p>
       <label class="check">
         <input type="checkbox" id="track">
@@ -166,10 +164,7 @@
   <div class="panel" id="panel-anki" hidden>
     <section>
       <h2>Where cards go</h2>
-      <p class="note">
-        Through AnkiConnect, which listens on your own machine. Anki has to be
-        open.
-      </p>
+      <p class="note">Anki has to be open, with AnkiConnect installed.</p>
 
       <label>
         <span>Deck</span>
@@ -199,26 +194,24 @@
         <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.1">
       </label>
       <p class="note hint">
-        Seconds kept from before the line, so the first word is not clipped.
-        Roughly, since a recorder swallows an unpredictable moment when it
-        starts.
-      </p>
-      <!--
-        The one question this panel gets asked that is not about this panel.
-        A black screenshot looks like a broken add-on and is a browser
-        setting, so the setting is named here rather than left to be found.
-      -->
-      <p class="note">
-        A copy-protected video, Netflix and the like, gives up a black frame
-        while your browser decodes on the graphics card. Firefox: Settings →
-        General → Performance, untick both boxes. Chrome: Settings → System.
+        Seconds kept before the line, so the first word is not clipped.
       </p>
 
-      <label class="check">
+      <label class="check" id="tab-audio-row">
         <input type="checkbox" id="tab-audio">
-        <span>Record its sound from the tab</span>
+        <span>Record sound from copy-protected video</span>
       </label>
       <p class="note hint" id="tab-audio-note"></p>
+
+      <!--
+        Not about this panel, and asked about more than anything on it: a
+        black screenshot is a browser setting, so the setting is named.
+      -->
+      <p class="note">
+        Copy-protected video also gives up a black frame unless your
+        browser's hardware acceleration is off. Firefox: Settings → General
+        → Performance. Chrome: Settings → System.
+      </p>
     </section>
 
     <p class="actions">
@@ -351,10 +344,9 @@
     <section>
       <h2>When something goes wrong</h2>
       <p class="note">
-        Torval normally says nothing in the browser's console unless there
-        is something you could act on. Turned on, it narrates every step of
-        finding and reading a video's subtitles, which is what to send if
-        you are reporting a problem with one.
+        Torval says nothing in the console unless you can act on it. Turned
+        on, it narrates finding and reading a video's subtitles, which is
+        what to send with a bug report.
       </p>
       <label class="check">
         <input type="checkbox" id="verbose">

@@ -974,9 +974,19 @@ const SHOW_ON_OPEN = 'showOnOpen';
 const OFFSCREEN = 'offscreen.html';
 let offscreenOpen = null;
 
-/** Can this browser do it, and has it been allowed to? */
+/**
+ * Can this browser do it, and has it been allowed to?
+ *
+ * Deliberately not asking whether api.tabCapture exists. An optional
+ * permission's namespace is undefined until it is granted, so that test
+ * says no until it is turned on and the switch is disabled until the test
+ * says yes: a box that cannot be ticked because it has not been ticked.
+ * api.offscreen is the honest question. It is an ordinary permission, so
+ * Chrome always has it and Firefox never does, which is exactly the line
+ * being drawn.
+ */
 async function tabAudioReady() {
-  const can = !!(api.tabCapture && api.offscreen && api.permissions);
+  const can = !!(api.offscreen && api.permissions);
   if (!can) return { can: false, granted: false };
   let granted = false;
   try {
@@ -1029,6 +1039,9 @@ async function tabAudioStart(tabId, mimeType) {
       'Settings \u2192 Anki \u2192 Recording from video.');
   }
   if (typeof tabId !== 'number') throw new Error('No tab to record.');
+  // Granted a moment ago, so the namespace should be here now; if the
+  // browser has not caught up, saying so beats a bare undefined.
+  if (!api.tabCapture) throw new Error('Tab recording is not available yet. Try again.');
 
   await ensureOffscreen();
   const streamId = await api.tabCapture.getMediaStreamId({ targetTabId: tabId });

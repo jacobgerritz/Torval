@@ -599,15 +599,15 @@ async function paintTabAudio() {
   } catch (err) { /* the background is still waking up */ }
 
   tabAudio.checked = !!state.granted;
-  tabAudio.disabled = !state.can;
+  // A box that cannot be ticked is worse than no box: it invites somebody
+  // to keep trying. Where the browser cannot do this at all, only the line
+  // saying so is left.
+  const row = document.getElementById('tab-audio-row');
+  if (row) row.hidden = !state.can;
   tabAudioNote.textContent = state.can
-    ? 'The line is played back and the tab is recorded, so you hear what is ' +
-      'being captured. Only ever on a copy-protected video; everywhere else ' +
-      'the sound comes off the video itself and this changes nothing.'
-    : 'Chrome and Edge only. Firefox has no way to record a tab: no ' +
-      'tabCapture API, and getDisplayMedia ignores audio (Mozilla bug ' +
-      '1541425, open since 2019). Nothing can work around it. Cards from a ' +
-      'copy-protected video are made here without their sound.';
+    ? 'The line is played back as it is recorded, so you hear what you are getting.'
+    : 'Recording a tab needs Chrome. Firefox has no way to do it, so cards ' +
+      'from a copy-protected video are made here without their sound.';
 }
 
 
