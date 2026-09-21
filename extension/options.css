@@ -77,6 +77,22 @@ main {
 }
 .sidebar-action:hover { background: #1b1d21; color: var(--ink); }
 
+/*
+ * How far through building the dictionary. In the sidebar because it is
+ * true of the whole page rather than of any one panel, and at the bottom
+ * because it is only there for a minute, once, and should not shift the
+ * tabs down while it is.
+ */
+.sidebar-note {
+  margin: 12px 0 0;
+  padding: 0 14px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+.sidebar-note.error { color: var(--warn); }
+
 h1 {
   margin: 0 0 26px;
   padding: 0 14px;

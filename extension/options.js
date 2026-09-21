@@ -523,6 +523,61 @@ if (appearance) TorvalLook.ready().then(drawAppearance);
 
 
 // ---------------------------------------------------------------------------
+// The dictionary
+// ---------------------------------------------------------------------------
+
+/*
+ * How far through opening the dictionary, where somebody can see it.
+ *
+ * The first choice of language copies 218,000 entries into the browser's own
+ * database, and that takes about a minute. The only place that said so was
+ * the handle in the corner of a web page, which is not where somebody who
+ * has just answered the question on this page is looking; from here the
+ * whole thing looked like nothing happening.
+ */
+const dictionaryNote = document.getElementById('dictionary');
+if (dictionaryNote) watchDictionary();
+
+async function watchDictionary() {
+  for (;;) {
+    let state = null;
+    try {
+      const reply = await api.runtime.sendMessage({ type: 'status' });
+      state = reply && reply.status;
+    } catch (err) { /* the background is asleep, or starting up */ }
+    // Often while it is working, rarely once it is not. A language can be
+    // changed from this very page, so the slow poll has to keep going.
+    await pause(paintDictionary(state) ? 500 : 4000);
+  }
+}
+
+/** Draws it, and answers whether there is still something to watch. */
+function paintDictionary(state) {
+  const how = state && state.state;
+  const busy = how === 'starting' || how === 'loading';
+
+  if (busy) {
+    const percent = Math.round((state.progress || 0) * 100);
+    dictionaryNote.textContent = percent
+      ? 'Building the dictionary, ' + percent + '%'
+      : 'Building the dictionary…';
+  } else if (how === 'error') {
+    dictionaryNote.textContent = state.message || 'The dictionary did not open.';
+  } else {
+    dictionaryNote.textContent = '';
+  }
+
+  dictionaryNote.className = 'sidebar-note' + (how === 'error' ? ' error' : '');
+  dictionaryNote.hidden = !dictionaryNote.textContent;
+  return busy;
+}
+
+function pause(ms) {
+  return new Promise((done) => setTimeout(done, ms));
+}
+
+
+// ---------------------------------------------------------------------------
 // Keeping score, or not
 // ---------------------------------------------------------------------------
 
