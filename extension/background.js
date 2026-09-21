@@ -1039,6 +1039,7 @@ async function ensureOffscreen() {
 }
 
 async function tabAudioStart(tabId, mimeType) {
+  trace('Torval: asked to record tab', tabId);
   const state = await tabAudioReady();
   if (!state.can) throw new Error('This browser cannot record a tab\u2019s sound.');
   if (!state.granted) {
@@ -1052,6 +1053,7 @@ async function tabAudioStart(tabId, mimeType) {
 
   await ensureOffscreen();
   const streamId = await api.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  trace('Torval: the browser handed over a stream for the tab');
   const reply = await api.runtime.sendMessage({
     to: 'offscreen', type: 'recordStart', streamId, mimeType
   });

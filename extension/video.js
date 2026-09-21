@@ -27,6 +27,14 @@
 var TorvalVideo = (function () {
   'use strict';
 
+  /**
+   * Narration, off unless it has been asked for. Guarded rather than
+   * assumed, because the tests load this file without log.js.
+   */
+  function trace() {
+    if (typeof TorvalLog !== 'undefined') TorvalLog.say.apply(null, arguments);
+  }
+
   var MAX_WIDTH = 1280;         // frames are scaled down to this before saving
   var JPEG_QUALITY = 0.82;
   var MAX_CLIP_SECONDS = 20;    // no subtitle line is longer than this
@@ -174,6 +182,8 @@ var TorvalVideo = (function () {
     var out = {};
     var lead = leadFrom(options);
     var sealed = contentProtected(video);
+    trace('Torval: capturing from a video that is ' +
+      (sealed ? 'decrypting, so the sound has to come off the tab' : 'not protected'));
 
     // Before anything moves: the picture you were actually looking at. This
     // is attempted on a protected video too, because whether it works there
@@ -461,8 +471,12 @@ var TorvalVideo = (function () {
       : (typeof chrome !== 'undefined' ? chrome : null);
     if (!api || !api.runtime) return null;
 
-    var ready = await ask(api, { type: 'tabAudioReady' });
-    if (!ready || !ready.can || !ready.granted) return null;
+    var ready = await ask(api, { type: 'tabAudioReady' }).catch(function () { return null; });
+    if (!ready || !ready.can) return null;
+    if (!ready.granted) {
+      // Not an error. The card offers the switch; see offerTabAudio.
+      return null;
+    }
 
     var from = Math.max(0, start - (lead || 0));
     var open = Math.max(0, from - WARMUP_SECONDS);
@@ -485,6 +499,11 @@ var TorvalVideo = (function () {
       await until(function () { return video.currentTime >= from + length; },
         length * 1000 + 5000);
     } catch (err) {
+      // Said out loud rather than swallowed. Everything between here and
+      // the sound is somebody else's: a permission, an offscreen document,
+      // a tab the browser may decline to hand over. A card that arrives
+      // silent with no reason anywhere is a morning of guessing.
+      console.warn('Torval: could not record the tab:', (err && err.message) || err);
       if (started) { try { await ask(api, { type: 'tabAudioStop' }); } catch (ignored) { /* */ } }
       await restore(video, Math.max(wasTime, from + length), wasRate, wasPaused);
       return null;
@@ -494,6 +513,7 @@ var TorvalVideo = (function () {
     try {
       got = await ask(api, { type: 'tabAudioStop' });
     } catch (err) {
+      console.warn('Torval: the tab recording came back empty:', (err && err.message) || err);
       got = null;
     }
     await restore(video, Math.max(wasTime, from + length), wasRate, wasPaused);
