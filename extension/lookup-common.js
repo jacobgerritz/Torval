@@ -136,7 +136,13 @@ var TorvalLookupCommon = (function () {
    * the whole passage again.
    */
   function coverage(tokens, known, ignored) {
-    var counts = {};
+    // No prototype, because the keys are words and some words are the names
+    // of things every object already has. Spanish has "constructor"; on a
+    // plain object `counts['constructor']` starts out as Object's own
+    // constructor rather than undefined, and the count for it came out as
+    // "function Object() { [native code] }1". See wordPlaces in
+    // background.js, where the same collision threw outright.
+    var counts = Object.create(null);
     var hits = 0;
     var total = 0;
     for (var i = 0; i < tokens.length; i++) {

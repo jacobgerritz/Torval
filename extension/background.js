@@ -515,7 +515,14 @@ async function wordPlaces(text, before, after, trusted, say) {
   // making a distinction nobody asked about.
   const seams = TorvalLang.profile().seams;
 
-  const places = {};
+  // No prototype. The keys here are words, and "constructor" is an ordinary
+  // Spanish word: on a plain object `places['constructor']` is already
+  // Object's own constructor, so the guard below saw it as a word it had
+  // met, skipped making an array, and called .push on a function. The whole
+  // read threw, the line came back as a failure, and every word in the
+  // sentence went unmarked while hovering any of them still answered. One
+  // word on a page was enough to do it, which is why it looked random.
+  const places = Object.create(null);
   // Words that get no mark on the page. Two quite different reasons to be on
   // this list, you know it, or you have said you never want to be told about
   // it, but the page only ever asks the one question, so they arrive as one
@@ -704,7 +711,11 @@ async function wordMap(key) {
     throw new Error('Your word list came back empty when it should have ' + expected +
       ' words in it, so nothing was changed. Try again in a moment.');
   }
-  return have > 0 ? map : {};
+  // Without a prototype, for the same reason as `places` in wordPlaces: a
+  // word list is keyed by words, and `map['constructor']` on a plain object
+  // is truthy before anything has been added, so marking that word known
+  // silently did nothing and importing it counted it as already there.
+  return Object.assign(Object.create(null), have > 0 ? map : {});
 }
 
 /**
@@ -851,7 +862,7 @@ async function importWords(data) {
  * reported rather than kept quiet about.
  */
 async function asWords(from, reader) {
-  const out = {};
+  const out = Object.create(null);
   let dropped = 0;
   if (!from || typeof from !== 'object') return { words: out, dropped };
 
@@ -878,7 +889,7 @@ async function asWords(from, reader) {
  * file lossy. So these are taken as they come.
  */
 function asGiven(from) {
-  const out = {};
+  const out = Object.create(null);
   if (!from || typeof from !== 'object') return out;
   for (const key of Object.keys(from)) {
     const when = Number(from[key]);

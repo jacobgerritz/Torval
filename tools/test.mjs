@@ -2690,6 +2690,31 @@ const run = async () => {
       JSON.stringify(emptied.result));
     check('the other list is left alone', 'ネカフェ' in stored.ignoredWords);
 
+    // A word list is keyed by words, and some words are the names of things
+    // every object already has. On a plain object `map['constructor']` is
+    // truthy before anything has been added, so marking that word known did
+    // nothing at all and said it had worked.
+    stored.knownWords = {};
+    stored.wordCounts = {};
+    for (const odd of ['constructor', 'toString', 'valueOf', 'hasOwnProperty']) {
+      const marked = await send({ type: 'setKnown', word: odd, known: true });
+      check('a word named after an object property can be marked known: ' + odd,
+        marked.ok && odd in stored.knownWords, JSON.stringify(marked));
+    }
+    const listed = await send({ type: 'knownList' });
+    check('and all of them are on the list afterwards',
+      listed.ok && listed.result.length === 4, JSON.stringify(listed.result));
+    const forgotten = await send({ type: 'forgetWords', words: ['constructor'] });
+    check('and can be taken off it again',
+      forgotten.ok && !('constructor' in stored.knownWords) &&
+      forgotten.result.removed === 1, JSON.stringify(forgotten.result));
+
+    // Back to the two lists the emptying checks are written against.
+    stored.knownWords = { '本': 1, '人': 2 };
+    stored.ignoredWords = { 'ネカフェ': 3 };
+    stored.wordCounts = { knownWords: 2, ignoredWords: 1 };
+    await send({ type: 'clearWords', list: 'known' });
+
     const emptiedToo = await send({ type: 'clearWords', list: 'ignored' });
     check('and the ignored list empties the same way',
       emptiedToo.ok && Object.keys(stored.ignoredWords).length === 0,
@@ -2881,6 +2906,47 @@ const run = async () => {
     }
     check('nor does any other Spanish word point at a phrase', wrongWay === 0,
       wrongWay + ' still do');
+
+    // A whole Netflix line, the one that reported this: not one word of it
+    // was marked, while hovering any of them still answered. "constructora"
+    // resolves to constructor, which is the name of a property every plain
+    // object already has, so the table of where each word sat found it
+    // already present, skipped making a list for it, and called .push on
+    // Object's own constructor. The read threw, the line came back as a
+    // failure, and one such word anywhere in a passage took the marks off
+    // all of it. Nothing about it looked language-specific, which is why it
+    // looked random.
+    const LINE = '[Samu] Para congraciarse con el pueblo, ' +
+      'la constructora decidió pagar tres becas';
+    const inLine = await LookupLatin.locateTokens(LINE, esDb);
+    check('every word of the line is found', inLine.length === 12,
+      inLine.length + ': ' + inLine.map((t) => t.word).join(' '));
+    check('including the one that is also the name of a thing every object has',
+      inLine.some((t) => t.word === 'constructor'));
+
+    const spread = LookupLatin.coverage(inLine, new Set(), new Set());
+    check('and it is counted as a word, not as a function',
+      spread.counts.constructor === 1, JSON.stringify(spread.counts.constructor));
+    check('none of the line counts as known to a reader who knows nothing',
+      spread.known === 0 && spread.total === 12, JSON.stringify(spread));
+
+    // The same collision, in the table of where on the page each word sat,
+    // which is the one that threw. Built here exactly as wordPlaces builds
+    // it, since that runs in the background script against a dictionary this
+    // file cannot open.
+    const places = Object.create(null);
+    let threw = null;
+    try {
+      inLine.forEach((token, i) => {
+        if (!places[token.word]) places[token.word] = [];
+        places[token.word].push(token.start, token.length, i % 2);
+      });
+    } catch (err) { threw = err.message; }
+    check('and writing down where each word sat does not throw', !threw, threw);
+    check('with a place kept for that word like any other',
+      Array.isArray(places.constructor) && places.constructor.length === 3,
+      JSON.stringify(places.constructor));
+
     Lang._setActive('ja');
   } else {
     console.log('  (no Spanish dictionary built; skipping its lookup checks. ' +
