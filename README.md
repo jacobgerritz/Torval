@@ -740,6 +740,13 @@ hand their video to the browser's DRM layer, and both the frame and the audio
 come back empty, that is what the protection is for, not a limitation to be
 worked around. Where capture is refused the card is still made, without media.
 
+Torval asks the video element rather than keeping a list of sites: the page
+sets `mediaKeys` on it when it starts decrypting, which stays right on the day
+a fourth service launches and on the day one of these three plays an
+unprotected trailer. Nothing is attempted on such a video, so the line is not
+replayed for a recording that cannot happen, and the card says why it has no
+picture and no sound instead of arriving short and silent about it.
+
 
 ---
 

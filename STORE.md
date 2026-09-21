@@ -54,7 +54,9 @@ a little HTML. This is written to read correctly as plain text.
 > IT MAKES ANKI CARDS. One click sends a word to your own collection
 > through AnkiConnect, into whatever note type you already use: the
 > dictionary form, the sentence with the word in bold, the definitions, the
-> frame on screen, and the line as it was spoken. Japanese cards can carry
+> frame on screen, and the line as it was spoken. The picture and the sound
+> cannot be taken from a copy-protected service such as Netflix, and Torval
+> says so on the card rather than leaving you to notice. Japanese cards can carry
 > a pitch-accent diagram; Italian and Spanish mark the stressed vowel, and
 > nouns come with their article, because "il cane" is the thing to learn
 > and "cane" is only half of it.

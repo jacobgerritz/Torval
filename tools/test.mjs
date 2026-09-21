@@ -2219,6 +2219,21 @@ const run = async () => {
   check('nor the same stretch asked for with a different lead-in',
     Video._clipKey(oneVideo, theLine, theCue, 0.1) !== Video._clipKey(oneVideo, theLine, theCue, 0.4));
 
+  // Netflix, Prime Video and Disney+ hand the video to the browser's
+  // decryption layer, where the frame comes back black or refused and the
+  // audio comes back empty. Both attempts used to fail quietly, and the card
+  // arrived with no picture and no sound and not a word about why. The
+  // element answers for itself: the page sets mediaKeys on it when it starts
+  // decrypting, which is truer than a list of sites would be, and still true
+  // on the day one of those sites plays an unprotected trailer.
+  check('a video being decrypted is known to be uncapturable',
+    Video.contentProtected({ mediaKeys: {} }) === true);
+  check('an ordinary one is not', Video.contentProtected({ mediaKeys: null }) === false);
+  check('nor is a video element that has never been asked about one',
+    Video.contentProtected({}) === false);
+  check('and no video at all is not a protected video',
+    Video.contentProtected(null) === false);
+
   // --- how long a line actually lasts ---------------------------------------
   // An automatic caption revises itself as the recogniser hears more, and
   // every revision is filed as a cue of its own. What you read as one line is

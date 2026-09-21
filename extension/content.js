@@ -1929,19 +1929,27 @@
     if (!ready || !ready.ok) throw new Error((ready && ready.error) || 'Could not reach Anki.');
 
     let media = {};
+    // A video the browser is decrypting gives up neither its picture nor its
+    // sound. The card is still worth making, but the reason it arrives
+    // without them belongs on the screen, not only in the README.
+    let blocked = false;
     if (fromVideo && typeof TorvalVideo !== 'undefined') {
       // Only say it when it is true. A second word out of the same subtitle
       // reuses the line already recorded, so nothing is played back and
       // there is nothing to wait for; the message would be a flash of a
-      // sentence describing something that did not happen.
+      // sentence describing something that did not happen. Nor is anything
+      // played back on a protected video, where there is nothing to record.
       const recording = cue && !TorvalVideo.hasClip(sentence, cue,
-        { lead: (settings[ankiConfigKey] || {}).lead });
+        { lead: (settings[ankiConfigKey] || {}).lead }) &&
+        !(TorvalVideo.contentProtected && TorvalVideo.contentProtected(TorvalVideo.currentVideo()));
       const doing = recording ? saying(entryEl, 'Recording the line…') : null;
       try {
         media = await TorvalVideo.capture(sentence, cue, { lead: (settings[ankiConfigKey] || {}).lead });
       } finally {
         if (doing) doing.remove();
       }
+      blocked = !!media.blocked;
+      delete media.blocked;   // not a file, and nothing past here wants it
     }
 
     // Whatever was clicked in the popup is folded in before the word is
@@ -2001,9 +2009,14 @@
       // The tick alone is easy to miss, and a card quietly not being made
       // looks exactly the same as one that was. So it says so, and then
       // takes itself away again rather than leaving the popup taller.
-      const said = saying(entryEl, 'Added to Anki.');
+      const said = saying(entryEl, blocked
+        ? 'Added to Anki, without the picture or the sound: this video is copy-protected.'
+        : 'Added to Anki.');
       said.className = 'note added';
-      setTimeout(function () { said.remove(); }, 2500);
+      // Long enough to read. The plain "Added to Anki." is four words and
+      // gone; the sentence about copy protection is one somebody has to
+      // finish before it takes itself away.
+      setTimeout(function () { said.remove(); }, blocked ? 6000 : 2500);
       return;
     }
     button.classList.remove('working');

@@ -171,6 +171,12 @@ var TorvalVideo = (function () {
   async function capture(sentence, cue, options) {
     var video = currentVideo();
     if (!video) return {};
+    // Nothing to attempt on a video the browser is decrypting: the frame
+    // comes back black or refused and the audio comes back empty, which is
+    // what the protection is for. Saying so is the point of stopping here.
+    // Before, both attempts quietly returned nothing and the card arrived
+    // without a picture or a sound and without a word about why.
+    if (contentProtected(video)) return { blocked: true };
     var out = {};
     var lead = leadFrom(options);
 
@@ -284,6 +290,18 @@ var TorvalVideo = (function () {
       view.setInt16(44 + s * 2, Math.round(value * 32767), true);
     }
     return new Blob([bytes], { type: 'audio/wav' });
+  }
+
+  /**
+   * Is this video being handed to the browser's content protection layer?
+   *
+   * `mediaKeys` is set on the element by the page itself when it starts
+   * decrypting, so the element answers for itself. A list of sites would
+   * have been simpler to write and wrong the day a fourth service launched,
+   * or the day one of these three played an unprotected trailer.
+   */
+  function contentProtected(video) {
+    return !!(video && video.mediaKeys);
   }
 
   function grabFrame(video) {
@@ -430,7 +448,7 @@ var TorvalVideo = (function () {
 
   return {
     capture: capture, record: record, currentVideo: currentVideo, name: name,
-    hasClip: hasClip,
+    hasClip: hasClip, contentProtected: contentProtected,
     // Exposed for the tests: what counts as the same recording.
     _clipKey: clipKey, _forgetClip: function () { lastClip = null; },
     // Exposed for the tests: the file the card actually carries.
