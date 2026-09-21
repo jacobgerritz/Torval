@@ -69,6 +69,15 @@ var TorvalAnki = (function () {
   var ANKI_SECONDS = 10;
   var AUDIO_SECONDS = 8;
 
+  /** This add-on's own address, which is what AnkiConnect is checking. */
+  function here() {
+    try {
+      return (typeof location !== 'undefined' && location.origin) || 'this add-on';
+    } catch (err) {
+      return 'this add-on';
+    }
+  }
+
   function deadline(seconds) {
     var controller = new AbortController();
     var timer = setTimeout(function () { controller.abort(); }, seconds * 1000);
@@ -92,6 +101,19 @@ var TorvalAnki = (function () {
         : 'Anki is not answering. Is it running, with the AnkiConnect add-on installed?');
     }
     try {
+      // AnkiConnect checks where a request came from against a list, and
+      // that list holds http://localhost and nothing else out of the box.
+      // Firefox never trips it, because an add-on with host permission for
+      // the address sends no Origin header; Chrome sends one, so the very
+      // first card from a Chrome install is refused with a 403 and no
+      // explanation of a setting that lives in another program. Saying the
+      // exact line to paste is the difference between a minute and an
+      // afternoon.
+      if (res.status === 403) {
+        throw new Error('AnkiConnect refused this because of where it came ' +
+          'from. In Anki: Tools \u2192 Add-ons \u2192 AnkiConnect \u2192 Config, ' +
+          'and add "' + here() + '" to webCorsOriginList.');
+      }
       if (!res.ok) throw new Error('AnkiConnect replied with ' + res.status);
       var data = await res.json();
       if (data.error) throw new Error(data.error);
