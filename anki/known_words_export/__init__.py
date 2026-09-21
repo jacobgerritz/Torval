@@ -382,7 +382,13 @@ def run():
     if mw.col is None:
         showWarning("Open a collection first.")
         return
-    ExportDialog(mw).exec()
+    dialog = ExportDialog(mw)
+    # exec() on Qt6, exec_() on the Qt5 builds Anki shipped until 2.1.66.
+    # The only line in here that knows which Qt it is talking to, and the
+    # only thing standing between this and the version floor the manifest
+    # claims.
+    show = getattr(dialog, "exec", None) or dialog.exec_
+    show()
 
 
 def setup_menu():
