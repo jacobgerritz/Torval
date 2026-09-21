@@ -182,24 +182,38 @@ var TorvalBar = (function () {
   }
 
   /**
-   * There turned out to be nothing to say about this page. If a number has
-   * been shown before, go back to it; if not, Torval has no business being on
-   * this page at all, so it takes itself off it.
+   * There turned out to be nothing to say about this page.
+   *
+   * If a number has been shown before, go back to it. Otherwise the bar has
+   * nothing to show, and what it used to do about that was set the host to
+   * display:none, which was wrong in three separate ways at once and all
+   * three were visible at the same time.
+   *
+   * It took the handle with it, so there was no longer anything to click to
+   * get the bar back. It did it to a pinned bar as readily as to an
+   * unpinned one, which is the opposite of what pinning is for. And it
+   * never gave back the 54 pixels the page was leaving for it, so the page
+   * stayed pushed down with an empty strip along the top and nothing in it.
+   *
+   * So now the bar tucks itself away, which is a state it already has: the
+   * handle stays, the room goes back, and pinning means what it says.
    */
   function quiet() {
     stopWaiting();
     if (!host) return;
     if (data && data.total) { idle(); return; }
-    // On a page that keeps the bar down, taking it away is worse than having
-    // nothing to say: the shelf in the reader has no Japanese on it, and a bar
-    // that vanished there and came back in a book would look broken.
-    if (always) {
-      idle();
-      els.score.textContent = '';
+    idle();
+    els.score.textContent = '';
+    // A bar that was asked to stay, stays, and says why it is empty rather
+    // than leaving somebody to wonder. `always` is the reader, whose shelf
+    // has no Japanese on it; `pinned` is a deliberate answer to this exact
+    // question.
+    if (always || pinned) {
       els.detail.textContent = 'nothing to read here yet';
       return;
     }
-    host.style.display = 'none';
+    els.detail.textContent = '';
+    setExpanded(false);
   }
 
   /**
@@ -460,18 +474,35 @@ var TorvalBar = (function () {
    * the top means the header stays exactly where the bar now is. YouTube is
    * the obvious one, and it is the one this was reported on.
    *
-   * So the pinned headers move too. Only things that really look like one: at
-   * the very top, most of the way across, and no taller than a header gets.
-   * A full-screen overlay or a sidebar is left alone, and everything moved is
-   * written down so it can be put back exactly as it was.
+   * This used to move only things shaped like a header: at the very top,
+   * most of the way across, no taller than a header gets. That moved
+   * YouTube's masthead and stopped there, which turned out to be half a
+   * fix. YouTube's sidebar, the one with Subscriptions on it, is fixed too
+   * and sits at the top of whatever the masthead is not covering, so it is
+   * already a little below the bar before anything moves. The old "already
+   * below the bar, so it needs no help" test therefore left it exactly
+   * where it was, and the masthead came down 54 pixels and parked on top
+   * of it.
+   *
+   * So the question is not "is this a header" but "is this anchored near
+   * the top of the window", which a sidebar hanging from under a header
+   * is. Anything full-screen is left alone, because that is a modal or a
+   * backdrop rather than furniture, and so is anything inside something
+   * already moved, which would otherwise come down twice.
    */
   function moveHeaders(yes) {
     for (var i = 0; i < moved.length; i++) {
-      moved[i].el.style.transform = moved[i].was;
+      moved[i].el.style.translate = moved[i].was;
       moved[i].el.style.transition = moved[i].wasTransition;
     }
     moved = [];
     if (!yes) return;
+
+    // How far down still counts as anchored to the top. A header is at 0; a
+    // sidebar under one starts at the header's own height, and there is no
+    // way to ask which header it belongs to, so the answer is "about one
+    // header further down than the bar is tall".
+    var NEAR_TOP = BAR_HEIGHT * 2;
 
     var all = document.body ? document.body.querySelectorAll('*') : [];
     for (var j = 0; j < all.length; j++) {
@@ -480,16 +511,31 @@ var TorvalBar = (function () {
       var style = getComputedStyle(el);
       if (style.position !== 'fixed') continue;
       var box = el.getBoundingClientRect();
-      if (box.height === 0 || box.height > 200) continue;
-      if (box.width < window.innerWidth * 0.6) continue;
-      // Already below the bar, so it needs no help.
-      if (box.top >= BAR_HEIGHT - 1) continue;
+      if (box.height === 0 || box.width === 0) continue;
+      if (box.top > NEAR_TOP) continue;
+      // A modal, a backdrop or a full-screen overlay, which is not page
+      // furniture and has no business being pushed anywhere.
+      if (box.width >= window.innerWidth * 0.95 &&
+          box.height >= window.innerHeight * 0.95) continue;
+      if (inside(el, moved)) continue;
 
-      moved.push({ el: el, was: el.style.transform, wasTransition: el.style.transition });
-      el.style.transition = 'transform .22s ease';
-      el.style.transform = (el.style.transform ? el.style.transform + ' ' : '') +
-        'translateY(' + BAR_HEIGHT + 'px)';
+      // `translate` rather than `transform`: plenty of these are animated by
+      // the page itself, and appending to its transform meant putting a
+      // stale copy of that transform back afterwards. This is a separate
+      // property that composes with whatever the page is doing and can be
+      // handed back without touching it.
+      moved.push({ el: el, was: el.style.translate, wasTransition: el.style.transition });
+      el.style.transition = 'translate .22s ease';
+      el.style.translate = '0 ' + BAR_HEIGHT + 'px';
     }
+  }
+
+  /** Is this inside something that has already been moved down? */
+  function inside(el, list) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].el !== el && list[i].el.contains(el)) return true;
+    }
+    return false;
   }
 
   function setExpanded(value) {
@@ -596,8 +642,17 @@ var TorvalBar = (function () {
     '.score { font-size: 24px; font-weight: 600; color: #f4f5f7; }',
     '.detail { color: #767b84; }',
     '.spacer { flex: 1; }',
+    // A button is a square box with its glyph centred in it, rather than a
+    // line of text with padding round it. ⟳, ⚙, ◉ and » come from whatever
+    // font the browser has them in, and those fonts disagree about where in
+    // the line box the ink sits; with line-height:1 and symmetric padding
+    // that disagreement showed up as every icon riding low. Centring the
+    // line box itself, in a box of a known size, is the thing that actually
+    // holds still.
     'button {',
-    '  padding: 6px 11px; background: none; border: 0; border-radius: 6px;',
+    '  display: inline-flex; align-items: center; justify-content: center;',
+    '  box-sizing: border-box; width: 38px; height: 38px; padding: 0;',
+    '  background: none; border: 0; border-radius: 6px;',
     '  font: inherit; font-size: 22px; line-height: 1; color: #6b7079; cursor: pointer;',
     '}',
     'button:hover { background: #24262b; color: #dfe1e5; }',
@@ -622,10 +677,13 @@ var TorvalBar = (function () {
     onRefresh: function (fn) { onRefresh = fn; },
     onSkip: function (fn) { onSkip = fn; },
     skipButton: skipButton,
-    // Off and on again, for the switch on the toolbar button.
+    // Off and on again, for the switch on the toolbar button. Switching it
+    // off gives the page its room back too: a page pushed down by a bar
+    // that is no longer there is the same complaint as in quiet() above.
     visible: function (show) {
       if (!host) return;
       host.style.display = show ? 'block' : 'none';
+      makeRoom(!!show && expanded && pinned);
     },
     alwaysDown: alwaysDown,
     colourFor: colourFor
