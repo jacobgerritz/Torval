@@ -225,7 +225,8 @@ for (const target of building) {
 }
 
 if (building.includes('firefox')) {
-  console.log('Firefox: https://addons.mozilla.org/developers/addon/submit/upload-unlisted');
+  console.log('Firefox: https://addons.mozilla.org/developers/addon/submit/upload-listed');
+  console.log('  (upload-unlisted instead to self-host it rather than list it on AMO.)');
 }
 if (building.includes('chrome')) {
   console.log('Chrome:  https://chrome.google.com/webstore/devconsole');
