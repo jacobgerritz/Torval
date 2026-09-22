@@ -2373,6 +2373,24 @@ const run = async () => {
   check('and the ones either side',
     pillar.left === 40 && pillar.width === 240 && pillar.height === 180);
 
+  // A bar that has been through a JPEG is not perfectly black, and the edge
+  // where the picture starts rings. Both used to leave the bar on.
+  const grubby = framed(320, 180, 24, 0);
+  for (let y = 0; y < 180; y++) {
+    for (let x = 0; x < 320; x++) {
+      const at = (y * 320 + x) * 4;
+      if (y < 24 || y >= 156) {
+        grubby[at] = 14 + (x % 7);            // near black, not black
+        grubby[at + 1] = 12;
+        grubby[at + 2] = 20;
+      }
+    }
+  }
+  grubby[(23 * 320 + 100) * 4] = 200;         // one ring along the edge
+  const cleaned = Video._withoutBars(grubby, 320, 180);
+  check('a bar that is nearly black is still a bar',
+    cleaned.top === 24 && cleaned.height === 132);
+
   const full = Video._withoutBars(framed(320, 180, 0, 0), 320, 180);
   check('a frame with no bars is left alone',
     full.left === 0 && full.top === 0 &&

@@ -600,32 +600,43 @@ var TorvalVideo = (function () {
    * the ratio between them is read off the image rather than taken from
    * devicePixelRatio, which is wrong the moment the page is zoomed.
    */
-  // A bar is not merely dark, it is black; and no film is more than about a
-  // third bar at either end, so a frame that looks like it is one is a frame
-  // that has been read wrong.
-  var BAR_DARK = 18;
+  // A bar is not merely dark, it is black. The threshold is generous rather
+  // than exact: a bar that has been through a JPEG, or a screen with a
+  // colour profile on it, arrives a few values off nought, and a bar left
+  // on because it measured 21 is the complaint this exists to answer.
+  var BAR_DARK = 30;
+  // And it need not be perfectly black everywhere. Compression rings along
+  // the edge where the picture starts, and a subtitle sitting in the bar
+  // puts real pixels in it, so a handful of bright samples in a row of
+  // hundreds is still a bar.
+  var BAR_STRAY = 0.06;
+  // No film is more than about a third bar at either end, so a frame that
+  // reads as one is a frame that has been read wrong.
   var BAR_MOST = 0.35;
 
-  function darkRow(data, wide, y) {
-    var step = Math.max(1, Math.floor(wide / 64));
-    for (var x = 0; x < wide; x += step) {
-      var at = (y * wide + x) * 4;
-      if (data[at] > BAR_DARK || data[at + 1] > BAR_DARK || data[at + 2] > BAR_DARK) {
-        return false;
+  function mostlyBlack(data, at, step, count) {
+    var stray = 0;
+    var allowed = Math.floor(count * BAR_STRAY);
+    for (var i = 0; i < count; i++) {
+      var p = at + i * step;
+      if (data[p] > BAR_DARK || data[p + 1] > BAR_DARK || data[p + 2] > BAR_DARK) {
+        stray++;
+        if (stray > allowed) return false;
       }
     }
     return true;
   }
 
+  function darkRow(data, wide, y) {
+    var every = Math.max(1, Math.floor(wide / 160));
+    var count = Math.floor(wide / every);
+    return mostlyBlack(data, y * wide * 4, every * 4, count);
+  }
+
   function darkColumn(data, wide, high, x) {
-    var step = Math.max(1, Math.floor(high / 64));
-    for (var y = 0; y < high; y += step) {
-      var at = (y * wide + x) * 4;
-      if (data[at] > BAR_DARK || data[at + 1] > BAR_DARK || data[at + 2] > BAR_DARK) {
-        return false;
-      }
-    }
-    return true;
+    var every = Math.max(1, Math.floor(high / 160));
+    var count = Math.floor(high / every);
+    return mostlyBlack(data, x * 4, every * wide * 4, count);
   }
 
   /**
@@ -675,6 +686,8 @@ var TorvalVideo = (function () {
       right = wide - 1;
     }
     if (top === 0 && bottom === high - 1 && left === 0 && right === wide - 1) return whole;
+    trace('Torval: trimming bars from the frame, ' + top + ' above, ' +
+      (high - 1 - bottom) + ' below, ' + left + ' left, ' + (wide - 1 - right) + ' right');
     return {
       left: left, top: top,
       width: right - left + 1, height: bottom - top + 1
