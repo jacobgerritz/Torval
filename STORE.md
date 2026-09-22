@@ -271,6 +271,25 @@ file on GitHub as insufficiently a policy).
 
 ---
 
+## Source code (Firefox asks, and the answer is yes)
+
+AMO asks whether the add-on uses any tool that processes files and generates
+files included in the package. It does, twice: `tools/build-dict*.mjs` make
+the dictionary JSON, and `tools/package.mjs` writes each browser's
+manifest.json from the one in `extension/`. Answer **yes**. Answering no to
+save a step is a misrepresentation, and it is checkable.
+
+Saying yes means uploading a source archive. Build it from the tag rather
+than the working directory, so nothing local goes with it:
+
+    git archive --format=zip --prefix=torval-1.0.0/ -o dist/torval-1.0.0-source.zip HEAD
+
+That is about 4 MB: every .js file, the build scripts and the tests, and
+none of the generated data, which the instructions below regenerate. The
+build instructions AMO asks for are the same text as the reviewer notes.
+
+---
+
 ## Notes for the Firefox reviewer
 
 Optional field, but not for this add-on: it ships 28 MB of generated JSON,
