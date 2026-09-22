@@ -1,9 +1,9 @@
 # Torval
 
-A pop-up dictionary for Firefox, for Japanese, Italian and Spanish. Hold
-**Shift** and point at a word; its meaning appears next to the cursor.
-Everything is on your own machine, the whole dictionary lives in the browser.
-It works with the network off, and it collects nothing: see
+A pop-up dictionary for Firefox and Chrome, for Japanese, Italian and
+Spanish. Hold **Shift** and point at a word; its meaning appears next to the
+cursor. Everything is on your own machine, the whole dictionary lives in the
+browser. It works with the network off, and it collects nothing: see
 [PRIVACY.md](PRIVACY.md).
 
 Japanese uses JMdict, the dictionary Jisho is built from. Italian and Spanish
@@ -60,12 +60,15 @@ see below.
 node tools/build-dict-es.mjs
 ```
 
-**2. Load it into Firefox.** Go to `about:debugging` → *This Firefox* → *Load
-Temporary Add-on…* and pick `extension/manifest.json`. The toolbar popup leads
-with a language picker the first time; pick one to get started, or switch
-later from that same popup or from Settings. Choosing a language you have not
-built the dictionary for yet just means that language's popup waits, the same
-way the very first run does for whichever language you built.
+**2. Load it into the browser.** On Firefox, go to `about:debugging` → *This
+Firefox* → *Load Temporary Add-on…* and pick `extension/manifest.json`. On
+Chrome, run `node tools/package.mjs`, then go to `chrome://extensions`, turn
+on *Developer mode* and *Load unpacked* the unzipped Chrome build from
+`dist/`. The toolbar popup leads with a language picker the first time; pick
+one to get started, or switch later from that same popup or from Settings.
+Choosing a language you have not built the dictionary for yet just means that
+language's popup waits, the same way the very first run does for whichever
+language you built.
 
 The first time it runs, the extension spends a minute or so copying the
 dictionary into the browser's own storage: 218,000 entries and 465,000
