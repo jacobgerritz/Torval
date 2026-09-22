@@ -10,7 +10,7 @@
  * code that ships.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -2862,6 +2862,25 @@ const run = async () => {
     check('the background asks the manifest before registering one',
       /getManifest\(\)\.permissions[\s\S]{0,60}webRequestBlocking/.test(background) &&
       /if \(CAN_BLOCK &&/.test(background));
+  }
+
+  // --- nothing enters that cannot leave ----------------------------------
+  // The licence is GPL-3.0 today and the copyright is one person's, which
+  // means it could be something else later. Two things would end that
+  // quietly and permanently: a dependency under a copyleft licence, and a
+  // function copied out of somebody else's project. Neither looks like a
+  // mistake at the time, and by the time it matters it is years back in
+  // the history. See CONTRIBUTING.md.
+  {
+    check('no package manifest, so no dependency can arrive unnoticed',
+      !existsSync(join(ROOT, 'package.json')));
+    const shipped = ['extension', 'tools'].flatMap((dir) =>
+      readdirSync(join(ROOT, dir))
+        .filter((f) => f.endsWith('.js') || f.endsWith('.mjs'))
+        .map((f) => [dir + '/' + f, readFileSync(join(ROOT, dir, f), 'utf8')]));
+    const foreign = shipped.filter(([, text]) => /copyright \(c\)/i.test(text));
+    check('no file carries somebody else\'s copyright notice',
+      foreign.length === 0, 'found in: ' + foreign.map(([f]) => f).join(', '));
   }
 
   // --- every message has somewhere to go ---------------------------------
