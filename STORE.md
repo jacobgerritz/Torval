@@ -301,7 +301,9 @@ looks like obfuscation if it is not explained. Say this:
       distinctive thing there and nothing else in the set shows it.
 
       **Exact size.** For anything in a browser, including the settings
-      page: Chrome, `Ctrl+Shift+M`, set the dimensions to 1280 × 800, then
+      page: Chrome, `F12` to open DevTools first (`Ctrl+Shift+M` does
+      nothing until it is open, since it is a DevTools shortcut), then
+      `Ctrl+Shift+M`, set the dimensions to 1280 × 800, then
       `Ctrl+Shift+P` and "Capture screenshot". That writes the viewport at
       exactly that size, with no browser chrome in it, so there is nothing
       to crop and nothing personal to crop out. For Anki, which is not a
