@@ -1663,3 +1663,6 @@ JMdict and Wiktextract are CC BY-SA, which says the same thing about data
 that the GPL says about code. Torval was MIT until version 1.0; anyone who
 took a copy before then still has it under those terms, which is how it
 should be.
+
+Bug reports and patches are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md),
+which also says what sending one means for the copyright in it.
