@@ -291,6 +291,24 @@ looks like obfuscation if it is not explained. Say this:
       `card.png`, replacing the three dashed boxes in `docs/index.html`.
       Nothing real in frame: no personal bookmarks, no email address in a
       browser chrome, no unrelated tabs.
+
+      **Language.** Shoot most of them in whichever language is actually
+      being studied, because the percentage and the word list are only
+      believable with a real list behind them. One shot in a second
+      language, so the set does not read as a Japanese-only add-on; the
+      article popup is the easiest one to redo. If Japanese is one of the
+      two, put it on the Anki card, since the pitch diagram is the most
+      distinctive thing there and nothing else in the set shows it.
+
+      **Exact size.** For anything in a browser, including the settings
+      page: Chrome, `Ctrl+Shift+M`, set the dimensions to 1280 × 800, then
+      `Ctrl+Shift+P` and "Capture screenshot". That writes the viewport at
+      exactly that size, with no browser chrome in it, so there is nothing
+      to crop and nothing personal to crop out. For Anki, which is not a
+      browser, take the window however and then:
+
+          magick shot.png -resize 1280x800 -background '#1c1d20' \
+            -gravity center -extent 1280x800 card.png
 - [x] Version is 1.0.0. A store version number cannot be reused, so if
       anything changes before the first upload, bump it again.
 - [ ] Privacy policy is actually live at the URL above (GitHub Pages must
