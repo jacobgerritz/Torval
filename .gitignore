@@ -33,3 +33,6 @@ anki/*/meta.json
 # The packaged add-on, built with:
 #   cd anki/known_words_export && zip -qXr ../known-words-export.ankiaddon . -x "meta.json" "__pycache__/*"
 *.ankiaddon
+
+# Editor/tool scratch, never part of the project
+.claude/
