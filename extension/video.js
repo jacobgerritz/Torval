@@ -418,10 +418,10 @@ var TorvalVideo = (function () {
     if (!api || !api.runtime) return null;
     if (window.top !== window) return null;
 
-    var rect = video.getBoundingClientRect();
-    if (rect.width < 1 || rect.height < 1) return null;
+    var rect = videoBox(video, { width: window.innerWidth, height: window.innerHeight });
+    if (!rect || rect.width < 1 || rect.height < 1) return null;
 
-    var show = hideOverlays();
+    var show = hideOverlays(video);
     var shot = null;
     try {
       await painted();
@@ -456,7 +456,7 @@ var TorvalVideo = (function () {
    * visibility rather than display: nothing reflows, so nothing moves in
    * the frame being photographed and nothing has to settle afterwards.
    */
-  function hideOverlays() {
+  function hideOverlays(video) {
     var found = [];
     var gather = function (selector) {
       if (!selector) return;
@@ -474,11 +474,79 @@ var TorvalVideo = (function () {
         if (TorvalSubtitles.overlays) gather(TorvalSubtitles.overlays());
       } catch (err) { /* this site has none named */ }
     }
+    besideTheVideo(video).forEach(function (el) { found.push(el); });
     var was = found.map(function (el) { return el.style.visibility; });
     found.forEach(function (el) { el.style.visibility = 'hidden'; });
     return function () {
       found.forEach(function (el, at) { el.style.visibility = was[at]; });
     };
+  }
+
+  /**
+   * Everything inside the player that is not the video.
+   *
+   * Naming the furniture selector by selector is a losing game: the back
+   * arrow, the logo, the skip button and the next-episode card are four
+   * names today and different names after a redesign. What does not change
+   * is the shape. The video sits at the end of one chain of elements, and
+   * every branch off that chain is something drawn beside or over it. So
+   * the chain is walked from the video up to the player, and everything
+   * hanging off it is put away, whatever it is called this month.
+   *
+   * Stops at the player rather than the body: outside it is the page, and
+   * the page is not in the crop anyway.
+   */
+  function besideTheVideo(video) {
+    var out = [];
+    var player = null;
+    if (typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.playerSelector) {
+      try {
+        var selector = TorvalSubtitles.playerSelector();
+        if (selector) player = video.closest(selector);
+      } catch (err) { player = null; }
+    }
+    if (!player) return out;
+    var node = video;
+    while (node && node !== player && node.parentElement) {
+      var kids = node.parentElement.children;
+      for (var i = 0; i < kids.length; i++) if (kids[i] !== node) out.push(kids[i]);
+      node = node.parentElement;
+    }
+    return out;
+  }
+
+  /**
+   * Where the picture actually is inside the element.
+   *
+   * A video element keeps its own shape and fits the picture inside it, so
+   * a 21:9 film in a 16:9 window has black above and below that belongs to
+   * the element and not to the film. Cropping to the element puts those
+   * bars on the card. The picture's own proportions say where it really
+   * is, and it is always centred.
+   *
+   * Clamped to the window, because a photograph of the window holds only
+   * what is in the window.
+   */
+  function videoBox(video, view) {
+    var screen = view || { width: window.innerWidth, height: window.innerHeight };
+    var rect = video.getBoundingClientRect();
+    var wide = video.videoWidth;
+    var high = video.videoHeight;
+    var box = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    if (wide && high && rect.width > 0 && rect.height > 0) {
+      var scale = Math.min(rect.width / wide, rect.height / high);
+      box.width = wide * scale;
+      box.height = high * scale;
+      box.left = rect.left + (rect.width - box.width) / 2;
+      box.top = rect.top + (rect.height - box.height) / 2;
+    }
+    var right = Math.min(box.left + box.width, screen.width);
+    var bottom = Math.min(box.top + box.height, screen.height);
+    box.left = Math.max(0, box.left);
+    box.top = Math.max(0, box.top);
+    box.width = right - box.left;
+    box.height = bottom - box.top;
+    return box;
   }
 
   /**
@@ -821,7 +889,8 @@ var TorvalVideo = (function () {
     _toMono: toMono, _wavFile: wavFile,
     // Exposed for the tests: telling a picture from a black rectangle.
     _allOneColour: allOneColour,
-    _trimHead: trimHead
+    _trimHead: trimHead,
+    _videoBox: videoBox
   };
 })();
 

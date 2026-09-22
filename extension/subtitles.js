@@ -2347,6 +2347,7 @@ var TorvalSubtitles = (function () {
     siteFor: siteFor,
     captionBox: captionBox,
     overlays: overlays,
+    playerSelector: function () { return (site && site.player) || ''; },
     seekTo: seekTo,
     /** Whether this site insists on being moved by its own player. */
     ownSeek: function () { return !!(site && site.seek); },

@@ -2348,6 +2348,34 @@ const run = async () => {
     Video._allOneColour(new Uint8ClampedArray(0)) === true &&
     Video._allOneColour(null) === true);
 
+  // --- where the picture is inside the element -------------------------------
+  // A 21:9 film in a 16:9 window has black bars that belong to the element,
+  // not the film, and cropping to the element puts them on the card.
+  const boxOf = (elementWide, elementHigh, wide, high) => Video._videoBox({
+    videoWidth: wide,
+    videoHeight: high,
+    getBoundingClientRect: () => ({
+      left: 0, top: 0, width: elementWide, height: elementHigh
+    })
+  }, { width: elementWide, height: elementHigh });
+
+  const letterboxed = boxOf(1600, 900, 1920, 800);
+  check('the bars above and below a wide film are cut off',
+    Math.round(letterboxed.width) === 1600 &&
+    Math.round(letterboxed.height) === 667 &&
+    Math.round(letterboxed.top) === 117);
+
+  const pillared = boxOf(1600, 900, 640, 480);
+  check('and the bars either side of a narrow one',
+    Math.round(pillared.height) === 900 &&
+    Math.round(pillared.width) === 1200 &&
+    Math.round(pillared.left) === 200);
+
+  const exact = boxOf(1600, 900, 1920, 1080);
+  check('a picture that fits the element is the element',
+    Math.round(exact.width) === 1600 && Math.round(exact.height) === 900 &&
+    Math.round(exact.left) === 0 && Math.round(exact.top) === 0);
+
   // --- cutting the warm-up off the front -------------------------------------
   // Recording opens half a second before the line, so the tail of the line
   // before is on every clip until it is cut off again.
