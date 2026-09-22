@@ -39,7 +39,7 @@ function showPanel(name) {
 // that is what the page was called when anything started linking to it.
 const asked = (location.hash || '').slice(1);
 showPanel(asked === 'known' ? 'words'
-  : document.getElementById('panel-' + asked) ? asked : 'words');
+  : document.getElementById('panel-' + asked) ? asked : 'dicts');
 
 /*
  * Opened to be shown one switch.
@@ -732,7 +732,7 @@ function askFirst() {
   // panel is already hidden and the panel the address asked for is left
   // exactly as it was.
   if (asking) showPanel('first');
-  else if (!firstPanel.hidden) showPanel('words');
+  else if (!firstPanel.hidden) showPanel('dicts');
   // Drawn only now, so a fresh install never shows a flash of the settings
   // it is not ready to have.
   layout.classList.add('settled');
@@ -764,20 +764,25 @@ if (firstPanel) {
 /*
  * What Torval has to read with, and what it is costing.
  *
- * Every language ships a dictionary, and none of them is read into the
- * browser until somebody chooses that language. So there are two different
- * questions about each one, and the page answers both: what it contains,
- * which is true of the package, and whether it is in this browser, which is
- * true of this machine and is the only part anybody can do anything about.
+ * Every language ships a dictionary and none of them is in the browser until
+ * it is put there, so there are two questions about each one: what it
+ * contains, which is true of the package, and whether this machine is
+ * carrying it, which is the only part anybody can do anything about.
  *
- * The one thing on offer is throwing one away. It buys back tens of
- * megabytes for somebody learning one language who opened the other two once
- * to look, and it costs nothing permanent, because choosing the language
- * again reads it straight back in.
+ * Hence one switch per dictionary. Off throws the database away; on reads it
+ * back in there and then rather than waiting until the language is next
+ * chosen, because a switch whose effect you cannot see is a switch nobody
+ * believes. Nothing is lost either way: the dictionary itself is in the
+ * package, and this is only about the copy unpacked into the browser.
+ *
+ * The language being read cannot be switched off. Deleting the database the
+ * lookups are running against would take the page down, and choosing another
+ * language first is the whole of the cure.
  */
 
 const dictList = document.getElementById('dict-list');
 const dictNote = document.getElementById('dict-note');
+let dictBusy = false;
 
 function countOf(n) {
   return typeof n === 'number' ? n.toLocaleString() : '';
@@ -792,11 +797,19 @@ function dayOf(text) {
 }
 
 function whereItStands(dict) {
+  if (dict.building !== null && dict.building !== undefined) {
+    return 'Reading it in, ' + Math.round(dict.building * 100) + '%…';
+  }
   if (dict.active) return 'The language you are reading.';
-  if (dict.stale) return 'An older copy is in this browser, replaced next time you choose it.';
+  if (dict.stale) return 'An older copy, replaced next time you choose it.';
   if (dict.ready) return 'In this browser.';
-  if (dict.here) return 'Half read in, and finished next time you choose it.';
-  return 'Not read in yet. Choosing ' + dict.name + ' reads it in.';
+  if (dict.here) return 'Half read in.';
+  return 'Not in this browser.';
+}
+
+/** Italian and Spanish come from the same places, so they share a list. */
+function sourcesFor(code) {
+  return document.getElementById('sources-' + (code === 'es' ? 'it' : code));
 }
 
 function dictionaryCard(dict) {
@@ -806,51 +819,54 @@ function dictionaryCard(dict) {
   title.textContent = dict.name;
   section.appendChild(title);
 
-  const size = document.createElement('p');
-  size.className = 'note';
-  size.textContent = dict.entries
-    ? countOf(dict.entries) + ' entries, ' + countOf(dict.terms) + ' forms. Built ' +
-      dayOf(dict.built) + '.'
-    : 'Not built into this copy of Torval.';
-  section.appendChild(size);
+  const keep = document.createElement('label');
+  keep.className = 'check';
+  const box = document.createElement('input');
+  box.type = 'checkbox';
+  box.checked = dict.here;
+  box.disabled = dictBusy || dict.active;
+  const what = document.createElement('span');
+  what.textContent = 'Keep in this browser';
+  keep.appendChild(box);
+  keep.appendChild(what);
+  box.addEventListener('change', () => keepDictionary(dict.code, box.checked));
+  section.appendChild(keep);
 
-  const row = document.createElement('p');
-  row.className = 'row';
+  const hint = document.createElement('p');
+  hint.className = 'hint';
+  hint.textContent = whereItStands(dict) + (dict.entries
+    ? ' ' + countOf(dict.entries) + ' entries, ' + countOf(dict.terms) +
+      ' forms, built ' + dayOf(dict.built) + '.'
+    : ' Not built into this copy of Torval.');
+  section.appendChild(hint);
 
-  const state = document.createElement('span');
-  state.className = 'note';
-  state.textContent = whereItStands(dict);
-  row.appendChild(state);
-
-  // Not the language being read: deleting the database the lookups are
-  // running against would take the page down, and choosing another language
-  // first is the whole of the cure.
-  if (dict.here && !dict.active) {
-    const drop = document.createElement('button');
-    drop.textContent = 'Remove';
-    drop.addEventListener('click', async () => {
-      drop.disabled = true;
-      await forget(dict.code);
-    });
-    row.appendChild(drop);
+  const made = sourcesFor(dict.code);
+  if (made) {
+    const of = document.createElement('p');
+    of.className = 'note';
+    of.appendChild(made.content.cloneNode(true));
+    section.appendChild(of);
   }
 
-  section.appendChild(row);
   return section;
 }
 
-async function forget(code) {
-  say('');
+async function keepDictionary(code, keep) {
+  dictBusy = true;
+  sayAboutDictionaries(keep ? 'Reading it in. This takes a minute.' : '');
+  await paintDictionaries();
   try {
-    const reply = await api.runtime.sendMessage({ type: 'forgetDictionary', code });
-    if (!reply || !reply.ok) throw new Error((reply && reply.error) || 'It would not go.');
+    const reply = await api.runtime.sendMessage({ type: 'keepDictionary', code, keep });
+    if (!reply || !reply.ok) throw new Error((reply && reply.error) || 'It would not budge.');
+    sayAboutDictionaries('');
   } catch (err) {
-    say(err.message, true);
+    sayAboutDictionaries(err.message, true);
   }
+  dictBusy = false;
   await paintDictionaries();
 }
 
-function say(text, wrong) {
+function sayAboutDictionaries(text, wrong) {
   if (!dictNote) return;
   dictNote.textContent = text || '';
   dictNote.className = 'note' + (wrong ? ' error' : '');
@@ -868,10 +884,20 @@ async function paintDictionaries() {
 
   dictList.textContent = '';
   for (const dict of dicts) dictList.appendChild(dictionaryCard(dict));
+  return dicts.some((d) => d.building !== null && d.building !== undefined);
+}
+
+/** While one is being read in, often; the rest of the time, not at all. */
+async function watchDictionaries() {
+  for (;;) {
+    const working = await paintDictionaries();
+    if (!working && !dictBusy) return;
+    await pause(600);
+  }
 }
 
 if (dictList) {
-  paintDictionaries();
+  paintDictionaries().then((working) => { if (working) watchDictionaries(); });
   // The language can be changed from the sidebar of this very page, and it
   // moves which dictionary is the one in use.
   TorvalLang.onChange(() => { paintDictionaries(); });

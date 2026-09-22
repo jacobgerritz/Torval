@@ -251,7 +251,7 @@ api.runtime.onMessage.addListener((message, sender) => {
       return true;
     });
     case 'dictionaries': return guard(() => dictionaries());
-    case 'forgetDictionary': return guard(() => forgetDictionary(message.code));
+    case 'keepDictionary': return guard(() => keepDictionary(message.code, message.keep));
     case 'grabVisible':  return guard(() => grabVisible(sender && sender.tab));
     case 'tabAudioReady': return guard(() => tabAudioReady());
     case 'tabAudioStart': return guard(() => tabAudioStart(sender && sender.tab && sender.tab.id,
@@ -1067,6 +1067,10 @@ async function ensureOffscreen() {
  * not there creates it, and asking a question should not be how a 30 MB
  * import gets started.
  */
+// How far through reading in a dictionary that is not the one in use. Null
+// the rest of the time, which is almost always.
+let building = null;
+
 async function dictionaries() {
   const present = new Set();
   try {
@@ -1103,6 +1107,7 @@ async function dictionaries() {
       code,
       name: profile.name,
       here: present.has(store),
+      building: building && building.code === code ? building.progress : null,
       ready: !!installed,
       stale: !!(installed && shipped && installed.version !== shipped.version),
       active: code === TorvalLang.active(),
@@ -1127,6 +1132,47 @@ async function dictionaries() {
  * lookups running against it would take the page down for no reason, and
  * the cure is one click on another language first.
  */
+/**
+ * Keep this dictionary in this browser, or do not.
+ *
+ * Turning it on reads the dictionary in there and then, rather than leaving
+ * it until the language is next chosen: a switch that does nothing you can
+ * see until later is a switch nobody believes. Turning it off throws the
+ * database away.
+ *
+ * One at a time. Two imports into two databases would both run, both be
+ * slow, and neither would be what anybody asked for first.
+ */
+async function keepDictionary(code, keep) {
+  const profile = TorvalLang.get(code);
+  if (!profile || code !== profile.code) throw new Error('There is no such dictionary.');
+  if (!keep) return forgetDictionary(code);
+  if (code === TorvalLang.active()) return { code };
+  if (building) throw new Error('One at a time: another dictionary is being read in.');
+
+  const db = await openDatabase('torval-dictionary' + profile.dbSuffix);
+  try {
+    const meta = await fetchJson('data/meta.json', profile.dataPath);
+    const installed = await get(db, STATE, 'meta');
+    if (installed && installed.version === meta.version) return { code };
+
+    building = { code, progress: 0 };
+    const awake = keepAwake();
+    try {
+      await importDictionary(db, meta, profile.dataPath, (fraction) => {
+        building = { code, progress: fraction };
+      });
+    } finally {
+      awake();
+    }
+  } finally {
+    db.close();
+    building = null;
+  }
+  trace('Torval: read the ' + profile.name + ' dictionary into this browser');
+  return { code };
+}
+
 async function forgetDictionary(code) {
   const profile = TorvalLang.get(code);
   if (!profile || code !== profile.code) throw new Error('There is no such dictionary.');
@@ -1579,7 +1625,7 @@ function keepAwake() {
  * the next start picks up where this one left off. Each batch also nudges the
  * badge, which is a browser API call, which is what tells Firefox we are alive.
  */
-async function importDictionary(db, meta) {
+async function importDictionary(db, meta, dataPath, onProgress) {
   const total = meta.entryChunks + meta.indexChunks;
   let progress = await get(db, STATE, 'import');
 
@@ -1602,7 +1648,7 @@ async function importDictionary(db, meta) {
   // Entry ids are positions in the build output, so the counter has to run
   // unbroken across chunks, which is why it is part of the saved progress.
   for (let i = progress.entries; i < meta.entryChunks; i++) {
-    const rows = await fetchJson(`data/entries-${pad(i)}.json`);
+    const rows = await fetchJson(`data/entries-${pad(i)}.json`, dataPath);
     let nextId = progress.nextId;
     const pairs = rows.map((entry) => {
       entry.id = nextId;
@@ -1614,7 +1660,7 @@ async function importDictionary(db, meta) {
   }
 
   for (let i = progress.index; i < meta.indexChunks; i++) {
-    const rows = await fetchJson(`data/index-${pad(i)}.json`);   // [term, ids][]
+    const rows = await fetchJson(`data/index-${pad(i)}.json`, dataPath);   // [term, ids][]
     await putAll(db, INDEX, rows, (fraction) => report(fraction));
     progress = { ...progress, index: i + 1 };
     await save();
@@ -1622,8 +1668,8 @@ async function importDictionary(db, meta) {
 
   await run(db, STATE, 'readwrite', (store) => store.put(meta, 'meta'));
   await run(db, STATE, 'readwrite', (store) => store.delete('import'));
-  status = { state: 'ready', progress: 1 };
-  setBadge('');
+  if (onProgress) onProgress(1);
+  else { status = { state: 'ready', progress: 1 }; setBadge(''); }
   trace(`Torval: dictionary ready, ${meta.entries} entries, ${meta.terms} forms`);
 
   function save() {
@@ -1631,8 +1677,12 @@ async function importDictionary(db, meta) {
   }
 
   /** `within` is how far through the chunk currently being written we are. */
+  // A dictionary being read in because somebody ticked a box on the settings
+  // page is not the one being read from, so it must not touch the badge or
+  // the status the popup reads. It reports to whoever asked for it instead.
   function report(within) {
     const done = progress.entries + progress.index + within;
+    if (onProgress) { onProgress(done / total); return; }
     status = { state: 'loading', progress: done / total };
     setBadge(Math.round((done / total) * 100) + '%');
   }
@@ -1692,8 +1742,8 @@ async function putAll(db, storeName, pairs, onProgress) {
 // existing install already has; swapped here for whichever language is
 // active, 'data-it/...' for Italian and 'data-es/...' for Spanish, rather
 // than touching every call site.
-async function fetchJson(path) {
-  const scoped = path.replace(/^data\//, TorvalLang.profile().dataPath + '/');
+async function fetchJson(path, dataPath) {
+  const scoped = path.replace(/^data\//, (dataPath || TorvalLang.profile().dataPath) + '/');
   const res = await fetch(api.runtime.getURL(scoped));
   if (!res.ok) {
     throw new Error(`cannot read ${scoped} (${res.status}), ` +

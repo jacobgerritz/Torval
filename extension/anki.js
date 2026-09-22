@@ -47,18 +47,30 @@ var TorvalAnki = (function () {
 
   // Used to guess the mapping the first time, so a sensibly named note type
   // needs no setting up. First field to claim a source keeps it.
+  //
+  // The spellings are the ones the note types people actually use go by:
+  // Lapis, JP Mining Note, AnkiMorphs, Migaku, Tango, Core 2k/6k and the
+  // decks built on them, plus the obvious English words. Spaces, hyphens and
+  // underscores are all allowed between the parts, since a field called
+  // "Word_Audio" is nobody's idea of a different field from "Word Audio".
+  // First field to claim a source keeps it, so the more specific patterns
+  // have to be checked before the looser ones: Sentence Audio is looked for
+  // before Audio, or every sentence recording would land in the word's box.
   var FIELD_GUESSES = [
-    [/^(target ?word|word|expression|vocab(ulary)?|front)$/i, 'word'],
-    [/^(reading|kana|furigana|pronunciation)$/i, 'reading'],
-    [/^(sentence|example|context|sentence japanese)$/i, 'sentence'],
-    [/^(definitions?|dictionary definitions?|meaning|gloss(es)?|back|english)$/i, 'definition'],
-    [/^(word ?audio|audio|term ?audio)$/i, 'audio'],
-    [/^(pitch|pitch ?accent|accent)$/i, 'pitch'],
-    [/^(stress|word ?stress)$/i, 'stress'],
-    [/^(images?|screenshot|picture|photo)$/i, 'image'],
-    [/^(sentence ?audio|expression ?audio|context ?audio)$/i, 'sentenceAudio'],
-    [/^(sentence ?before|previous ?(sentence|line)|line ?before|before)$/i, 'sentenceBefore'],
-    [/^(sentence ?after|next ?(sentence|line)|line ?after|after)$/i, 'sentenceAfter']
+    [/^(sentence|sent|expression|expr|context|selection)[ _-]?audio$/i, 'sentenceAudio'],
+    [/^(audio[ _-]?(sentence|on[ _-]?bold))$/i, 'sentenceAudio'],
+    [/^(sentence|example|context|usage|snippet|phrase|sentence[ _-]?japanese)$/i, 'sentence'],
+    [/^(target[ _-]?word|word|words|expression|vocab(ulary)?|term|headword|front|kanji|spelling)$/i, 'word'],
+    [/^(reading|readings|kana|furigana|word[ _-]?reading|pronunciation|hiragana|romaji)$/i, 'reading'],
+    [/^((primary|main|dictionary|word|selection)[ _-]?)?definitions?$/i, 'definition'],
+    [/^(meaning|meanings|gloss(es)?|translation|back|english|word[ _-]?meaning|sense)$/i, 'definition'],
+    [/^(word|term|vocab|target)[ _-]?audio$/i, 'audio'],
+    [/^(audio|sound|pronunciation[ _-]?audio)$/i, 'audio'],
+    [/^(pitch|pitch[ _-]?accent|accent|pitch[ _-]?accent[ _-]?graphs?|word[ _-]?pitch)$/i, 'pitch'],
+    [/^(stress|word[ _-]?stress|accented|accented[ _-]?word)$/i, 'stress'],
+    [/^(images?|screenshot|picture|photo|pictures?|main[ _-]?image|sentence[ _-]?image)$/i, 'image'],
+    [/^(sentence[ _-]?before|previous[ _-]?(sentence|line)|line[ _-]?before|before|prev(ious)?)$/i, 'sentenceBefore'],
+    [/^(sentence[ _-]?after|next[ _-]?(sentence|line)|line[ _-]?after|after|next)$/i, 'sentenceAfter']
   ];
 
   // Every request gets a deadline. Without one, a call that simply never

@@ -304,6 +304,43 @@ const run = async () => {
     guessed['Source'] === '' && guessed['Sentence English'] === '',
     JSON.stringify(guessed));
 
+  // The note types people actually have, rather than the one Torval suggests.
+  const lapis = Anki.guessMapping(
+    ['Word', 'Word Reading', 'Sentence', 'Word Meaning', 'Sentence Audio',
+     'Word Audio', 'Picture', 'Pitch Accent Graphs']);
+  check('a note type named the way Lapis names things maps itself',
+    lapis['Word'] === 'word' && lapis['Word Reading'] === 'reading' &&
+    lapis['Word Meaning'] === 'definition' && lapis['Word Audio'] === 'audio' &&
+    lapis['Picture'] === 'image' && lapis['Pitch Accent Graphs'] === 'pitch',
+    JSON.stringify(lapis));
+
+  const runTogether = Anki.guessMapping(
+    ['Key', 'Word', 'WordReading', 'PrimaryDefinition', 'SentAudio',
+     'Audio', 'Picture', 'WordPitch']);
+  check('so does one with the spaces taken out',
+    runTogether['Word'] === 'word' && runTogether['WordReading'] === 'reading' &&
+    runTogether['SentAudio'] === 'sentenceAudio' && runTogether['Audio'] === 'audio' &&
+    runTogether['WordPitch'] === 'pitch',
+    JSON.stringify(runTogether));
+
+  const underscored = Anki.guessMapping(
+    ['target_word', 'word_audio', 'sentence_audio', 'sentence_before', 'sentence_after']);
+  check('and one held together with underscores',
+    underscored['target_word'] === 'word' &&
+    underscored['word_audio'] === 'audio' &&
+    underscored['sentence_audio'] === 'sentenceAudio' &&
+    underscored['sentence_before'] === 'sentenceBefore' &&
+    underscored['sentence_after'] === 'sentenceAfter',
+    JSON.stringify(underscored));
+
+  // The order of the patterns is the whole of this: "Audio" on its own means
+  // the word, but "Sentence Audio" must never be read as one of those.
+  const twoKinds = Anki.guessMapping(['Audio', 'Sentence Audio', 'Expression', 'Meaning']);
+  check('a sentence recording is never mistaken for a word recording',
+    twoKinds['Sentence Audio'] === 'sentenceAudio' && twoKinds['Audio'] === 'audio' &&
+    twoKinds['Expression'] === 'word' && twoKinds['Meaning'] === 'definition',
+    JSON.stringify(twoKinds));
+
   // Captured media is stored in Anki and referenced, not pasted into the field.
   let mediaCalls = [];
   globalThis.fetch = async (url, init) => {
@@ -2963,18 +3000,24 @@ const run = async () => {
         all[2].here === true && all[2].ready === false);
       check('and one that does not is not', all[0].here === false);
 
-      const refused = await send({ type: 'forgetDictionary', code: 'ja' });
+      const refused = await send({ type: 'keepDictionary', code: 'ja', keep: false });
       check('the dictionary in use will not be thrown away',
         !refused.ok && /reading/.test(refused.error), JSON.stringify(refused));
 
-      const gone = await send({ type: 'forgetDictionary', code: 'es' });
+      const gone = await send({ type: 'keepDictionary', code: 'es', keep: false });
       check('another one goes when asked',
         gone.ok && deleted.includes('torval-dictionary-es'),
         JSON.stringify(gone) + ' ' + deleted.join(','));
 
-      const nonsense = await send({ type: 'forgetDictionary', code: 'xx' });
+      const nonsense = await send({ type: 'keepDictionary', code: 'xx', keep: false });
       check('and a language that does not exist is refused rather than guessed at',
         !nonsense.ok, JSON.stringify(nonsense));
+
+      // Switching one on when it is already the language in use is not an
+      // error and not an import; there is nothing to do.
+      const already = await send({ type: 'keepDictionary', code: 'ja', keep: true });
+      check('switching on the one already in use does nothing and says so',
+        already.ok, JSON.stringify(already));
     }
 
     const before = JSON.stringify(stored);

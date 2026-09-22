@@ -10,12 +10,12 @@
       <span>Language</span>
       <select id="language"></select>
     </label>
-    <button class="tab" data-panel="words">Words</button>
+    <button class="tab" data-panel="dicts">Dictionaries</button>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="video">Video</button>
+    <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="keys">Keys</button>
     <button class="tab" data-panel="look">Appearance</button>
-    <button class="tab" data-panel="dicts">Dictionaries</button>
     <button class="tab" data-panel="about">About</button>
     <span class="sidebar-spacer"></span>
     <button id="open-reader" class="sidebar-action">Open your books</button>
@@ -309,44 +309,39 @@
 
     <div id="dict-list"></div>
 
-    <div class="parting"><h2>What is in each one</h2></div>
-
     <section>
       <p class="note">
         Definitions, how common each word is, and for Japanese its pitch
         accent, are built into the one file rather than kept apart, so
         there is nothing separate to switch off.
       </p>
-      <h2>Japanese</h2>
-      <p class="note">
-        <b>JMdict</b>, from the Electronic Dictionary Research and
-        Development Group, under
-        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
-        The same dictionary Jisho is built on.<br>
-        <b>Pitch accent</b> from the Kanjium accent data.<br>
-        <b>Frequency</b> from JPDB and from the Balanced Corpus of
-        Contemporary Written Japanese.
-      </p>
-    </section>
-
-    <section>
-      <h2>Italian and Spanish</h2>
-      <p class="note">
-        <b>Wiktextract</b>, kaikki.org's machine extraction of English
-        Wiktionary, under
-        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.<br>
-        <b>Frequency</b> from hermitdave/FrequencyWords, built from
-        OpenSubtitles, MIT licensed, averaged with Wikipedia word counts
-        from adno/wikipedia-word-frequency-clean, under
-        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.<br>
-        <b>Pronunciations</b> from
-        <a href="https://lingualibre.org/">Lingua Libre</a>, volunteers
-        reading their own language onto Wikimedia Commons, under
-        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
-        Each recording names its speaker in its filename.
-      </p>
     </section>
   </div>
+
+  <!-- What each dictionary is made of, cloned into its card above. -->
+  <template id="sources-ja">
+    <b>JMdict</b>, from the Electronic Dictionary Research and Development
+    Group, under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+    The same dictionary Jisho is built on.<br>
+    <b>Pitch accent</b> from the Kanjium accent data.<br>
+    <b>Frequency</b> from JPDB and from the Balanced Corpus of Contemporary
+    Written Japanese.
+  </template>
+
+  <template id="sources-it">
+    <b>Wiktextract</b>, kaikki.org's machine extraction of English
+    Wiktionary, under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.<br>
+    <b>Frequency</b> from hermitdave/FrequencyWords, built from
+    OpenSubtitles, MIT licensed, averaged with Wikipedia word counts from
+    adno/wikipedia-word-frequency-clean, under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.<br>
+    <b>Pronunciations</b> from
+    <a href="https://lingualibre.org/">Lingua Libre</a>, volunteers reading
+    their own language onto Wikimedia Commons, under
+    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
+  </template>
 
   <div class="panel" id="panel-about" hidden>
     <section>
