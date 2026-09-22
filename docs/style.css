@@ -129,23 +129,6 @@ figure img {
   border-radius: 10px;
 }
 
-/* Where a screenshot goes and has not been taken yet. Deliberately plain
-   and deliberately not pretty: it is a note to self, not a design. */
-.want {
-  display: grid;
-  place-content: center;
-  min-height: 260px;
-  padding: 28px;
-  border: 1px dashed var(--line);
-  border-radius: 10px;
-  background: var(--card);
-  color: var(--ink-faint);
-  font-size: 14px;
-  line-height: 1.6;
-  text-align: center;
-}
-
-.want b { display: block; margin-bottom: 6px; color: var(--ink-dim); font-weight: 500; }
 
 figcaption {
   margin-top: 12px;

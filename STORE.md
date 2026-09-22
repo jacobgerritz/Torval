@@ -287,8 +287,11 @@ looks like obfuscation if it is not explained. Say this:
       5. Settings → Anki, with the fields mapped. *(store)*
       6. Settings → Words, with a real list and real counts. *(store)*
 
-      Website ones go in `docs/shots/` as `popup.png`, `video.png` and
-      `card.png`, replacing the three dashed boxes in `docs/index.html`.
+      Taken. The store set is in `shots/`, and the website's three are in
+      `docs/shots/`: `popup.png` for the article, `video.jpg` and `card.jpg`
+      for the two with a photograph in them, which JPEG carries at a
+      seventh of the size.
+
       Nothing real in frame: no personal bookmarks, no email address in a
       browser chrome, no unrelated tabs.
 
