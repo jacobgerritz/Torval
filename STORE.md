@@ -138,6 +138,16 @@ justification from a claim into something checkable.
 > allow a blocking listener. One rule, one URL pattern:
 > `||youtube.com/api/timedtext`.
 
+**`activeTab`**
+> The screenshot and the sound for a card, on a copy-protected video. Such a
+> video refuses to draw into a canvas, so the frame has to be taken by
+> photographing the tab, and the sound has to be taken off the tab too. The
+> browser allows neither until the user has clicked Torval's toolbar button
+> on that tab, which is the point of this permission: nothing is read from a
+> page the user has not just asked Torval to work on. The photograph is
+> cropped to the video, used for the card the user asked for, and never
+> leaves their machine.
+
 **`tabCapture`** (Chrome only, and optional: never requested until asked for)
 > The sound of a line on a copy-protected video, for a card. A video the
 > browser is decrypting hands over no audio when its element is asked for a
@@ -258,6 +268,9 @@ looks like obfuscation if it is not explained. Say this:
 
 ## Before you press submit
 
+- [ ] The manifests match what is written above. `activeTab`, `tabCapture`
+      and `offscreen` all arrived late, and a justification that does not
+      list a permission the package asks for is a rejection.
 - [ ] Screenshots. Both stores want real captures, not mockups. The site's
       drawn popup will not do. Five is plenty: the popup over a real page,
       the comprehension bar on a YouTube video, a subtitle line with the
