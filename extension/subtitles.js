@@ -974,10 +974,17 @@ var TorvalSubtitles = (function () {
         trace('Torval:', cues.length, 'subtitle lines ready, direct from YouTube');
         return;
       }
-      console.warn('Torval: YouTube would not hand over subtitle data for this video, ' +
-        'in any format this tried.');
+      // Not silent, because both ways of fetching the file have just
+      // failed and what follows is the lesser version: reading the screen
+      // needs YouTube's own captions switched on, and cannot know the
+      // transcript before it has been watched, so there is no percentage
+      // up front. Said once per video, and it names the cure.
+      console.warn('Torval: could not fetch this video\'s subtitles, so it is ' +
+        'reading them off the screen instead. Switch YouTube\'s own captions on ' +
+        'if nothing appears.');
     } catch (err) {
-      console.warn('Torval: could not load subtitles:', err && err.message);
+      console.warn('Torval: could not fetch this video\'s subtitles (' +
+        (err && err.message) + '), so it is reading them off the screen instead.');
     }
     fallBackToWatching();
   }
@@ -1230,7 +1237,13 @@ var TorvalSubtitles = (function () {
       var a = formats[i];
       trace('Torval: trying the', a.label, 'format');
       var text = await request(a.url);
-      if (!text) continue;
+      if (!text) {
+        // The one failure worth naming on its own: an empty answer here is
+        // usually the permission header not arriving, which is a different
+        // fault from a format this cannot read.
+        trace('Torval: the', a.label, 'request came back with nothing.');
+        continue;
+      }
       try {
         var cues = a.parse(text);
         if (cues.length) {
