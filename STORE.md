@@ -300,17 +300,18 @@ looks like obfuscation if it is not explained. Say this:
       two, put it on the Anki card, since the pitch diagram is the most
       distinctive thing there and nothing else in the set shows it.
 
-      **Exact size.** For anything in a browser, including the settings
-      page: Chrome, `F12` to open DevTools first (`Ctrl+Shift+M` does
-      nothing until it is open, since it is a DevTools shortcut), then
-      `Ctrl+Shift+M`, set the dimensions to 1280 × 800, then
-      `Ctrl+Shift+P` and "Capture screenshot". That writes the viewport at
-      exactly that size, with no browser chrome in it, so there is nothing
-      to crop and nothing personal to crop out. For Anki, which is not a
-      browser, take the window however and then:
+      **Exact size.** Take them however is comfortable, selecting the
+      page area rather than the whole screen, and resize afterwards:
 
-          magick shot.png -resize 1280x800 -background '#1c1d20' \
-            -gravity center -extent 1280x800 card.png
+          for f in ~/Pictures/Screenshots/*.png; do
+            magick "$f" -resize 1280x800^ -gravity center \
+              -extent 1280x800 "shots/$(basename "$f")"
+          done
+
+      That scales to fill and crops the overflow from the edges, so a
+      selection roughly 8:5 comes out right. Select more than 1280 × 800,
+      never less: scaling down is free and scaling up is visibly soft.
+
 - [x] Version is 1.0.0. A store version number cannot be reused, so if
       anything changes before the first upload, bump it again.
 - [ ] Privacy policy is actually live at the URL above (GitHub Pages must
