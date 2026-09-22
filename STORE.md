@@ -39,8 +39,15 @@ learning, subtitles, immersion
 
 ## The description
 
-Both stores take the same text. Chrome renders no formatting; Firefox takes
-a little HTML. This is written to read correctly as plain text.
+Chrome takes the long one below and renders no formatting. Firefox's field
+recommends 250 characters, so it gets its own, which is 249:
+
+```text
+A pop-up dictionary for Japanese, Italian and Spanish. Hold Shift, hover a word, read. It handles conjugation, times subtitles on YouTube and Netflix, counts how much of a page you know, and makes Anki cards. Free, open source, and entirely offline.
+```
+
+The Firefox field has no hard limit, so the long version fits there too if
+the short one ever looks thin. The long one, for Chrome:
 
 ```text
 Torval is a pop-up dictionary for Japanese, Italian and Spanish. Hold
