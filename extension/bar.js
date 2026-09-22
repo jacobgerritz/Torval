@@ -164,6 +164,7 @@ var TorvalBar = (function () {
   }
 
   function paintBusy() {
+    stayOnThePage();
     var percent = typeof pending.progress === 'number'
       ? Math.round(pending.progress * 100) + '%'
       : null;
@@ -299,6 +300,7 @@ var TorvalBar = (function () {
   }
 
   function render() {
+    stayOnThePage();
     var percent = data.total ? Math.round((data.known / data.total) * 100) : 0;
     els.score.textContent = percent + '%';
     els.detail.textContent = data.known.toLocaleString('en-US') + ' of ' +
@@ -329,6 +331,21 @@ var TorvalBar = (function () {
   function colourFor(percent) {
     var hue = Math.max(0, Math.min(120, (percent - 70) * 4));
     return 'hsl(' + Math.round(hue) + ' 48% 62%)';
+  }
+
+  /**
+   * Back onto the page, if the page has thrown it off.
+   *
+   * Netflix replaces most of its document when it goes from browsing to
+   * watching, and anything appended to the old body goes with it. The bar
+   * was built once and never looked at again, so it simply vanished, which
+   * was hardest to notice in exactly the case it was built for: a
+   * dictionary still being read in, where nothing else on screen says
+   * anything is happening.
+   */
+  function stayOnThePage() {
+    if (!host || host.isConnected) return;
+    (document.body || document.documentElement).appendChild(host);
   }
 
   function build() {

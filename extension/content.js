@@ -187,7 +187,12 @@
       if (TorvalSubtitles.restart) TorvalSubtitles.restart();
     }
     lastTranscript = '';
-    readPage();
+    // A new language means a new dictionary, and building one takes a
+    // minute. Only the startup path used to say so, so changing language
+    // with a video already open left the bar silent for that minute: the
+    // page was read, the read waited on a dictionary that did not exist
+    // yet, and nothing on screen said anything was happening.
+    waitForDictionary().then(readPage);
   }
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
@@ -988,6 +993,7 @@
   // again, since a page whose text keeps changing under you is rare enough not
   // to be worth watching for constantly.
   let lastTranscript = '';
+  let waitingForDictionary = null;
   let readingPage = false;
   // How many subtitle lines had arrived when the transcript was last read,
   // and when that was. -1 means nothing has been read for this video yet,
@@ -1075,6 +1081,16 @@
    * is happening, and how far along it is.
    */
   async function waitForDictionary() {
+    // One at a time. Startup and a language change can both ask, and two
+    // loops polling the same status is two of everything for one answer.
+    if (waitingForDictionary) return waitingForDictionary;
+    waitingForDictionary = (async function () {
+      try { await pollDictionary(); } finally { waitingForDictionary = null; }
+    })();
+    return waitingForDictionary;
+  }
+
+  async function pollDictionary() {
     for (;;) {
       let reply;
       try {
