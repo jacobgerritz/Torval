@@ -2348,6 +2348,56 @@ const run = async () => {
     Video._allOneColour(new Uint8ClampedArray(0)) === true &&
     Video._allOneColour(null) === true);
 
+  // --- black bars baked into the frame ---------------------------------------
+  // A film wider than 16:9 is delivered as a 16:9 frame with the bars in it,
+  // so the element is full and the picture still is not.
+  const framed = (wide, high, barTop, barSide) => {
+    const data = new Uint8ClampedArray(wide * high * 4);
+    for (let y = barTop; y < high - barTop; y++) {
+      for (let x = barSide; x < wide - barSide; x++) {
+        const at = (y * wide + x) * 4;
+        data[at] = 90 + ((x + y) % 60);   // anything that is not black
+        data[at + 1] = 120;
+        data[at + 2] = 200;
+      }
+    }
+    return data;
+  };
+
+  const wide169 = Video._withoutBars(framed(320, 180, 24, 0), 320, 180);
+  check('the bars above and below come off',
+    wide169.top === 24 && wide169.height === 132 &&
+    wide169.left === 0 && wide169.width === 320);
+
+  const pillar = Video._withoutBars(framed(320, 180, 0, 40), 320, 180);
+  check('and the ones either side',
+    pillar.left === 40 && pillar.width === 240 && pillar.height === 180);
+
+  const full = Video._withoutBars(framed(320, 180, 0, 0), 320, 180);
+  check('a frame with no bars is left alone',
+    full.left === 0 && full.top === 0 &&
+    full.width === 320 && full.height === 180);
+
+  // A fade to black, or a shot that opens in a dark room, reads as nothing
+  // but bar. Handing it back whole costs a dark screenshot; trimming it to
+  // the last lit pixel costs the card.
+  const nearlyDark = Video._withoutBars(framed(320, 180, 80, 0), 320, 180);
+  check('a frame that is mostly bar is handed back untouched',
+    nearlyDark.top === 0 && nearlyDark.height === 180);
+
+  // A night scene under a black sky: deep band at the top, none at the
+  // bottom. Cropping that is cropping the photograph.
+  const sky = new Uint8ClampedArray(320 * 180 * 4);
+  for (let y = 40; y < 180; y++) {
+    for (let x = 0; x < 320; x++) {
+      const at = (y * 320 + x) * 4;
+      sky[at] = 70; sky[at + 1] = 90; sky[at + 2] = 140;
+    }
+  }
+  const night = Video._withoutBars(sky, 320, 180);
+  check('a band at one end only is part of the picture',
+    night.top === 0 && night.height === 180);
+
   // --- finding the player round the video ------------------------------------
   // Netflix nests three elements that all answer to the player selector.
   // Stopping at the nearest leaves everything hung off the two above it on

@@ -600,6 +600,106 @@ var TorvalVideo = (function () {
    * the ratio between them is read off the image rather than taken from
    * devicePixelRatio, which is wrong the moment the page is zoomed.
    */
+  // A bar is not merely dark, it is black; and no film is more than about a
+  // third bar at either end, so a frame that looks like it is one is a frame
+  // that has been read wrong.
+  var BAR_DARK = 18;
+  var BAR_MOST = 0.35;
+
+  function darkRow(data, wide, y) {
+    var step = Math.max(1, Math.floor(wide / 64));
+    for (var x = 0; x < wide; x += step) {
+      var at = (y * wide + x) * 4;
+      if (data[at] > BAR_DARK || data[at + 1] > BAR_DARK || data[at + 2] > BAR_DARK) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function darkColumn(data, wide, high, x) {
+    var step = Math.max(1, Math.floor(high / 64));
+    for (var y = 0; y < high; y += step) {
+      var at = (y * wide + x) * 4;
+      if (data[at] > BAR_DARK || data[at + 1] > BAR_DARK || data[at + 2] > BAR_DARK) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * The picture inside the black bars.
+   *
+   * Working out where the picture sits in its element gets rid of the bars
+   * the browser drew. It cannot touch the ones that arrived already in the
+   * frame, and those are the common case: a film wider than 16:9 is
+   * delivered as a 16:9 frame with the bars baked into it, so the element
+   * is full and the picture still is not.
+   *
+   * Nothing clever, then. Black rows come off the top and bottom and black
+   * columns off the sides until there is a picture. The cap matters more
+   * than the threshold: a fade to black, or a shot that opens on a dark
+   * room, would otherwise be eaten whole, so a frame that reads as mostly
+   * bar is handed back untouched and goes on the card as it came.
+   */
+  /** Two bars near enough the same depth to be one pair. */
+  function evenEnds(near, far, span) {
+    return Math.abs(near - far) <= Math.max(2, span * 0.02);
+  }
+
+  function withoutBars(data, wide, high) {
+    var whole = { left: 0, top: 0, width: wide, height: high };
+    if (!data || wide < 4 || high < 4) return whole;
+    var top = 0, bottom = high - 1, left = 0, right = wide - 1;
+    var mostTall = Math.floor(high * BAR_MOST);
+    var mostWide = Math.floor(wide * BAR_MOST);
+    while (top < mostTall && darkRow(data, wide, top)) top++;
+    while (bottom > high - 1 - mostTall && darkRow(data, wide, bottom)) bottom--;
+    while (left < mostWide && darkColumn(data, wide, high, left)) left++;
+    while (right > wide - 1 - mostWide && darkColumn(data, wide, high, right)) right--;
+
+    // Letterboxing is symmetrical, and a dark picture is not. A night scene
+    // with a black sky over it has a deep band at the top and none at the
+    // bottom, and cropping that is cropping the photograph. Both ends
+    // running all the way to the cap is the other tell: that is not a bar
+    // either, that is a frame which is simply dark.
+    if (!evenEnds(top, high - 1 - bottom, high) ||
+        (top >= mostTall && bottom <= high - 1 - mostTall)) {
+      top = 0;
+      bottom = high - 1;
+    }
+    if (!evenEnds(left, wide - 1 - right, wide) ||
+        (left >= mostWide && right <= wide - 1 - mostWide)) {
+      left = 0;
+      right = wide - 1;
+    }
+    if (top === 0 && bottom === high - 1 && left === 0 && right === wide - 1) return whole;
+    return {
+      left: left, top: top,
+      width: right - left + 1, height: bottom - top + 1
+    };
+  }
+
+  /** The picture out of a canvas, bars off, scaled down, as JPEG. */
+  function finish(stage) {
+    try {
+      var ctx = stage.getContext('2d');
+      var pixels = ctx.getImageData(0, 0, stage.width, stage.height);
+      if (allOneColour(pixels.data)) return null;
+      var inner = withoutBars(pixels.data, stage.width, stage.height);
+      var scale = Math.min(1, MAX_WIDTH / inner.width);
+      var out = document.createElement('canvas');
+      out.width = Math.max(1, Math.round(inner.width * scale));
+      out.height = Math.max(1, Math.round(inner.height * scale));
+      out.getContext('2d').drawImage(stage, inner.left, inner.top,
+        inner.width, inner.height, 0, 0, out.width, out.height);
+      return out.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1];
+    } catch (err) {
+      return null;   // the canvas was tainted and will not be read at all
+    }
+  }
+
   function cropTo(dataUrl, rect) {
     return new Promise(function (resolve) {
       var img = new Image();
@@ -610,20 +710,20 @@ var TorvalVideo = (function () {
         var w = Math.round(rect.width * ratio);
         var h = Math.round(rect.height * ratio);
         if (w < 1 || h < 1) { resolve(null); return; }
-        var scale = Math.min(1, MAX_WIDTH / w);
-        var canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(w * scale));
-        canvas.height = Math.max(1, Math.round(h * scale));
+        // Staged at the size it was photographed at, so the bars are looked
+        // for in the real pixels rather than in a scaled-down guess.
+        var stage = document.createElement('canvas');
+        stage.width = w;
+        stage.height = h;
         try {
-          var ctx = canvas.getContext('2d');
-          ctx.drawImage(img, Math.round(rect.left * ratio), Math.round(rect.top * ratio),
-            w, h, 0, 0, canvas.width, canvas.height);
-          var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          if (allOneColour(pixels.data)) { resolve(null); return; }
-          resolve(canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1]);
+          stage.getContext('2d').drawImage(img,
+            Math.round(rect.left * ratio), Math.round(rect.top * ratio),
+            w, h, 0, 0, w, h);
         } catch (err) {
           resolve(null);
+          return;
         }
+        resolve(finish(stage));
       };
       img.src = dataUrl;
     });
@@ -631,19 +731,15 @@ var TorvalVideo = (function () {
 
   function grabFrame(video) {
     if (!video.videoWidth) return null;
-    var scale = Math.min(1, MAX_WIDTH / video.videoWidth);
-    var canvas = document.createElement('canvas');
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
+    var stage = document.createElement('canvas');
+    stage.width = video.videoWidth;
+    stage.height = video.videoHeight;
     try {
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      var pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      if (allOneColour(pixels.data)) return null;
-      return canvas.toDataURL('image/jpeg', JPEG_QUALITY).split(',')[1];
+      stage.getContext('2d').drawImage(video, 0, 0, stage.width, stage.height);
     } catch (err) {
       return null;   // the canvas was tainted and will not be read at all
     }
+    return finish(stage);
   }
 
   /**
@@ -908,7 +1004,8 @@ var TorvalVideo = (function () {
     _allOneColour: allOneColour,
     _trimHead: trimHead,
     _videoBox: videoBox,
-    _outermost: outermost
+    _outermost: outermost,
+    _withoutBars: withoutBars
   };
 })();
 
