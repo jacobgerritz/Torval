@@ -19,6 +19,7 @@
 
 import { createReadStream, readFileSync, writeFileSync,
   existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { createGunzip } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { join, dirname } from 'node:path';
@@ -66,8 +67,21 @@ export async function build(lang) {
   await ensure(FREQ_FILE, lang.freqUrl);
 
   console.log('Reading', FREQ_FILE);
-  const frequency = loadFrequency(FREQ_FILE);
-  console.log(`  ${frequency.size} frequency ranks`);
+  const frequency = loadFrequency(FREQ_FILE, ' ');
+  console.log(`  ${frequency.size} frequency ranks from subtitles`);
+
+  // A second corpus, and a different kind of language. The subtitle list is
+  // people talking, which is most of what Torval is pointed at, and it barely
+  // knows the words that only ever get written down. Wikipedia is the other
+  // half of that: formal, written, and hopeless on anything colloquial. Each
+  // covers what the other misses, so the two are averaged.
+  let written = new Map();
+  if (lang.writtenFile) {
+    const WRITTEN = join(ROOT, 'data', lang.writtenFile);
+    await ensure(WRITTEN, lang.writtenUrl);
+    written = loadFrequency(WRITTEN, '\t');
+    console.log(`  ${written.size} frequency ranks from Wikipedia`);
+  }
 
   // Which words somebody has read aloud onto Wikimedia Commons. See
   // build-audio.mjs; an empty map here simply means no card gets a
@@ -78,7 +92,7 @@ export async function build(lang) {
   console.log('Reading', SOURCE);
   const entries = [];
   const index = new Map();     // term -> [entry ids]
-  const aliases = [];          // [inflected form, the lemma it belongs to][]
+  const aliases = [];          // [inflected form, its lemma, its part of speech][]
   let lines = 0;
   let kept = 0;
   let stressed = 0;
@@ -94,7 +108,9 @@ export async function build(lang) {
     const entry = toEntry(row, lang, recordings);
     if (!entry) {
       const target = aliasOf(row, lang);
-      if (target && target !== row.word) aliases.push([row.word, target]);
+      if (target && target !== row.word) {
+        aliases.push([row.word, target, POS_MAP[row.pos]]);
+      }
       continue;
     }
 
@@ -125,10 +141,22 @@ export async function build(lang) {
   // since a suffix-rule deinflector only ever covers the regular ones. So the
   // form earns an index term rather than an entry, resolved after the whole
   // dump has been read because a form is very often filed before its lemma.
+  //
+  // An inflected form belongs to one part of speech, and a spelling often
+  // covers several words. "molaba" is the verb molar and cannot be the tooth
+  // or either adjective, and pointing it at all four buries the only sense it
+  // can possibly mean under three it cannot. So the form goes to the entries
+  // whose part of speech matches the page it came from. If none match, they
+  // all get it: a sense in the wrong order beats a word that cannot be found.
   let aliased = 0;
-  for (const [form, target] of aliases) {
-    const ids = index.get(target);
-    if (!ids) continue;                       // a lemma Torval had no use for
+  for (const [form, target, pos] of aliases) {
+    const all = index.get(target);
+    if (!all) continue;                       // a lemma Torval had no use for
+    let ids = all;
+    if (pos) {
+      const fitting = all.filter((id) => hasPart(entries[id], pos));
+      if (fitting.length) ids = fitting;
+    }
     let list = index.get(form);
     if (!list) { list = []; index.set(form, list); aliased++; }
     for (const id of ids) {
@@ -143,7 +171,11 @@ export async function build(lang) {
 
   let ranked = 0;
   for (const entry of entries) {
-    const rank = frequency.get(entry.k[0]) || frequency.get(entry.k[0].toLowerCase());
+    const word = entry.k[0];
+    const lower = word.toLowerCase();
+    const rank = combineRanks(
+      frequency.get(word) || frequency.get(lower),
+      written.get(word) || written.get(lower));
     if (rank) { entry.q = rank; ranked++; }
   }
   console.log(`  ${ranked} entries carry a frequency rank`);
@@ -380,19 +412,38 @@ function aliasOf(row, lang) {
 }
 
 /** "word count" per line, already ranked by how common each word is. */
-function loadFrequency(path) {
+/**
+ * A frequency list as word to rank, commonest first.
+ *
+ * Two shapes, because the two corpora are published differently. The
+ * subtitle list is "word count" a line; the Wikipedia one is a TSV whose
+ * first column is the word. Both are already in order, so the rank is the
+ * line number and the counts are never read.
+ */
+function loadFrequency(path, separator) {
   const ranks = new Map();
   const lines = readFileSync(path, 'utf8').split('\n');
   let rank = 0;
   for (const line of lines) {
-    const sp = line.lastIndexOf(' ');
-    if (sp === -1) continue;
-    const word = line.slice(0, sp);
+    const cut = separator === '\t' ? line.indexOf('\t') : line.lastIndexOf(' ');
+    if (cut === -1) continue;
+    const word = line.slice(0, cut);
     if (!word) continue;
     rank++;
     if (!ranks.has(word)) ranks.set(word, rank);
   }
   return ranks;
+}
+
+/**
+ * One rank out of two, weighted towards whichever list thinks the word is
+ * rarer, which is the harmonic mean. A word both corpora know well keeps a
+ * low number; a word only one of them has keeps that one's, since a corpus
+ * that has never seen a word is not evidence that the word is rare.
+ */
+function combineRanks(a, b) {
+  if (a && b) return Math.round((2 * a * b) / (a + b));
+  return a || b || 0;
 }
 
 async function ensure(file, url) {
@@ -401,7 +452,16 @@ async function ensure(file, url) {
   console.log('Downloading', url);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`download failed: ${res.status}`);
-  writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+  const body = Buffer.from(await res.arrayBuffer());
+  // One source is published as .xz, which Node cannot read and which is not
+  // worth a dependency for. xz is on every Linux and on macOS, and this is a
+  // build step rather than anything that ships.
+  if (url.endsWith('.xz')) {
+    writeFileSync(file + '.xz', body);
+    execFileSync('xz', ['--decompress', '--force', file + '.xz']);
+    return;
+  }
+  writeFileSync(file, body);
 }
 
 /**
@@ -414,6 +474,12 @@ async function ensure(file, url) {
  * store's validator refuses to parse any file over five megabytes and
  * reports it as an error against the submission.
  */
+/** Does this entry define the word as that part of speech? */
+function hasPart(entry, pos) {
+  if (!entry || !entry.s) return false;
+  return entry.s.some((sense) => sense.p && sense.p.indexOf(pos) !== -1);
+}
+
 function writeChunks(out, name, items) {
   let chunk = [];
   let bytes = 0;

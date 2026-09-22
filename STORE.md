@@ -77,7 +77,8 @@ a little HTML. This is written to read correctly as plain text.
 > Torval is free and open source, under the GPL. The Japanese dictionary is
 > JMdict from the EDRDG; Italian and Spanish come from Wiktextract's
 > extraction of English Wiktionary; all under CC BY-SA 4.0. Pitch accent
-> from Kanjium, word frequency from JPDB and hermitdave/FrequencyWords.
+> from Kanjium, word frequency from JPDB, hermitdave/FrequencyWords and
+> Wikipedia word counts.
 >
 > Source and issues: https://github.com/jacobgerritz/Torval
 
@@ -247,6 +248,9 @@ looks like obfuscation if it is not explained. Say this:
 >     node tools/build-dict-it.mjs   # Italian, from Wiktextract
 >     node tools/build-dict-es.mjs   # Spanish, from Wiktextract
 >     node tools/package.mjs --firefox
+>
+> Node 18 or later. The two Latin builds also call `xz` to unpack one of
+> their frequency lists, which is present on every Linux and on macOS.
 >
 > Each build script downloads its own source data on first run; the URLs
 > are at the top of each file. Node 18 or later, no dependencies, no build

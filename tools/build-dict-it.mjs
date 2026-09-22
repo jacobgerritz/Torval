@@ -41,15 +41,18 @@ await build({
   sourceUrl: 'https://kaikki.org/dictionary/Italian/kaikki.org-dictionary-Italian.jsonl.gz',
   freqFile: 'it-frequency.txt',
   freqUrl: 'https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/it/it_full.txt',
+  writtenFile: 'itwiki-frequency.tsv',
+  writtenUrl: 'https://raw.githubusercontent.com/adno/wikipedia-word-frequency-clean/main/results/itwiki-frequency-20221020-lower.tsv.xz',
   out: 'data-it',
   // Bumping this makes the extension rebuild its Italian database on next start.
-  version: 7,
+  version: 9,
   // Where recorded pronunciations come from. The category is walked
   // once at build time; the id and ISO code are the two constants a
   // Lingua Libre filename is built from. See build-audio.mjs.
   voice: { category: 'Lingua Libre pronunciation-ita', qid: 'Q652', iso: 'ita' },
   sourceNote: 'Wiktextract (kaikki.org), from English Wiktionary, CC BY-SA 4.0; ' +
-    'word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT',
+    'word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT, ' +
+    'and Wikipedia word frequency (adno/wikipedia-word-frequency-clean), CC BY-SA 4.0',
   stressIndex
 });
 

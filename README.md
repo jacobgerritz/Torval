@@ -40,8 +40,10 @@ Then the pitch accent data, which is separate and much smaller:
 node tools/build-pitch.mjs
 ```
 
-Italian: downloads a Wiktextract dump of Italian entries (about 75 MB) and the
-hermitdave/FrequencyWords frequency list, and converts them the same way.
+Italian: downloads a Wiktextract dump of Italian entries (about 75 MB) and two
+frequency lists, hermitdave/FrequencyWords and the Wikipedia word counts, and
+converts them the same way. The second arrives as `.xz`, which Node cannot
+read and which is not worth a dependency for, so the build shells out to `xz`.
 Stress marks are computed as part of this step, from each entry's
 pronunciation, so there is no separate build for those.
 
@@ -1602,7 +1604,19 @@ machine extraction of English Wiktionary, used under
 [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/), with word
 frequency from
 [hermitdave/FrequencyWords](https://github.com/hermitdave/FrequencyWords)
-(OpenSubtitles), MIT.
+(OpenSubtitles), MIT, averaged with
+[Wikipedia word counts](https://github.com/adno/wikipedia-word-frequency-clean),
+CC BY-SA 4.0.
+
+Two corpora rather than one, because a corpus is a kind of language and not
+a measure of the language. Subtitles are people talking, which is most of
+what Torval is pointed at, and they barely know a word that only ever gets
+written down. Wikipedia is the other half: formal, written, and hopeless on
+anything colloquial. Each covers what the other misses, and where both know
+a word the two ranks are averaged towards whichever thinks it rarer. The
+effect is not subtle. Spanish went from 63,759 entries with a rank to
+85,962, and Italian from 63,761 to 90,191, which is the difference between
+half the dictionary being ranked and three quarters of it.
 
 That source has one limit worth knowing about, because it looks like a bug
 and is not. These are entries from *English* Wiktionary, so a word English
