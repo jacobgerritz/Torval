@@ -139,6 +139,11 @@ var TorvalBar = (function () {
    * conclude was that nothing worked. The handle carries it, since that is
    * what is visible while the bar is tucked away: "Torval 42%" while the
    * dictionary is still being built, "Torval ·" while a page is being read.
+   *
+   * And the open bar carries it too. Somebody who has pinned the bar open,
+   * or is hovering it because they are waiting, is exactly the person
+   * watching for the number, and until now opening it was the one way to
+   * stop seeing it.
    */
   function busy(what, progress) {
     pending = { what: what, progress: progress };
@@ -159,12 +164,17 @@ var TorvalBar = (function () {
   }
 
   function paintBusy() {
-    els.handle.textContent = typeof pending.progress === 'number'
-      ? 'Torval ' + Math.round(pending.progress * 100) + '%'
-      : 'Torval ·';
+    var percent = typeof pending.progress === 'number'
+      ? Math.round(pending.progress * 100) + '%'
+      : null;
+    els.handle.textContent = percent ? 'Torval ' + percent : 'Torval ·';
     els.handle.classList.add('busy');
     els.handle.title = pending.what;
-    els.note.textContent = pending.what;
+    // The trailing ellipsis becomes the comma: "Reading this page…" and
+    // "Reading this page… 60%" both read worse than "Reading this page, 60%".
+    els.note.textContent = percent
+      ? pending.what.replace(/…$/, '') + ', ' + percent
+      : pending.what;
     els.note.hidden = false;
     els.score.hidden = true;
     els.detail.hidden = true;
