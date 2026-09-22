@@ -273,11 +273,24 @@ looks like obfuscation if it is not explained. Say this:
 - [ ] The manifests match what is written above. `activeTab`, `tabCapture`
       and `offscreen` all arrived late, and a justification that does not
       list a permission the package asks for is a rejection.
-- [ ] Screenshots. Both stores want real captures, not mockups. The site's
-      drawn popup will not do. Five is plenty: the popup over a real page,
-      the comprehension bar on a YouTube video, a subtitle line with the
-      popup open over it, the Anki field mapping, the known-words page.
-      Chrome wants 1280×800 or 640×400.
+- [ ] Screenshots. Both stores want real captures, not mockups. Shoot the
+      whole set at **1280×800** and one set serves both stores and the
+      website. Six, in this order:
+
+      1. The popup open over a word in an ordinary article. *(store, and
+         website shot 1)*
+      2. A YouTube video: the bar across the top, the subtitle line below,
+         unknown words coloured. *(store, and website shot 2)*
+      3. A finished card in Anki, with its screenshot and audio.
+         *(store, and website shot 3)*
+      4. The popup open over a subtitle line, mid-video. *(store)*
+      5. Settings → Anki, with the fields mapped. *(store)*
+      6. Settings → Words, with a real list and real counts. *(store)*
+
+      Website ones go in `docs/shots/` as `popup.png`, `video.png` and
+      `card.png`, replacing the three dashed boxes in `docs/index.html`.
+      Nothing real in frame: no personal bookmarks, no email address in a
+      browser chrome, no unrelated tabs.
 - [x] Version is 1.0.0. A store version number cannot be reused, so if
       anything changes before the first upload, bump it again.
 - [ ] Privacy policy is actually live at the URL above (GitHub Pages must
