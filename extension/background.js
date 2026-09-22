@@ -250,6 +250,8 @@ api.runtime.onMessage.addListener((message, sender) => {
       api.runtime.openOptionsPage();
       return true;
     });
+    case 'dictionaries': return guard(() => dictionaries());
+    case 'forgetDictionary': return guard(() => forgetDictionary(message.code));
     case 'grabVisible':  return guard(() => grabVisible(sender && sender.tab));
     case 'tabAudioReady': return guard(() => tabAudioReady());
     case 'tabAudioStart': return guard(() => tabAudioStart(sender && sender.tab && sender.tab.id,
@@ -1052,6 +1054,97 @@ async function ensureOffscreen() {
  * Needs the extension to have been invoked on the tab, so the error is
  * passed along rather than flattened; video.js knows what to say about it.
  */
+/**
+ * Every dictionary Torval ships, and what this browser has done with it.
+ *
+ * Two facts about each, from two places. What is in the package comes from
+ * that language's meta.json, which is there whether or not anybody has ever
+ * chosen the language. What is in this browser comes from its own database,
+ * which only exists once the language has been read in. The settings page
+ * wants both: one says what is on offer, the other says what it is costing.
+ *
+ * The databases are listed rather than opened, because opening one that is
+ * not there creates it, and asking a question should not be how a 30 MB
+ * import gets started.
+ */
+async function dictionaries() {
+  const present = new Set();
+  try {
+    if (indexedDB.databases) {
+      for (const each of await indexedDB.databases()) if (each.name) present.add(each.name);
+    }
+  } catch (err) {
+    // A browser that will not list them. Every dictionary then reports as
+    // not installed, which is wrong but harmless: the page offers to remove
+    // nothing, and choosing a language still works.
+  }
+
+  const out = [];
+  for (const { code } of TorvalLang.list()) {
+    const profile = TorvalLang.get(code);
+    const store = 'torval-dictionary' + profile.dbSuffix;
+
+    let shipped = null;
+    try {
+      const res = await fetch(api.runtime.getURL(profile.dataPath + '/meta.json'));
+      if (res.ok) shipped = await res.json();
+    } catch (err) { /* not built into this package */ }
+
+    let installed = null;
+    if (present.has(store)) {
+      try {
+        const db = await openDatabase(store);
+        installed = await get(db, STATE, 'meta');
+        db.close();
+      } catch (err) { /* there, but it will not say what is in it */ }
+    }
+
+    out.push({
+      code,
+      name: profile.name,
+      here: present.has(store),
+      ready: !!installed,
+      stale: !!(installed && shipped && installed.version !== shipped.version),
+      active: code === TorvalLang.active(),
+      built: shipped ? shipped.built : null,
+      entries: shipped ? shipped.entries : null,
+      terms: shipped ? shipped.terms : null,
+      source: shipped ? shipped.source : null
+    });
+  }
+  return out;
+}
+
+/**
+ * Throw away one language's database.
+ *
+ * Nothing is lost that cannot be had again: the dictionary is in the
+ * package, and choosing that language reads it back in. What it buys is
+ * the tens of megabytes it was taking up, for somebody learning one
+ * language who has looked at the other two once.
+ *
+ * Not the language being read. Deleting the database out from under the
+ * lookups running against it would take the page down for no reason, and
+ * the cure is one click on another language first.
+ */
+async function forgetDictionary(code) {
+  const profile = TorvalLang.get(code);
+  if (!profile || code !== profile.code) throw new Error('There is no such dictionary.');
+  if (code === TorvalLang.active()) {
+    throw new Error('That is the language you are reading. Choose another one first.');
+  }
+  await new Promise((resolve, reject) => {
+    const req = indexedDB.deleteDatabase('torval-dictionary' + profile.dbSuffix);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+    // Something still has it open. It will go when that lets go, and saying
+    // so now is closer to the truth than an error the reader cannot act on.
+    req.onblocked = () => resolve();
+  });
+  trace('Torval: removed the ' + profile.name + ' dictionary from this browser');
+  return { code };
+}
+
 async function grabVisible(tab) {
   if (!api.tabs || !api.tabs.captureVisibleTab) {
     throw new Error('this browser will not photograph a tab');
@@ -1549,9 +1642,9 @@ async function importDictionary(db, meta) {
 // IndexedDB helpers. Its callback style is old; these wrap it in promises.
 // ---------------------------------------------------------------------------
 
-function openDatabase() {
+function openDatabase(name) {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(dbName(), DB_VERSION);
+    const req = indexedDB.open(name || dbName(), DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
       for (const name of [ENTRIES, INDEX, STATE]) {

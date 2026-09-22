@@ -2796,9 +2796,28 @@ const run = async () => {
           readFileSync(join(ROOT, 'extension', 'manifest.json'), 'utf8'))
       }
     };
+    // Just enough IndexedDB to answer "which databases are there", which is
+    // what the Dictionaries page is built on. Spanish is present and will
+    // not open, so it reports as there but not finished, which is a real
+    // state and the awkward one.
+    const deleted = [];
     const sandbox = {
       browser: fakeApi, console: { log() {}, warn() {}, error() {} },
       fetch: async () => { throw new Error('no dictionary in this test'); },
+      indexedDB: {
+        async databases() { return [{ name: 'torval-dictionary-es' }]; },
+        open() {
+          const req = {};
+          setTimeout(() => req.onerror && req.onerror(), 0);
+          return req;
+        },
+        deleteDatabase(name) {
+          const req = {};
+          deleted.push(name);
+          setTimeout(() => req.onsuccess && req.onsuccess(), 0);
+          return req;
+        }
+      },
       setTimeout, clearTimeout, URL
     };
     sandbox.globalThis = sandbox;
@@ -2929,6 +2948,34 @@ const run = async () => {
     check('known beats ignored when a file disagrees',
       '本' in stored.knownWords && !('本' in stored.ignoredWords),
       JSON.stringify(stored.ignoredWords));
+
+    // --- the Dictionaries page ------------------------------------------
+    {
+      const listed = await send({ type: 'dictionaries' });
+      const all = listed.result;
+      check('every language has a dictionary row',
+        listed.ok && all.length === 3 &&
+        all.map((d) => d.code).join(',') === 'ja,it,es',
+        JSON.stringify(listed).slice(0, 200));
+      check('the language being read is marked as such',
+        all.filter((d) => d.active).length === 1 && all[0].active);
+      check('a database that exists is reported as here',
+        all[2].here === true && all[2].ready === false);
+      check('and one that does not is not', all[0].here === false);
+
+      const refused = await send({ type: 'forgetDictionary', code: 'ja' });
+      check('the dictionary in use will not be thrown away',
+        !refused.ok && /reading/.test(refused.error), JSON.stringify(refused));
+
+      const gone = await send({ type: 'forgetDictionary', code: 'es' });
+      check('another one goes when asked',
+        gone.ok && deleted.includes('torval-dictionary-es'),
+        JSON.stringify(gone) + ' ' + deleted.join(','));
+
+      const nonsense = await send({ type: 'forgetDictionary', code: 'xx' });
+      check('and a language that does not exist is refused rather than guessed at',
+        !nonsense.ok, JSON.stringify(nonsense));
+    }
 
     const before = JSON.stringify(stored);
     const junk = await send({ type: 'importWords', data: { some: 'other tool' } });

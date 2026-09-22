@@ -15,6 +15,7 @@
     <button class="tab" data-panel="video">Video</button>
     <button class="tab" data-panel="keys">Keys</button>
     <button class="tab" data-panel="look">Appearance</button>
+    <button class="tab" data-panel="dicts">Dictionaries</button>
     <button class="tab" data-panel="about">About</button>
     <span class="sidebar-spacer"></span>
     <button id="open-reader" class="sidebar-action">Open your books</button>
@@ -182,6 +183,11 @@
     <section id="mapping-section" hidden>
       <h2>What goes in each field</h2>
       <div id="mapping"></div>
+      <p class="note">
+        No note type you like?
+        <a href="https://jacobgerritz.github.io/Torval/anki.html">Torval's
+        own</a> fills every field and maps itself.
+      </p>
     </section>
 
     <section>
@@ -290,28 +296,27 @@
     page in the settings rather than a file in the download because the
     people who need to read it are the people using the program.
   -->
-  <div class="panel" id="panel-about" hidden>
+  <div class="panel" id="panel-dicts" hidden>
     <section>
-      <h2>Torval <span id="version" class="quiet"></span></h2>
+      <h2>Dictionaries</h2>
       <p class="note">
-        A pop-up dictionary that runs entirely on this machine. Nothing you
-        read, look up or mark is sent anywhere; there is no account, no
-        telemetry and no server. The dictionaries were downloaded once, when
-        they were built, and are read out of this browser's own storage.
+        One for each language, built into Torval. A dictionary is read into
+        this browser the first time you choose its language, and stays until
+        you remove it.
       </p>
-      <p class="note">
-        The program is GPL-3.0 licensed: free to use, change and pass on,
-        and anything built on it stays free in the same way. Its source is at
-        <a href="https://github.com/jacobgerritz/Torval">github.com/jacobgerritz/Torval</a>.
-      </p>
-      <p class="note">
-        The dictionaries are not the program, and each keeps its own licence,
-        listed below. The ones under CC BY-SA stay under CC BY-SA wherever
-        they go, this copy included.
-      </p>
+      <p class="note" id="dict-note" hidden></p>
     </section>
 
+    <div id="dict-list"></div>
+
+    <div class="parting"><h2>What is in each one</h2></div>
+
     <section>
+      <p class="note">
+        Definitions, how common each word is, and for Japanese its pitch
+        accent, are built into the one file rather than kept apart, so
+        there is nothing separate to switch off.
+      </p>
       <h2>Japanese</h2>
       <p class="note">
         <b>JMdict</b>, from the Electronic Dictionary Research and
@@ -339,6 +344,28 @@
         reading their own language onto Wikimedia Commons, under
         <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.
         Each recording names its speaker in its filename.
+      </p>
+    </section>
+  </div>
+
+  <div class="panel" id="panel-about" hidden>
+    <section>
+      <h2>Torval <span id="version" class="quiet"></span></h2>
+      <p class="note">
+        A pop-up dictionary that runs entirely on this machine. Nothing you
+        read, look up or mark is sent anywhere; there is no account, no
+        telemetry and no server. The dictionaries were downloaded once, when
+        they were built, and are read out of this browser's own storage.
+      </p>
+      <p class="note">
+        The program is GPL-3.0 licensed: free to use, change and pass on,
+        and anything built on it stays free in the same way. Its source is at
+        <a href="https://github.com/jacobgerritz/Torval">github.com/jacobgerritz/Torval</a>.
+      </p>
+      <p class="note">
+        The dictionaries are not the program, and each keeps its own
+        licence. Which ones, and where they came from, is on the
+        Dictionaries page.
       </p>
     </section>
 

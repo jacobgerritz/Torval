@@ -755,3 +755,127 @@ if (firstPanel) {
   TorvalLang.onChange(askFirst);
   TorvalLang.ready().then(askFirst);
 }
+
+
+// ---------------------------------------------------------------------------
+// Dictionaries
+// ---------------------------------------------------------------------------
+
+/*
+ * What Torval has to read with, and what it is costing.
+ *
+ * Every language ships a dictionary, and none of them is read into the
+ * browser until somebody chooses that language. So there are two different
+ * questions about each one, and the page answers both: what it contains,
+ * which is true of the package, and whether it is in this browser, which is
+ * true of this machine and is the only part anybody can do anything about.
+ *
+ * The one thing on offer is throwing one away. It buys back tens of
+ * megabytes for somebody learning one language who opened the other two once
+ * to look, and it costs nothing permanent, because choosing the language
+ * again reads it straight back in.
+ */
+
+const dictList = document.getElementById('dict-list');
+const dictNote = document.getElementById('dict-note');
+
+function countOf(n) {
+  return typeof n === 'number' ? n.toLocaleString() : '';
+}
+
+/** A build date as a person would write it, or the raw string if it will not parse. */
+function dayOf(text) {
+  if (!text) return '';
+  const when = new Date(text + 'T00:00:00');
+  if (isNaN(when.getTime())) return text;
+  return when.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function whereItStands(dict) {
+  if (dict.active) return 'The language you are reading.';
+  if (dict.stale) return 'An older copy is in this browser, replaced next time you choose it.';
+  if (dict.ready) return 'In this browser.';
+  if (dict.here) return 'Half read in, and finished next time you choose it.';
+  return 'Not read in yet. Choosing ' + dict.name + ' reads it in.';
+}
+
+function dictionaryCard(dict) {
+  const section = document.createElement('section');
+
+  const title = document.createElement('h2');
+  title.textContent = dict.name;
+  section.appendChild(title);
+
+  const size = document.createElement('p');
+  size.className = 'note';
+  size.textContent = dict.entries
+    ? countOf(dict.entries) + ' entries, ' + countOf(dict.terms) + ' forms. Built ' +
+      dayOf(dict.built) + '.'
+    : 'Not built into this copy of Torval.';
+  section.appendChild(size);
+
+  const row = document.createElement('p');
+  row.className = 'row';
+
+  const state = document.createElement('span');
+  state.className = 'note';
+  state.textContent = whereItStands(dict);
+  row.appendChild(state);
+
+  // Not the language being read: deleting the database the lookups are
+  // running against would take the page down, and choosing another language
+  // first is the whole of the cure.
+  if (dict.here && !dict.active) {
+    const drop = document.createElement('button');
+    drop.textContent = 'Remove';
+    drop.addEventListener('click', async () => {
+      drop.disabled = true;
+      await forget(dict.code);
+    });
+    row.appendChild(drop);
+  }
+
+  section.appendChild(row);
+  return section;
+}
+
+async function forget(code) {
+  say('');
+  try {
+    const reply = await api.runtime.sendMessage({ type: 'forgetDictionary', code });
+    if (!reply || !reply.ok) throw new Error((reply && reply.error) || 'It would not go.');
+  } catch (err) {
+    say(err.message, true);
+  }
+  await paintDictionaries();
+}
+
+function say(text, wrong) {
+  if (!dictNote) return;
+  dictNote.textContent = text || '';
+  dictNote.className = 'note' + (wrong ? ' error' : '');
+  dictNote.hidden = !text;
+}
+
+async function paintDictionaries() {
+  if (!dictList) return;
+  let dicts = null;
+  try {
+    const reply = await api.runtime.sendMessage({ type: 'dictionaries' });
+    if (reply && reply.ok) dicts = reply.result;
+  } catch (err) { /* the background is asleep; the list stands as it was */ }
+  if (!dicts) return;
+
+  dictList.textContent = '';
+  for (const dict of dicts) dictList.appendChild(dictionaryCard(dict));
+}
+
+if (dictList) {
+  paintDictionaries();
+  // The language can be changed from the sidebar of this very page, and it
+  // moves which dictionary is the one in use.
+  TorvalLang.onChange(() => { paintDictionaries(); });
+  for (const tab of document.querySelectorAll('.tab[data-panel="dicts"]')) {
+    tab.addEventListener('click', () => paintDictionaries());
+  }
+}

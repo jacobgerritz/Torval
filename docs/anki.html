@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>An Anki note type for Torval</title>
+<meta name="description" content="A note type Torval fills in completely: the fields to add, the two templates, and the styling.">
+<link rel="icon" href="icon-32.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="./">← Torval</a>
+
+<h1>A note type for Torval</h1>
+
+<p class="lede" style="margin-bottom:40px">
+  If you already have a note type you like, keep it. Torval works with
+  whatever you have. This is for people who do not.
+</p>
+
+<p>
+  It makes a sentence card: the line you met the word in on the front, the
+  word and what it means on the back. Every field is optional in the
+  templates, so a card with no picture or no pitch accent simply does not
+  show those rows rather than leaving a gap.
+</p>
+
+<p>
+  The field names below are the ones Torval recognises, so once the note type
+  exists, <b>Settings → Anki</b> fills the mapping in by itself and you have
+  nothing to match up by hand.
+</p>
+
+<section>
+  <h2>1. Make the note type</h2>
+  <p>
+    In Anki: <b>Tools → Manage Note Types → Add → Add: Basic</b>, and call it
+    <code>Torval</code>.
+  </p>
+</section>
+
+<section>
+  <h2>2. The fields</h2>
+  <p>
+    <b>Fields…</b>, then add these, exactly as spelled. Delete Basic's own
+    <code>Front</code> and <code>Back</code> once the others are in. Set
+    <b>Sort by this field</b> on <code>Word</code>.
+  </p>
+  <pre><code>Word
+Reading
+Sentence
+Definition
+Word Audio
+Sentence Audio
+Pitch
+Stress
+Image
+Sentence Before
+Sentence After</code></pre>
+  <p class="note">
+    Reading and Pitch are Japanese; Stress is Italian and Spanish. Leaving
+    in the ones your language does not use costs nothing, and means the same
+    note type works if you take up another.
+  </p>
+</section>
+
+<section>
+  <h2>3. The front</h2>
+  <p><b>Cards…</b>, then paste this over the front template.</p>
+  <pre><code>&lt;div class="sentence"&gt;{{Sentence}}&lt;/div&gt;
+
+{{#Image}}&lt;div class="shot"&gt;{{Image}}&lt;/div&gt;{{/Image}}
+{{#Sentence Audio}}&lt;div class="play"&gt;{{Sentence Audio}}&lt;/div&gt;{{/Sentence Audio}}</code></pre>
+</section>
+
+<section>
+  <h2>4. The back</h2>
+  <pre><code>{{FrontSide}}
+
+&lt;hr id="answer"&gt;
+
+&lt;div class="word"&gt;
+  {{Word}}{{#Reading}} &lt;span class="reading"&gt;{{Reading}}&lt;/span&gt;{{/Reading}}
+  {{#Word Audio}}&lt;span class="play"&gt;{{Word Audio}}&lt;/span&gt;{{/Word Audio}}
+&lt;/div&gt;
+
+{{#Pitch}}&lt;div class="accent"&gt;{{Pitch}}&lt;/div&gt;{{/Pitch}}
+{{#Stress}}&lt;div class="accent"&gt;{{Stress}}&lt;/div&gt;{{/Stress}}
+
+&lt;div class="meaning"&gt;{{Definition}}&lt;/div&gt;
+
+{{#Sentence Before}}&lt;div class="around"&gt;{{Sentence Before}}&lt;/div&gt;{{/Sentence Before}}
+{{#Sentence After}}&lt;div class="around"&gt;{{Sentence After}}&lt;/div&gt;{{/Sentence After}}</code></pre>
+</section>
+
+<section>
+  <h2>5. The styling</h2>
+  <p>Same screen, the <b>Styling</b> box.</p>
+  <pre><code>.card {
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 20px;
+  line-height: 1.7;
+  text-align: center;
+  color: #1c1d20;
+  background: #fbfaf8;
+  padding: 24px 16px;
+}
+
+.sentence { font-size: 24px; margin-bottom: 18px; }
+.sentence b { color: #b8763a; font-weight: 600; }
+
+.shot img { max-width: 100%; max-height: 320px; border-radius: 6px; }
+.play { margin-top: 12px; }
+
+hr#answer { border: 0; border-top: 1px solid #dcd8d1; margin: 24px 0; }
+
+.word { font-size: 30px; font-weight: 600; }
+.reading { font-size: 20px; font-weight: 400; color: #6d6a64; }
+.accent { margin-top: 6px; }
+.meaning { font-size: 18px; margin-top: 14px; text-align: left; }
+.around { font-size: 15px; color: #6d6a64; margin-top: 10px; }
+
+.nightMode.card { color: #e8e6e3; background: #1c1d20; }
+.nightMode .sentence b { color: #e6b578; }
+.nightMode .reading,
+.nightMode .around { color: #98948c; }
+.nightMode hr#answer { border-top-color: #3d4149; }</code></pre>
+</section>
+
+<section>
+  <h2>6. Point Torval at it</h2>
+  <p>
+    <b>Settings → Anki</b>, choose your deck and then <code>Torval</code> as
+    the note type. The fields match themselves. Press <b>+</b> on a word and
+    the card arrives filled in.
+  </p>
+</section>
+
+<div class="claim aside">
+  <p>
+    <strong>No recording for a word?</strong>
+    Italian and Spanish pronunciations come from volunteers, and they have
+    not read everything. Adding <code>{{tts it_IT:Word}}</code> to the back
+    template makes Anki say the word itself, with the voices already on your
+    phone or computer. Use <code>es_ES</code> or <code>ja_JP</code> as it
+    suits.
+  </p>
+</div>
+
+<footer>
+  <p>© 2026 Jacob Gerritz · <a href="./">Torval</a></p>
+</footer>
+
+</div>
+</body>
+</html>

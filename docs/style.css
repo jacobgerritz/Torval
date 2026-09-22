@@ -234,6 +234,19 @@ code {
   color: var(--ink-dim);
 }
 
+/* Something to copy, so it wraps nowhere and scrolls instead: a template
+   silently broken across two lines is a template that does not work. */
+pre {
+  margin: 0 0 20px;
+  padding: 16px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--card);
+}
+
+pre code { display: block; color: var(--ink); white-space: pre; }
+
 /* A caveat rather than a claim: same box, quieter opening line. */
 .claim.aside {
   margin-top: 36px;
