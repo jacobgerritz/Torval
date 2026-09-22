@@ -680,7 +680,10 @@ var TorvalSubtitles = (function () {
       silence++;
       if (silence === WATCH_IN_SILENCE) {
         state = 'unavailable';
-        console.warn('Torval: no subtitles have appeared on this video. ' +
+        // Traced, not warned. A video with no subtitles on is not a fault,
+        // it is most videos, and the bar already says so on the page where
+        // somebody is looking.
+        trace('Torval: no subtitles have appeared on this video. ' +
           'Torval is reading them off the screen, which needs the site’s own ' +
           'subtitles switched on, in ' + (TorvalLang.profile().name) + '.');
       }
@@ -937,7 +940,9 @@ var TorvalSubtitles = (function () {
     } else {
       track = pickTrack(tracks);
       if (!track) {
-        console.warn('Torval: this video has no ' + TorvalLang.profile().name +
+        // Also ordinary: most of YouTube is not in the language you are
+        // learning, and saying so out loud on every video is noise.
+        trace('Torval: this video has no ' + TorvalLang.profile().name +
           ' subtitle track. Tracks offered:',
           tracks.map(function (t) { return t.languageCode; }).join(', '));
         return fallBackToWatching();

@@ -24,7 +24,40 @@
 var TorvalNetflix = (function () {
   'use strict';
 
+  /**
+   * Narration, off unless the switch on the About panel is on.
+   *
+   * Guarded rather than assumed: this file runs at document_start and
+   * log.js arrives with the rest at document_idle, so the first few lines
+   * fall on the floor. They are the ones about a player that has not
+   * started yet, which nobody is reading anyway.
+   *
+   * The page-side half has no storage of its own to read, so it is told.
+   */
+  function tellThePage(on) {
+    window.postMessage({ torval: 'torval-netflix-loud', on: !!on }, '*');
+  }
+
+  // Read here rather than waited for from TorvalLog, which arrives with the
+  // rest of Torval at document_idle and would leave the page-side half
+  // silent through the part of the run worth watching.
+  (function () {
+    var store = (typeof browser !== 'undefined' && browser.storage) ? browser
+      : (typeof chrome !== 'undefined' ? chrome : null);
+    if (!store || !store.storage) return;
+    store.storage.local.get('verboseLog')
+      .then(function (stored) { tellThePage(stored && stored.verboseLog); })
+      .catch(function () { /* nothing to read; the page stays quiet */ });
+    if (store.storage.onChanged) {
+      store.storage.onChanged.addListener(function (changes, area) {
+        if (area !== 'local' || !changes.verboseLog) return;
+        tellThePage(changes.verboseLog.newValue);
+      });
+    }
+  })();
+
   function say() {
+    if (typeof TorvalLog === 'undefined' || !TorvalLog.isVerbose()) return;
     var parts = ['Torval (Netflix):'];
     for (var i = 0; i < arguments.length; i++) parts.push(arguments[i]);
     console.log.apply(console, parts);

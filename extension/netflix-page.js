@@ -84,7 +84,26 @@
     return match ? match[1] : '';
   }
 
+  /**
+   * Narration, off unless asked for.
+   *
+   * This file runs in the page's own world, where there is no TorvalLog
+   * and no storage to read, so the answer has to be sent in. netflix.js
+   * posts it when the switch on the About panel is on, and until that
+   * arrives this says nothing, which is the right way round: quiet is the
+   * common case and the loud one is somebody debugging.
+   */
+  var loud = false;
+
+  window.addEventListener('message', function (event) {
+    if (event.source !== window) return;
+    var data = event.data;
+    if (!data || data.torval !== 'torval-netflix-loud') return;
+    loud = !!data.on;
+  });
+
   function say() {
+    if (!loud) return;
     var parts = ['Torval (Netflix):'];
     for (var i = 0; i < arguments.length; i++) parts.push(arguments[i]);
     console.log.apply(console, parts);

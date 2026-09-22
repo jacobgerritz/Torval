@@ -180,6 +180,19 @@
     const loadNote = document.getElementById('load-note');
     if (!saveButton || !loadInput) return;
 
+    // Both notes count the words in one language, so they are wrong the
+    // moment another is picked. Cleared rather than recalculated: each is a
+    // sentence about something that just happened, and nothing just
+    // happened in the language being switched to.
+    const clearNotes = () => {
+      for (const note of [saveNote, loadNote]) {
+        if (!note) continue;
+        note.className = 'note';
+        note.textContent = '';
+      }
+    };
+    TorvalLang.onChange(clearNotes);
+
     saveButton.addEventListener('click', async () => {
       saveNote.className = 'note';
       saveNote.textContent = '';
