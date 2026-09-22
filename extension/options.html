@@ -10,7 +10,6 @@
       <span>Language</span>
       <select id="language"></select>
     </label>
-    <button class="tab" data-panel="dicts">Dictionaries</button>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="video">Video</button>
     <button class="tab" data-panel="words">Words</button>
@@ -296,28 +295,6 @@
     page in the settings rather than a file in the download because the
     people who need to read it are the people using the program.
   -->
-  <div class="panel" id="panel-dicts" hidden>
-    <section>
-      <h2>Dictionaries</h2>
-      <p class="note">
-        One for each language, built into Torval. A dictionary is read into
-        this browser the first time you choose its language, and stays until
-        you remove it.
-      </p>
-      <p class="note" id="dict-note" hidden></p>
-    </section>
-
-    <div id="dict-list"></div>
-
-    <section>
-      <p class="note">
-        Definitions, how common each word is, and for Japanese its pitch
-        accent, are built into the one file rather than kept apart, so
-        there is nothing separate to switch off.
-      </p>
-    </section>
-  </div>
-
   <!-- What each dictionary is made of, cloned into its card above. -->
   <template id="sources-ja">
     <b>JMdict</b>, from the Electronic Dictionary Research and Development
@@ -359,13 +336,28 @@
       </p>
       <p class="note">
         The dictionaries are not the program, and each keeps its own
-        licence. Which ones, and where they came from, is on the
-        Dictionaries page.
+        licence, below.
       </p>
     </section>
 
+    <div class="parting"><h2>Dictionaries</h2></div>
+
     <section>
-      <h2>When something goes wrong</h2>
+      <p class="note">
+        One for each language. A dictionary is read into this browser the
+        first time you choose its language, and stays until you say
+        otherwise. Definitions, how common each word is, and for Japanese
+        its pitch accent, are built into the one file rather than kept
+        apart, so there is nothing separate to switch off.
+      </p>
+      <p class="note" id="dict-note" hidden></p>
+    </section>
+
+    <div id="dict-list"></div>
+
+    <div class="parting"><h2>When something goes wrong</h2></div>
+
+    <section>
       <p class="note">
         Torval says nothing in the console unless you can act on it. Turned
         on, it narrates finding and reading a video's subtitles, which is

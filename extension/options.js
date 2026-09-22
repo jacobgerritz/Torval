@@ -39,7 +39,7 @@ function showPanel(name) {
 // that is what the page was called when anything started linking to it.
 const asked = (location.hash || '').slice(1);
 showPanel(asked === 'known' ? 'words'
-  : document.getElementById('panel-' + asked) ? asked : 'dicts');
+  : document.getElementById('panel-' + asked) ? asked : 'anki');
 
 /*
  * Opened to be shown one switch.
@@ -732,7 +732,7 @@ function askFirst() {
   // panel is already hidden and the panel the address asked for is left
   // exactly as it was.
   if (asking) showPanel('first');
-  else if (!firstPanel.hidden) showPanel('dicts');
+  else if (!firstPanel.hidden) showPanel('anki');
   // Drawn only now, so a fresh install never shows a flash of the settings
   // it is not ready to have.
   layout.classList.add('settled');
@@ -901,7 +901,7 @@ if (dictList) {
   // The language can be changed from the sidebar of this very page, and it
   // moves which dictionary is the one in use.
   TorvalLang.onChange(() => { paintDictionaries(); });
-  for (const tab of document.querySelectorAll('.tab[data-panel="dicts"]')) {
+  for (const tab of document.querySelectorAll('.tab[data-panel="about"]')) {
     tab.addEventListener('click', () => paintDictionaries());
   }
 }
