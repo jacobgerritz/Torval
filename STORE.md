@@ -122,7 +122,8 @@ justification from a claim into something checkable.
 > add-on's storage can be cleared by the browser without warning; this is
 > the backup. It is a file on the user's own disk and is never uploaded.
 
-**`webRequest`** (Firefox; observational only on Chrome)
+**`webRequest`** (both, observational only on Chrome) and
+**`webRequestBlocking`** (Firefox only)
 > Two narrow uses, both scoped to
 > `https://www.youtube.com/api/timedtext*` and nothing else. First, Torval
 > observes the address YouTube's own player uses to fetch a subtitle
@@ -270,10 +271,10 @@ looks like obfuscation if it is not explained. Say this:
 
 ## Before you press submit
 
-- [ ] The manifests match what is written above. `activeTab`, `tabCapture`
+- [x] The manifests match what is written above. `activeTab`, `tabCapture`
       and `offscreen` all arrived late, and a justification that does not
       list a permission the package asks for is a rejection.
-- [ ] Screenshots. Both stores want real captures, not mockups. Shoot the
+- [x] Screenshots. Both stores want real captures, not mockups. Shoot the
       whole set at **1280×800** and one set serves both stores and the
       website. Six, in this order:
 
@@ -317,9 +318,9 @@ looks like obfuscation if it is not explained. Say this:
 
 - [x] Version is 1.0.0. A store version number cannot be reused, so if
       anything changes before the first upload, bump it again.
-- [ ] Privacy policy is actually live at the URL above (GitHub Pages must
+- [x] Privacy policy is actually live at the URL above (GitHub Pages must
       be switched on first, Settings → Pages → main /docs).
-- [ ] The two builds install and run: `node tools/package.mjs`, then load
+- [x] The two builds install and run: `node tools/package.mjs`, then load
       each zip in its own browser. The Chrome service worker and the
       declarativeNetRequest rule have no Firefox equivalent and are the two
       things most likely to be wrong.
@@ -327,7 +328,7 @@ looks like obfuscation if it is not explained. Say this:
       out at the first upload. `node tools/package.mjs` still watches for the
       placeholder coming back.
 - [x] Chrome's one-time $5 developer registration is paid.
-- [ ] Nothing in the console. Torval says nothing on an ordinary page now,
+- [x] Nothing in the console. Torval says nothing on an ordinary page now,
       and narrates itself only when the box on the About panel is ticked.
       Worth confirming on a YouTube video, since that is the one path that
       used to talk the whole way through.
