@@ -275,7 +275,7 @@ looks like obfuscation if it is not explained. Say this:
       and `offscreen` all arrived late, and a justification that does not
       list a permission the package asks for is a rejection.
 - [x] Screenshots. Both stores want real captures, not mockups. Shoot the
-      whole set at **1280×800** and one set serves both stores and the
+      whole set at **1280x800** and one set serves both stores and the
       website. Six, in this order:
 
       1. The popup open over a word in an ordinary article. *(store, and
@@ -285,8 +285,8 @@ looks like obfuscation if it is not explained. Say this:
       3. A finished card in Anki, with its screenshot and audio.
          *(store, and website shot 3)*
       4. The popup open over a subtitle line, mid-video. *(store)*
-      5. Settings → Anki, with the fields mapped. *(store)*
-      6. Settings → Words, with a real list and real counts. *(store)*
+      5. Settings > Anki, with the fields mapped. *(store)*
+      6. Settings > Words, with a real list and real counts. *(store)*
 
       Taken. The store set is in `shots/`, and the website's three are in
       `docs/shots/`: `popup.png` for the article, `video.jpg` and `card.jpg`
@@ -313,13 +313,13 @@ looks like obfuscation if it is not explained. Say this:
           done
 
       That scales to fill and crops the overflow from the edges, so a
-      selection roughly 8:5 comes out right. Select more than 1280 × 800,
+      selection roughly 8:5 comes out right. Select more than 1280 x 800,
       never less: scaling down is free and scaling up is visibly soft.
 
 - [x] Version is 1.0.0. A store version number cannot be reused, so if
       anything changes before the first upload, bump it again.
 - [x] Privacy policy is actually live at the URL above (GitHub Pages must
-      be switched on first, Settings → Pages → main /docs).
+      be switched on first, Settings > Pages > main /docs).
 - [x] The two builds install and run: `node tools/package.mjs`, then load
       each zip in its own browser. The Chrome service worker and the
       declarativeNetRequest rule have no Firefox equivalent and are the two
