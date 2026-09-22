@@ -14,14 +14,20 @@ justification that is vague gets a rejection and another fortnight.
 
 **Name.** Torval
 
-**Summary** (Chrome: 132 characters; Firefox: 250)
+**Summary.** Two of them, because the limits are far apart and a field
+half used is a field wasted.
+
+Chrome, 132 characters. This one is 129:
 
 ```text
-Hold Shift and hover any Japanese, Italian or Spanish word to see what it
-means. Free, private, and it never leaves your machine.
+Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. Free, private, and it never leaves your machine.
 ```
 
-That is 129 characters, so it fits both.
+Firefox, 250 characters. This one is 246:
+
+```text
+Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. It counts how much of a page you already know, times YouTube and Netflix subtitles, and sends words to Anki in one click. Free, private, nothing leaves your machine.
+```
 
 **Category.** Chrome: *Education*. Firefox: *Language support* (secondary:
 *Other*).
