@@ -18,9 +18,8 @@
 
   <p class="lede">
     A pop-up dictionary for <b>Japanese</b>, <b>Italian</b> and <b>Spanish</b>
-    that runs entirely in your browser. It reads the page you are on, tells
-    you how much of it you already know, and puts any word you meet onto an
-    Anki card in one click.
+    that runs entirely in your browser, tells you how much of a page you
+    already know, and puts any word onto an Anki card in one click.
   </p>
 
   <div class="actions">
@@ -30,45 +29,19 @@
   </div>
 
   <p class="pending">
-    Not in the stores yet. Until then the repository has a build you can
-    load yourself, and instructions for doing it.
+    Not in the stores yet. Until then the repository has a build you can load
+    yourself.
   </p>
 </header>
 
 <figure>
-  <!--
-    The popup as it actually appears, drawn rather than screenshotted: a
-    screenshot of a dark panel over somebody else's web page is mostly
-    somebody else's web page. The colours are the extension's own.
-  -->
-  <svg viewBox="0 0 640 210" role="img" aria-label="The Torval popup over a line of Italian: the word amico, its article, its stress mark and its definitions.">
-    <rect x="0" y="0" width="640" height="210" rx="10" fill="#0f1013"/>
-    <text x="28" y="44" font-family="-apple-system, Segoe UI, sans-serif" font-size="17" fill="#5a5f67">
-      Ho incontrato un vecchio <tspan fill="#f4f5f7" text-decoration="underline">amico</tspan> per strada.
-    </text>
-
-    <rect x="28" y="70" width="380" height="116" rx="8" fill="#16171a" stroke="#292b30"/>
-    <text x="48" y="104" font-family="-apple-system, Segoe UI, sans-serif" font-size="21" fill="#f4f5f7">
-      <tspan fill="#8f959e">l’</tspan>am<tspan font-weight="700">i</tspan>co
-    </text>
-    <text x="48" y="128" font-family="-apple-system, Segoe UI, sans-serif" font-size="12" fill="#767b84">
-      very common · masculine noun
-    </text>
-    <text x="48" y="154" font-family="-apple-system, Segoe UI, sans-serif" font-size="14" fill="#a4a9b2">
-      1. friend
-    </text>
-    <text x="48" y="174" font-family="-apple-system, Segoe UI, sans-serif" font-size="14" fill="#a4a9b2">
-      2. supporter, well-wisher
-    </text>
-    <text x="370" y="104" font-family="-apple-system, Segoe UI, sans-serif" font-size="18" fill="#dba35f">+</text>
-
-    <rect x="440" y="70" width="172" height="40" rx="6" fill="#16171a" stroke="#292b30"/>
-    <text x="458" y="95" font-family="-apple-system, Segoe UI, sans-serif" font-size="15" fill="#8fbf8a">94%</text>
-    <text x="500" y="95" font-family="-apple-system, Segoe UI, sans-serif" font-size="13" fill="#767b84">of this video</text>
-  </svg>
+  <div class="want">
+    <b>Screenshot 1</b>
+    The popup open over a word in an ordinary article.
+  </div>
   <figcaption>
-    The word with its article and its stressed vowel, what kind of word it
-    is, what it means, and one button to send it to Anki.
+    The word, what kind of word it is, what it means, and one button to send
+    it to Anki.
   </figcaption>
 </figure>
 
@@ -78,39 +51,48 @@
     <div>
       <h3>Looks words up</h3>
       <p>
-        Hold Shift, hover, read. It handles conjugation and inflection, so
+        Hold Shift, hover, read. Conjugation and inflection are handled, so
         <i>食べなかった</i> finds 食べる and <i>hablábamos</i> finds
-        <i>hablar</i>. Italian and Spanish nouns come with their article,
-        because that is how you actually have to know them.
+        <i>hablar</i>. Italian and Spanish nouns come with their article.
       </p>
     </div>
     <div>
       <h3>Says what you already know</h3>
       <p>
-        One number across the top of the page: how much of what is in front
-        of you is built from words you know. On a video that is the whole
-        transcript, before you start watching, which is what decides whether
-        it is worth watching at all. Optional, and off until you ask.
+        One number across the top: how much of the page is built from words
+        you have marked as known. On a video it is measured against the whole
+        transcript before you press play. Optional, and off until you ask.
       </p>
     </div>
     <div>
       <h3>Mines subtitles</h3>
       <p>
-        On YouTube and Netflix it times every line itself, so a card can
-        carry the sentence, the frame on screen and the line as it was
-        spoken. Step between lines with A and D; replay the one you are on.
+        On YouTube and Netflix it times every line itself. Step between them
+        with <kbd>A</kbd> and <kbd>D</kbd>, replay the one you are on, and
+        hover the words in it like any other text.
       </p>
     </div>
     <div>
       <h3>Talks to Anki</h3>
       <p>
-        Straight into your own collection through AnkiConnect, into whatever
-        note type you already use. Pitch accent for Japanese, the stressed
-        vowel for Italian and Spanish.
+        Into your own collection through AnkiConnect, into whatever note type
+        you use. Pitch accent for Japanese, the stressed vowel for Italian
+        and Spanish.
       </p>
     </div>
   </div>
 </section>
+
+<figure>
+  <div class="want">
+    <b>Screenshot 2</b>
+    A YouTube video with the bar across the top and the subtitle line below,
+    unknown words coloured.
+  </div>
+  <figcaption>
+    How much of this video you know, worked out before you start watching.
+  </figcaption>
+</figure>
 
 <section>
   <h2>Getting started</h2>
@@ -119,94 +101,75 @@
     <li>
       <h3>Say what you are learning</h3>
       <p>
-        Torval does nothing at all until it knows. The first screen asks,
-        and the answer downloads that language's dictionary into your
-        browser: a minute once, then never again. You can change language
-        later from the toolbar button, and nothing is lost by switching, as
-        each language keeps its own word list.
+        The first screen asks. The answer reads that language's dictionary
+        into your browser, which takes a minute once. Changing language later
+        loses nothing: each keeps its own words.
       </p>
     </li>
     <li>
       <h3>Hold <kbd>Shift</kbd> and hover a word</h3>
       <p>
-        That is the whole of it. There is no clicking, no selecting and no
-        button to press first. Let go of Shift and the popup goes away.
-        Anywhere there is text: an article, a forum, a subtitle.
+        That is the whole of it. No clicking, no selecting. Let go and the
+        popup goes away. Anywhere there is text.
       </p>
     </li>
     <li>
-      <h3>Tell it what you already know, if you want that</h3>
+      <h3>Mark what you know, if you want that</h3>
       <p>
-        This half is optional and starts switched off, under
-        <b>Settings → Words</b>. Leave it off and Torval is a pop-up
-        dictionary that makes Anki cards, with nothing to set up. Turn it
-        on and it also keeps score.
-      </p>
-      <p>
-        Press <kbd>2</kbd>, or the ✓ in the popup, on a word you know.
-        Press <kbd>3</kbd>, or ⊘, on one you never want to be told about
-        again: a name, a piece of English, something the dictionary read
-        wrongly. The percentage across the top of the page is measured
-        against that list, so it means little on your first day and a great
-        deal by your second week. If you already have an Anki deck, the
-        add-on in <code>anki/</code> hands its words over in one go, so you
-        do not start from nothing.
+        Optional, and off until you turn it on under <b>Settings → Words</b>.
+        Press <kbd>2</kbd> on a word you know, <kbd>3</kbd> on one you never
+        want to be told about again. The percentage is measured against that
+        list, so it means little on your first day and a great deal by your
+        second week. An Anki deck can hand over its words in one go.
       </p>
     </li>
     <li>
       <h3>On a video, step between the lines</h3>
       <p>
         <kbd>A</kbd> back, <kbd>D</kbd> forward. Torval fetches the subtitle
-        file itself and works out where every line begins and ends, so it
-        can take you to the start of one and play it again. The percentage
-        on a video is measured against the whole transcript before you
-        start, which is what actually decides whether it is worth your
-        evening.
+        file and works out where every line begins and ends, so it can take
+        you to the start of one and play it again.
       </p>
     </li>
     <li>
       <h3>Send a word to Anki</h3>
       <p>
         Install <a href="https://ankiweb.net/shared/info/2055492159">AnkiConnect</a>,
-        leave Anki open, and map your note type's fields once under
-        <b>Settings → Anki</b>. After that, <b>+</b> on any word makes the
-        card: the dictionary form, the sentence with the word in bold, the
+        leave Anki open, and map your fields once under <b>Settings → Anki</b>.
+        After that <b>+</b> makes the card: the word, the sentence, the
         definitions, and on a video the frame and the line as it was spoken.
-        No note type you like? There is
-        <a href="anki.html">one here</a> that Torval fills completely.
+        No note type you like? Use <a href="anki.html">this one</a>.
       </p>
     </li>
   </ol>
+</section>
 
+<figure>
+  <div class="want">
+    <b>Screenshot 3</b>
+    A finished card in Anki, with its screenshot and audio.
+  </div>
+  <figcaption>What arrives in your collection.</figcaption>
+</figure>
+
+<section>
+  <h2>Netflix, and the other protected services</h2>
   <div class="claim aside">
-    <strong>One thing to know about Netflix</strong>
+    <strong>Subtitles work. The picture and sound ask for something.</strong>
     <p>
-      Netflix, Prime Video and Disney+ hand their video to the browser's
-      copy-protection layer, and that changes what a card can carry. The
-      subtitles are unaffected: timing, stepping and looking words up all
-      work normally. The picture and the sound do not come for free.
+      <b>Click the Torval button in the toolbar once per tab.</b> A protected
+      video will not hand its pixels to a script, so Torval photographs the
+      window instead, and the browser allows neither that nor the recording
+      until the add-on has been used on the tab.
     </p>
     <p>
-      <b>The screenshot comes the long way round.</b> A protected video
-      won't hand its pixels to a script, so Torval asks the browser for a
-      photograph of the window and crops the video out of it. That needs
-      the extension to have been used on the tab first: <b>click the Torval
-      button in the toolbar once</b> after you open a video, and the
-      picture and the sound both work for as long as that tab is open.
-    </p>
-    <p>
-      <b>The sound needs Chrome.</b> It has to be recorded from the tab
-      rather than from the video, and Chrome is the only browser that will
-      hand a tab's audio to an add-on. Firefox has no such API, and its
-      <code>getDisplayMedia</code> ignores audio entirely
+      <b>The sound needs Chrome.</b> It has to come off the tab, and Chrome
+      is the only browser that will hand a tab's audio to an add-on
       (<a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1541425">Mozilla
-      bug 1541425</a>, open since 2019). There is no way around it. On
-      Chrome, tick the box under <b>Settings → Anki</b>; Torval asks for the
-      permission then and at no other time.
+      bug 1541425</a>, open since 2019). There is no way around it.
     </p>
     <p class="note" style="margin-top:14px">
-      Torval says which of the two is missing on the card itself, so you
-      are never left wondering.
+      Torval says on the card itself which of the two is missing.
     </p>
   </div>
 </section>
@@ -216,14 +179,12 @@
   <div class="claim">
     <strong>Torval collects nothing.</strong>
     <p>
-      No account, no telemetry, no analytics, no crash reporting, and no
-      server belonging to this project. The dictionaries were downloaded
-      once, when they were built, and ship inside the add-on. Nothing you
-      read, look up, mark as known or add to Anki ever leaves your computer.
+      No account, no telemetry, no analytics, no server. The dictionaries
+      ship inside the add-on. Nothing you read, look up, mark or add to Anki
+      leaves your computer.
     </p>
     <p class="note" style="margin-top:14px">
-      <a href="privacy.html">The whole privacy policy</a>. It is short,
-      because there is not much to say.
+      <a href="privacy.html">The whole privacy policy</a>. It is short.
     </p>
   </div>
 </section>
@@ -231,13 +192,8 @@
 <section>
   <h2>What it costs</h2>
   <p>
-    Nothing, and there is no paid version waiting behind it. Torval has no
-    servers to pay for and no accounts to run, so there is nothing to
-    charge a subscription for.
-  </p>
-  <p>
-    If it earns its keep and you want to say so, there is somewhere to do
-    that. It will never be asked for inside the add-on.
+    Nothing, and there is no paid version behind it. There are no servers to
+    pay for and no accounts to run.
   </p>
   <div class="actions">
     <a class="button" href="https://github.com/sponsors/jacobgerritz">Support the work</a>
@@ -248,19 +204,19 @@
   <p>
     <a href="https://github.com/jacobgerritz/Torval">Source</a> ·
     <a href="privacy.html">Privacy</a> ·
+    <a href="anki.html">Note type</a> ·
     <a href="https://github.com/jacobgerritz/Torval/issues">Report a problem</a>
   </p>
   <p>
     The program is GPL-3.0. The dictionaries keep their own licences:
     <b>JMdict</b> from the
-    <a href="https://www.edrdg.org/">Electronic Dictionary Research and Development Group</a>
-    <b>Wiktextract</b> from
-    <a href="https://kaikki.org/">kaikki.org</a> and the Italian and Spanish
-    pronunciations from <a href="https://lingualibre.org/">Lingua Libre</a>
-    by way of Wikimedia Commons, all under
+    <a href="https://www.edrdg.org/">EDRDG</a>, <b>Wiktextract</b> from
+    <a href="https://kaikki.org/">kaikki.org</a>, and the Italian and Spanish
+    pronunciations from <a href="https://lingualibre.org/">Lingua Libre</a>,
+    all under
     <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>;
-    pitch accent from Kanjium; word frequency from
-    hermitdave/FrequencyWords, Wikipedia word counts and JPDB.
+    pitch accent from Kanjium; word frequency from hermitdave/FrequencyWords,
+    Wikipedia word counts and JPDB.
   </p>
   <p>© 2026 Jacob Gerritz</p>
 </footer>
