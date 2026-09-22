@@ -948,13 +948,20 @@
   /**
    * The sentence with whichever neighbours were asked for folded into it.
    *
-   * Joined with nothing between them, which is how Japanese is written and
-   * also what a caption cut in half actually needs: the line before ends
-   * mid-word about as often as not.
+   * Joined the way the language joins words. Japanese gets nothing between
+   * them, which is how it is written and also what a caption cut in half
+   * needs, since the line before ends mid-word about as often as not. The
+   * other two get a space, or the last word of one line fuses onto the
+   * first of the next and the card carries "il tempoPoi". The lines have
+   * been trimmed by tidy() at this point, so there is never one already
+   * there to double.
    */
   function widen(sentence, wanted) {
-    const lead = wanted.before ? (sentence.before || '') : '';
-    const trail = wanted.after ? (sentence.after || '') : '';
+    const gap = (typeof TorvalLang !== 'undefined' && TorvalLang.profile().seams) ? '' : ' ';
+    const before = wanted.before ? (sentence.before || '') : '';
+    const after = wanted.after ? (sentence.after || '') : '';
+    const lead = before ? before + gap : '';
+    const trail = after ? gap + after : '';
     if (!lead && !trail) return sentence;
     return {
       text: lead + sentence.text + trail,

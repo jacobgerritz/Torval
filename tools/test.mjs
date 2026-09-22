@@ -1001,6 +1001,23 @@ const run = async () => {
       }
     }
 
+    // The same join, on the card itself. The lookup above got its space
+    // and the card did not, so a sentence mined across two Italian lines
+    // arrived in Anki reading "il tempoPoi". Both sides of the word have
+    // to be checked: only the leading one moves the bold.
+    {
+      const content = readFileSync(join(ROOT, 'extension', 'content.js'), 'utf8');
+      const widen = content.slice(content.indexOf('function widen('),
+        content.indexOf('function markSentence('));
+      check('the card joins its lines the way the language joins words',
+        /profile\(\)\.seams\) \? '' : ' '/.test(widen));
+      check('and the space goes on both sides of the line being mined',
+        /before \? before \+ gap : ''/.test(widen) &&
+        /after \? gap \+ after : ''/.test(widen));
+      check('the bold still counts the space it now sits behind',
+        /index: sentence\.index \+ lead\.length/.test(widen));
+    }
+
     // Nothing is asked for, nothing changes: a line read with no neighbours
     // comes back exactly as it was.
     const plain = await Lookup.locateTokens(line, db);
