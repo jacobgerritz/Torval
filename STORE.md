@@ -14,19 +14,12 @@ justification that is vague gets a rejection and another fortnight.
 
 **Name.** Torval
 
-**Summary.** Two of them, because the limits are far apart and a field
-half used is a field wasted.
-
-Chrome, 132 characters. This one is 129:
+**Summary.** One for both stores, 129 characters. Firefox allows 250 and
+recommends it, but the description below carries the detail, and a summary
+that repeats the description reads as padding.
 
 ```text
 Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. Free, private, and it never leaves your machine.
-```
-
-Firefox, 250 characters. This one is 246:
-
-```text
-Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. It counts how much of a page you already know, times YouTube and Netflix subtitles, and sends words to Anki in one click. Free, private, nothing leaves your machine.
 ```
 
 **Category.** Chrome: *Education*. Firefox: *Language support* (secondary:
@@ -40,10 +33,11 @@ learning, subtitles, immersion
 ## The description
 
 Chrome takes the long one below and renders no formatting. Firefox's field
-recommends 250 characters, so it gets its own, which is 249:
+recommends 250 characters, so it gets its own, which is 236. It picks
+up where the summary stops rather than saying the same thing again:
 
 ```text
-A pop-up dictionary for Japanese, Italian and Spanish. Hold Shift, hover a word, read. It handles conjugation, times subtitles on YouTube and Netflix, counts how much of a page you know, and makes Anki cards. Free, open source, and entirely offline.
+A pop-up dictionary that handles conjugation, counts how much of a page you already know, times subtitles on YouTube and Netflix, and makes Anki cards in one click. Japanese, Italian and Spanish. No account, no server, nothing uploaded.
 ```
 
 The Firefox field has no hard limit, so the long version fits there too if
@@ -279,41 +273,24 @@ file on GitHub as insufficiently a policy).
 
 ## Notes for the Firefox reviewer
 
-AMO reviews source, and this add-on ships large generated JSON files, which
-looks like obfuscation if it is not explained. Say this:
+Optional field, but not for this add-on: it ships 28 MB of generated JSON,
+which looks like obfuscation until somebody says otherwise. Leaving it empty
+buys a question and another wait in the queue. Say this:
 
 ```text
-The add-on contains no minified, obfuscated or generated JavaScript.
-Every .js file is the original source, commented.
+No minified, obfuscated or generated JavaScript. Every .js file is the original, commented source.
 
-It does contain generated data: extension/data/, extension/data-it/ and
-extension/data-es/ hold the dictionaries as chunked JSON. These are built
-from public dumps by the scripts in tools/, and are not written by hand.
-To reproduce them from a clean checkout of
-https://github.com/jacobgerritz/Torval :
+The size is data. extension/data/, extension/data-it/ and extension/data-es/ hold the dictionaries as chunked JSON, built from public dumps by the scripts in tools/. To reproduce them from a clean checkout of https://github.com/jacobgerritz/Torval, with Node 18 or later and no npm dependencies:
 
-    node tools/build-dict.mjs      # Japanese, from JMdict (EDRDG)
-    node tools/build-pitch.mjs     # pitch accent, from Kanjium
-    node tools/build-dict-it.mjs   # Italian, from Wiktextract
-    node tools/build-dict-es.mjs   # Spanish, from Wiktextract
+    node tools/build-dict.mjs      # Japanese, JMdict (EDRDG)
+    node tools/build-pitch.mjs     # pitch accent, Kanjium
+    node tools/build-dict-it.mjs   # Italian, Wiktextract
+    node tools/build-dict-es.mjs   # Spanish, Wiktextract
     node tools/package.mjs --firefox
 
-Each build script downloads its own source data on first run; the URLs
-are at the top of each file. Node 18 or later and no npm dependencies.
-The two Latin builds also call `xz` to unpack one of their frequency
-lists; it is present on every Linux and on macOS. tools/test.mjs runs the test suite against the built
-dictionaries.
+Each script downloads its own source data on first run; the URLs are at the top of each file. The two Latin builds also call xz. tools/test.mjs runs the test suite.
 
-The add-on is GPL-3.0. Its data keeps the licences of its sources, listed
-in the add-on's own About panel and in README.md.
-
-The Firefox package deliberately differs from the Chrome one in two
-places, both built by tools/package.mjs from the single
-extension/manifest.json: webRequestBlocking against declarativeNetRequest,
-and the absence here of tabCapture, the offscreen permission and
-offscreen.html/offscreen.js. Those last are Chrome's only way to record a
-copy-protected video's sound, which Firefox has no API for at all, so
-shipping them here would be dead code in a review that reads every line.
+This package differs from the Chrome one deliberately, both built by tools/package.mjs from one manifest: webRequestBlocking here in place of declarativeNetRequest, and no tabCapture, offscreen permission or offscreen.html/offscreen.js. Those are Chrome's only way to record a copy-protected video's sound, which Firefox has no API for, so shipping them here would be dead code in a review that reads every line.
 ```
 
 ---
