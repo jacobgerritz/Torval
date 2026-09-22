@@ -972,6 +972,35 @@ const run = async () => {
       second.some((t) => t.word === '見に行く' && t.start === 0 && t.length === 1),
       JSON.stringify(second.map((t) => [t.word, t.start, t.length])));
 
+    // A line break between two lines of Japanese is not a word break, which
+    // is what the whole of the above depends on. In Italian it is one, and
+    // joining without a space fused "visionari" and "e" into "visionarie",
+    // a real word, so the lone "e" at the head of the second line was
+    // marked and opened visionario's entry. The join is the language's.
+    {
+      const esDir = join(ROOT, 'extension', 'data-it');
+      if (existsSync(join(esDir, 'meta.json'))) {
+        const itDb = loadDictionary(esDir);
+        Lang._setActive('it');
+        const first = 'Faraoni, imperatori e re, miliardari, scienziati e visionari';
+        const second = 'e intere civiltà hanno inseguito la stessa ossessione';
+
+        const fused = await LookupLatin.locateTokens(first + second, itDb);
+        check('run together, the two lines make a word that is in neither',
+          fused.some((t) => t.word === 'visionario' &&
+            (first + second).slice(t.start, t.start + t.length).indexOf('e') !== -1 &&
+            t.start + t.length > first.length),
+          fused.map((t) => t.word).join(' '));
+
+        const spaced = await LookupLatin.locateTokens(first + ' ' + second, itDb);
+        const head = LookupLatin.within(spaced, first.length + 1, second.length);
+        check('joined with a space, nothing from the line before reaches this one',
+          !head.some((t) => t.start === 0 && t.word === 'visionario'),
+          JSON.stringify(head.slice(0, 3).map((t) => [t.word, t.start, t.length])));
+        Lang._setActive('ja');
+      }
+    }
+
     // Nothing is asked for, nothing changes: a line read with no neighbours
     // comes back exactly as it was.
     const plain = await Lookup.locateTokens(line, db);

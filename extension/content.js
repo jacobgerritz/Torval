@@ -526,8 +526,13 @@
     if (!block || !block.closest || !block.closest('[data-torval-subtitle]')) return plain;
 
     const beside = TorvalSubtitles.around(found.whole);
-    const before = beside.before || '';
-    const after = beside.after || '';
+    // Joined the way the language joins words, or the last word of the line
+    // before fuses onto the first of this one: "visionari" and "e" read as
+    // "visionarie", and hovering the lone "e" answered visionario. Japanese
+    // is the other way round, where the break is not a word break at all.
+    const gap = (typeof TorvalLang !== 'undefined' && TorvalLang.profile().seams) ? '' : ' ';
+    const before = beside.before ? beside.before + gap : '';
+    const after = beside.after ? gap + beside.after : '';
     if (!before && !after) return plain;
     return {
       text: before + found.whole + after,

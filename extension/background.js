@@ -528,11 +528,21 @@ async function wordPlaces(text, before, after, trusted, say) {
   // Read with whatever came before and after, so that a line cut mid-word,
   // which automatic captions do constantly, is still read as the word it is.
   // Only the words starting inside this line are kept.
+  //
+  // Joined the way the language joins words. A line break between two lines
+  // of Japanese is not a word break, and 見に行っ / たので is one verb; a line
+  // break between two lines of Italian is one, and running them together
+  // fused the last word of the line before onto the first of this one.
+  // "visionari" and "e" became "visionarie", a real word, so the lone "e" at
+  // the head of the line was marked and opened visionario's entry.
+  const gap = TorvalLang.profile().seams ? '' : ' ';
   const lead = String(before || '').slice(-CONTEXT);
   const trail = String(after || '').slice(0, CONTEXT);
-  const whole = lead + text + trail;
+  const head = lead ? lead + gap : '';
+  const tail = trail ? gap + trail : '';
+  const whole = head + text + tail;
   const found = await lookup.locateTokens(whole, reader, say);
-  const tokens = lookup.within(found, lead.length, text.length);
+  const tokens = lookup.within(found, head.length, text.length);
   if (!trusted && !TorvalLang.profile().plausible(text, tokens.length)) return NOT_THIS_LANGUAGE;
   const known = await effectiveKnown(text, tokens, reader, await knownSet());
   const ignored = await ignoredSet();
