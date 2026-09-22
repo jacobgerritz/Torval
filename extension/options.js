@@ -39,7 +39,7 @@ function showPanel(name) {
 // that is what the page was called when anything started linking to it.
 const asked = (location.hash || '').slice(1);
 showPanel(asked === 'known' ? 'words'
-  : document.getElementById('panel-' + asked) ? asked : 'anki');
+  : document.getElementById('panel-' + asked) ? asked : 'words');
 
 /*
  * Opened to be shown one switch.
@@ -274,15 +274,31 @@ async function save() {
     deck: deckSelect.value,
     model: modelSelect.value,
     tags: tagsInput.value.split(',').map((t) => t.trim()).filter(Boolean),
-    // Left out entirely when the box is empty, so that "no answer" stays
-    // the recorder's own default rather than becoming zero.
-    lead: leadInput.value === '' ? undefined : Math.max(0, Math.min(3, Number(leadInput.value) || 0)),
+    lead: config.lead,
     fields
   };
   await api.storage.local.set({ [ankiConfigKey()]: config });
   statusText.textContent = 'Saved.';
   statusText.className = '';
   setTimeout(() => { statusText.textContent = ''; }, 2000);
+}
+
+/**
+ * How much to keep before the line. Saved as it is typed, because the Save
+ * button is on another page now, and a setting that needs a button you
+ * cannot see is a setting that never takes.
+ *
+ * Left out entirely when the box is empty, so "no answer" stays the
+ * recorder's own default rather than becoming zero.
+ */
+if (leadInput) {
+  leadInput.addEventListener('change', async () => {
+    config.lead = leadInput.value === ''
+      ? undefined
+      : Math.max(0, Math.min(3, Number(leadInput.value) || 0));
+    if (config.lead !== undefined) leadInput.value = config.lead;
+    await api.storage.local.set({ [ankiConfigKey()]: config }).catch(() => {});
+  });
 }
 
 function fail(message) {
@@ -731,7 +747,7 @@ function askFirst() {
   // panel is already hidden and the panel the address asked for is left
   // exactly as it was.
   if (asking) showPanel('first');
-  else if (!firstPanel.hidden) showPanel('anki');
+  else if (!firstPanel.hidden) showPanel('words');
   // Drawn only now, so a fresh install never shows a flash of the settings
   // it is not ready to have.
   layout.classList.add('settled');

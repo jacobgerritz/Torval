@@ -1931,7 +1931,7 @@
     // done depends on the browser and on a permission, and the panel that
     // holds that switch is also the only place with room to say why Firefox
     // cannot do it at all.
-    return ' No sound: copy-protected. See Settings → Anki.';
+    return ' No sound: copy-protected. See Settings → Video.';
   }
 
   /**

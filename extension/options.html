@@ -10,9 +10,9 @@
       <span>Language</span>
       <select id="language"></select>
     </label>
+    <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="anki">Anki</button>
     <button class="tab" data-panel="video">Video</button>
-    <button class="tab" data-panel="words">Words</button>
     <button class="tab" data-panel="keys">Keys</button>
     <button class="tab" data-panel="look">Appearance</button>
     <button class="tab" data-panel="about">About</button>
@@ -182,6 +182,29 @@
       </p>
     </section>
 
+
+    <p class="actions">
+      <button id="save" class="primary">Save</button>
+      <span id="status" role="status"></span>
+    </p>
+  </div>
+
+  <!-- ------------------------------------------------------------------ -->
+
+  <div class="panel" id="panel-video" hidden>
+    <section>
+      <h2>Speed up non-dialogue</h2>
+
+      <label>
+        <span>Speed</span>
+        <input id="skip-speed" type="number" min="1.25" max="8" step="0.25" placeholder="2">
+      </label>
+
+      <p class="note hint">
+        Turn it on with <b>»</b> on the bar, or press <b id="skip-key">S</b>.
+      </p>
+    </section>
+
     <section>
       <h2>Recording from video</h2>
       <label>
@@ -203,28 +226,6 @@
       <p class="note">
         On copy-protected video, click the Torval button in the toolbar
         once per tab. The browser allows no picture or sound until you do.
-      </p>
-    </section>
-
-    <p class="actions">
-      <button id="save" class="primary">Save</button>
-      <span id="status" role="status"></span>
-    </p>
-  </div>
-
-  <!-- ------------------------------------------------------------------ -->
-
-  <div class="panel" id="panel-video" hidden>
-    <section>
-      <h2>Speed up non-dialogue</h2>
-
-      <label>
-        <span>Speed</span>
-        <input id="skip-speed" type="number" min="1.25" max="8" step="0.25" placeholder="2">
-      </label>
-
-      <p class="note hint">
-        <b>»</b> on the bar, or <b id="skip-key">S</b>.
       </p>
     </section>
   </div>
