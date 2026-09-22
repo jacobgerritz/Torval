@@ -1,7 +1,10 @@
 /*
  * Torval, tiny static file server, for the preview page only.
  *
- *   node tools/serve.mjs        then open http://localhost:8137/tools/preview.html
+ *   node tools/serve.mjs
+ *
+ * Then http://localhost:8137/docs/ for the website, or
+ * http://localhost:8137/tools/preview.html for the popup preview.
  *
  * The extension itself never needs this.
  */
@@ -18,12 +21,18 @@ const TYPES = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
-  '.svg': 'image/svg+xml; charset=utf-8'
+  '.svg': 'image/svg+xml; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.ico': 'image/x-icon'
 };
 
 createServer(async (req, res) => {
   const path = decodeURIComponent(req.url.split('?')[0]);
-  const file = join(ROOT, normalize(path).replace(/^(\.\.[/\\])+/, ''));
+  // A directory means its index, the way every other server does it, so
+  // /docs/ opens the website rather than answering "not found".
+  const asked = path.endsWith('/') ? path + 'index.html' : path;
+  const file = join(ROOT, normalize(asked).replace(/^(\.\.[/\\])+/, ''));
   try {
     const body = await readFile(file);
     res.writeHead(200, { 'content-type': TYPES[extname(file)] || 'application/octet-stream' });
@@ -31,4 +40,7 @@ createServer(async (req, res) => {
   } catch {
     res.writeHead(404).end('not found');
   }
-}).listen(PORT, () => console.log(`http://localhost:${PORT}/tools/preview.html`));
+}).listen(PORT, () => {
+  console.log(`the website:  http://localhost:${PORT}/docs/`);
+  console.log(`the preview:  http://localhost:${PORT}/tools/preview.html`);
+});
