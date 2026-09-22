@@ -287,6 +287,13 @@ var TorvalSubtitles = (function () {
   }
 
   var videoId = null;
+  // The caption address already handed to loadSeenTrack for this video.
+  // Asking for it on every idle pass means the same address comes back
+  // every second until the transcript lands, and each one would start its
+  // own fetch and its own comprehension pass over the result. Two of those
+  // racing is what left the bar stuck partway through "Reading the
+  // subtitles…". Cleared when the video changes.
+  var triedSeen = '';
   var cues = [];
   var index = 0;
   var video = null;
@@ -496,6 +503,8 @@ var TorvalSubtitles = (function () {
     // Italian transcript with the English one. The address says which
     // language it is for, so it can simply be read.
     if (!wantedTimedtext(message.url)) return;
+    if (triedSeen === message.url) return;   // already in flight, or already loaded
+    triedSeen = message.url;
     loadSeenTrack(message.url);
   }
 
@@ -671,6 +680,7 @@ var TorvalSubtitles = (function () {
     var id = site.id();
     if (id !== videoId) {
       videoId = id;
+      triedSeen = '';
       cues = [];
       index = 0;
       openCue = null;

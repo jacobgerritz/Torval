@@ -2361,6 +2361,14 @@ const run = async () => {
       /case 'lastTimedtext':/.test(background));
     check('and forgets it when the tab goes away',
       /onRemoved[\s\S]{0,80}seenPerTab\.delete/.test(background));
+    // Asking every pass means the same address comes back every second.
+    // Without this each reply started its own fetch and its own
+    // comprehension pass, and two of those racing left the bar stuck
+    // partway through "Reading the subtitles…".
+    check('the same address is only ever acted on once per video',
+      /if \(triedSeen === message\.url\) return;[\s\S]{0,60}triedSeen = message\.url;/.test(subs));
+    check('and that is cleared when the video changes',
+      /videoId = id;\s*\n\s*triedSeen = '';/.test(subs));
   }
 
   // --- video capture -----------------------------------------------------
