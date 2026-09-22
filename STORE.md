@@ -206,6 +206,30 @@ Torval can time the lines. Netflix only; nothing is injected anywhere
 else.
 ```
 
+Chrome gives host permissions one box, not one each, and asks separately
+about remote code. Those two:
+
+**Host permissions** (Chrome's single box)
+```text
+<all_urls>: reading the text of the page is the entire program. Torval has to be present on whatever page the user is reading, whether a news article, a blog, a forum or a video, to see the word under the cursor and draw the popup. It reads the page locally and sends nothing from it anywhere. There is no list of sites that would work, because the whole point is that it works on the page the learner happens to be on.
+
+127.0.0.1:8765 and localhost:8765: AnkiConnect, the add-on that lets Anki accept a card from outside, listens on this port on the user's own machine. This is how a card is created. It is contacted only when the user presses + on a word or opens the Anki settings page, and it is not on the network.
+
+youtube.com and netflix.com: fetching the subtitle track of the video the user has open, so each line can be timed. The same request the player itself makes, for the video already on screen.
+
+assets.languagepod101.com: a word's pronunciation for a Japanese card, and only when the user's note type has a field mapped to word audio. The request contains the word being looked up and nothing else.
+
+upload.wikimedia.org: the same for an Italian or Spanish card, a Lingua Libre recording on Wikimedia Commons under CC BY-SA. Which words have a recording is decided when the dictionary is built, so this fetches a known file rather than searching for the word.
+```
+
+**Remote code.** Answer **no**: Torval executes no remote code. Every line
+it runs ships in the package. The only things fetched at runtime are a
+subtitle file, a pronunciation audio file and AnkiConnect's JSON replies,
+all data, none of it evaluated.
+
+The per-permission wording below is kept because AMO's reviewer notes use
+it, and because Chrome's single box is easier to write from parts.
+
 **Host permission: `<all_urls>` (content scripts)**
 ```text
 Reading the text of the page is the entire program. Torval has to be
