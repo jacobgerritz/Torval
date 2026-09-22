@@ -269,6 +269,21 @@ all, and the field is simply left empty. About 10,400 Italian words and 17,100
 Spanish ones have one, weighted towards common vocabulary: a little over half
 the thousand commonest Italian words, three quarters of the Spanish.
 
+That is the whole of it, and it was worth checking rather than assuming.
+The Lingua Libre categories hold 12,637 Italian files and 19,128 Spanish, and
+the build already takes every one that names a word in the dictionary. The
+older `Category:Italian pronunciation` and `Category:Spanish pronunciation`
+trees look like a second source and are not: walking them and their
+subcategories turns up 368 Italian words and 113 Spanish that Lingua Libre
+does not already have. Forvo has the coverage and a licence that forbids
+passing recordings on. So a word without a recording here does not have a
+free human one anywhere, and the field stays empty.
+
+Where that matters, Anki says the word itself. A `{{tts it_IT:Word}}` line on
+the card template speaks whatever is in the field using the voices already on
+the device, which covers the words no volunteer has read yet. Torval does not
+write that line, because it is a decision about somebody's own note type.
+
 Anki downloads and stores nothing itself; Torval passes it the file.
 
 Pitch accents come from **Kanjium**, which derives from the NHK accent
