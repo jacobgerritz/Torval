@@ -2482,6 +2482,24 @@ const run = async () => {
   check('a band at one end only is part of the picture',
     night.top === 0 && night.height === 180);
 
+  // --- the two halves of the Netflix bridge agree on the words ---------------
+  // netflix.js runs beside the page and netflix-page.js runs inside it, and
+  // everything between them is a string in a postMessage. A typo in either
+  // file is silence, not an error.
+  {
+    const beside = readFileSync(join(ROOT, 'extension', 'netflix.js'), 'utf8');
+    const inside = readFileSync(join(ROOT, 'extension', 'netflix-page.js'), 'utf8');
+    const named = (text) => new Set(
+      [...text.matchAll(/'(torval-netflix-[a-z-]+)'/g)].map((m) => m[1]));
+    const sent = named(beside);
+    const heard = named(inside);
+    for (const name of ['torval-netflix-seek', 'torval-netflix-captions',
+      'torval-netflix-captions-on', 'torval-netflix-loud']) {
+      check('both halves know ' + name, sent.has(name) && heard.has(name),
+        'beside: ' + sent.has(name) + ', inside: ' + heard.has(name));
+    }
+  }
+
   // --- finding the player round the video ------------------------------------
   // Netflix nests three elements that all answer to the player selector.
   // Stopping at the nearest leaves everything hung off the two above it on

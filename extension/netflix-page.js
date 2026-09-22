@@ -603,6 +603,75 @@
   });
 
   /** The player for whatever is playing, which is page code's to reach. */
+  /*
+   * Turning the right subtitles on, rather than waiting to be given them.
+   *
+   * Netflix hands no subtitle file to anybody, so Torval reads the lines off
+   * the screen, and there is nothing on the screen until the viewer has gone
+   * into the player's own menu and chosen the language. Every first video in
+   * a new language began that way: Torval apparently doing nothing, with no
+   * way to tell that from broken.
+   *
+   * The player knows its own track list and takes a track back, which is
+   * what its menu does when a language is clicked. So Torval clicks it.
+   * Only ever onto the language being learned, only when what is showing is
+   * not already that, and never off: somebody who has deliberately picked
+   * Italian subtitles for an Italian film has already said what they want.
+   */
+  window.addEventListener('message', function (e) {
+    if (e.source !== window) return;
+    var data = e.data;
+    if (!data || data.torval !== 'torval-netflix-captions') return;
+    window.postMessage({
+      torval: 'torval-netflix-captions-on',
+      on: chooseCaptions(data.wanted || [])
+    }, '*');
+  });
+
+  function chooseCaptions(wanted) {
+    var moving = playing();
+    if (!moving || typeof moving.getTimedTextTrackList !== 'function') return false;
+
+    var list;
+    try { list = moving.getTimedTextTrackList(); } catch (err) { return false; }
+    if (!list || !list.length) return false;
+
+    try {
+      var showing = moving.getTimedTextTrack && moving.getTimedTextTrack();
+      if (fits(showing, wanted)) return true;
+    } catch (err) { /* ask for one anyway */ }
+
+    // The ordinary track ahead of the one written for the deaf, which carries
+    // [DOOR CREAKS] and the speakers' names and is not the dialogue.
+    var best = pick(list, wanted, false) || pick(list, wanted, true);
+    if (!best) return false;
+    try { moving.setTimedTextTrack(best); } catch (err) { return false; }
+    return true;
+  }
+
+  function pick(list, wanted, allowAssistive) {
+    for (var i = 0; i < list.length; i++) {
+      var track = list[i];
+      if (!fits(track, wanted)) continue;
+      var kind = String(track.trackType || track.rawTrackType || '').toUpperCase();
+      if (!allowAssistive && kind === 'ASSISTIVE') continue;
+      return track;
+    }
+    return null;
+  }
+
+  /** Is this the language being learned, and is it subtitles at all? */
+  function fits(track, wanted) {
+    if (!track) return false;
+    var code = String(track.bcp47 || track.language || '').toLowerCase();
+    if (!code || code === 'none' || code === 'off') return false;
+    for (var i = 0; i < wanted.length; i++) {
+      var want = String(wanted[i]).toLowerCase();
+      if (code === want || code.indexOf(want + '-') === 0) return true;
+    }
+    return false;
+  }
+
   function playing() {
     try {
       var app = window.netflix && window.netflix.appContext;

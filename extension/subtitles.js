@@ -243,7 +243,7 @@ var TorvalSubtitles = (function () {
           : (typeof window !== 'undefined' ? window.TorvalNetflix : null);
         if (reader) reader.seek(seconds);
       },
-      captionsOn: null      // Netflix's player has no such handle to pull
+      captionsOn: netflixCaptionsOn
     }
   };
   var site = null;
@@ -261,6 +261,16 @@ var TorvalSubtitles = (function () {
    * title, the skip button. Harmless on screen and ruinous in a screenshot,
    * which is the only thing that asks for it.
    */
+  /**
+   * Netflix's own menu, pulled from here. It lives in netflix.js because
+   * only that file can reach the page, and the answer comes back a moment
+   * later, so false here means "ask me again" rather than "no".
+   */
+  function netflixCaptionsOn(wanted) {
+    if (typeof TorvalNetflix === 'undefined' || !TorvalNetflix.captionsOn) return true;
+    return TorvalNetflix.captionsOn(wanted);
+  }
+
   function overlays() {
     return (site && site.overlays) || '';
   }

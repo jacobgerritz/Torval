@@ -102,11 +102,17 @@ var TorvalNetflix = (function () {
   }
 
   var caught = null;
+  var captionsShowing = false;
   window.addEventListener('message', function (e) {
     // Only this page, and only these messages. Anything can post to a window.
     if (e.source !== window) return;
     var data = e.data;
     if (!data) return;
+    if (data.torval === 'torval-netflix-captions-on') {
+      captionsShowing = !!data.on;
+      if (captionsShowing) say('the player is showing the subtitles we asked for');
+      return;
+    }
     if (data.torval === 'torval-netflix-subtitles') {
       var text = typeof data.text === 'string' && data.text ? data.text : data.vtt;
       if (typeof text !== 'string' || !text) return;
@@ -279,6 +285,28 @@ var TorvalNetflix = (function () {
   return {
     /** The subtitle file netflix-page.js caught, if one has arrived. */
     track: function () { return caught; },
+
+    /**
+     * Ask the player to show the subtitles in the language being learned.
+     *
+     * Netflix hands its subtitle file to nobody, so the lines are read off
+     * the screen, and there is nothing on the screen until somebody has
+     * been into the player's menu and chosen a language. That made every
+     * first video in a new language look broken.
+     *
+     * Answered from the page side, since the player object lives there,
+     * which means the answer arrives after this has returned. Saying false
+     * is what keeps subtitles.js asking, and it stops asking as soon as one
+     * of those answers comes back yes. See chooseCaptions in netflix-page.js
+     * for what it will and will not touch.
+     */
+    captionsOn: function (wanted) {
+      if (captionsShowing) return true;
+      window.postMessage({
+        torval: 'torval-netflix-captions', wanted: wanted || []
+      }, '*');
+      return false;
+    },
 
     /** See describePlayer. Called by subtitles.js when nothing was caught. */
     describe: describePlayer,
