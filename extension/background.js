@@ -118,8 +118,24 @@ let hoverReader = null;        // reassigned per language, see loadLanguage
  * `&torval=1` marks Torval's own re-fetch of that address so it is not mistaken for
  * a second genuine request and forwarded right back again.
  */
+/*
+ * tabId -> the last caption address seen in that tab.
+ *
+ * Kept out here rather than inside the listener because the content script
+ * asks for it as well as being handed it. Being handed it is a race it
+ * loses often on a fresh install: the page is already asking for captions
+ * while subtitles.js is still working out which video it is on, so the
+ * message arrives, finds no videoId, and is dropped. The address does not
+ * change when the page is reloaded, so the guard below then means a second
+ * one is never sent, and YouTube stays broken in that tab until the add-on
+ * is toggled off and on, which is the only thing that empties this map.
+ */
+const seenPerTab = new Map();
+if (api.tabs && api.tabs.onRemoved) {
+  api.tabs.onRemoved.addListener((tabId) => seenPerTab.delete(tabId));
+}
+
 if (api.webRequest && api.webRequest.onBeforeRequest) {
-  const seenPerTab = new Map();   // tabId -> last captured URL, so as not to repeat one
   api.webRequest.onBeforeRequest.addListener(
     (details) => {
       if (details.tabId < 0) return;
@@ -252,6 +268,8 @@ api.runtime.onMessage.addListener((message, sender) => {
     });
     case 'dictionaries': return guard(() => dictionaries());
     case 'keepDictionary': return guard(() => keepDictionary(message.code, message.keep));
+    case 'lastTimedtext': return Promise.resolve(
+      { url: seenPerTab.get(sender && sender.tab && sender.tab.id) || '' });
     case 'grabVisible':  return guard(() => grabVisible(sender && sender.tab));
     case 'tabAudioReady': return guard(() => tabAudioReady());
     case 'tabAudioStart': return guard(() => tabAudioStart(sender && sender.tab && sender.tab.id,

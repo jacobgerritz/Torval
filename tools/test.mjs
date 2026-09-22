@@ -2341,6 +2341,28 @@ const run = async () => {
   Lang._setActive('ja');
   delete globalThis.TorvalLang;
 
+  // --- the address is asked for, not only waited on -----------------------
+  // On a fresh install the push loses the race: YouTube asks for captions
+  // while subtitles.js is still working out which video it is on, so the
+  // message arrives with no videoId and is dropped. The address is the same
+  // on a reload, so the "already forwarded this one" guard meant a second
+  // one never came, and the tab stayed broken until the add-on was toggled
+  // off and on. Both halves of the fix are checked, because either one
+  // alone leaves the race.
+  {
+    const subs = readFileSync(join(ROOT, 'extension', 'subtitles.js'), 'utf8');
+    const background = readFileSync(join(ROOT, 'extension', 'background.js'), 'utf8');
+    check('the idle retry asks for the caption address it may have missed',
+      /askForCaughtTrack\(\);[\s\S]{0,80}MAX_LOOKUP_ATTEMPTS/.test(subs));
+    check('a pulled address goes through the same checks as a pushed one',
+      /askForCaughtTrack[\s\S]{0,900}onBackgroundMessage\(\{ type: 'timedtextSeen'/.test(subs));
+    check('the background keeps the address where it can be asked for it',
+      /^const seenPerTab = new Map\(\);$/m.test(background) &&
+      /case 'lastTimedtext':/.test(background));
+    check('and forgets it when the tab goes away',
+      /onRemoved[\s\S]{0,80}seenPerTab\.delete/.test(background));
+  }
+
   // --- video capture -----------------------------------------------------
   // Media filenames come from the sentence, so re-mining a line reuses its
   // files instead of filling the collection with copies.

@@ -461,6 +461,32 @@ var TorvalSubtitles = (function () {
    * genuine transcript beats one assembled a line at a time regardless of how
    * it was found.
    */
+  /**
+   * Ask for the caption address rather than wait to be handed it.
+   *
+   * The background script sees YouTube's own request whether or not this
+   * script was ready to be told about it, and on a fresh install it very
+   * often is not: the push arrives before `videoId` is known, is dropped by
+   * the check below, and since the address is the same on a reload no
+   * second one is ever sent. Asking costs one message per idle pass and
+   * takes the ordering out of the question. The reply goes through the same
+   * checks as a push, so a stale address from the tab's previous video is
+   * turned away exactly as it would be.
+   */
+  function askForCaughtTrack() {
+    if (!api || !api.runtime || !api.runtime.sendMessage) return;
+    var asked;
+    try {
+      asked = api.runtime.sendMessage({ type: 'lastTimedtext' });
+    } catch (err) {
+      return;   // the background is asleep or gone; the next pass asks again
+    }
+    if (!asked || !asked.then) return;
+    asked.then(function (reply) {
+      if (reply && reply.url) onBackgroundMessage({ type: 'timedtextSeen', url: reply.url });
+    }).catch(function () {});
+  }
+
   function onBackgroundMessage(message) {
     if (!message || message.type !== 'timedtextSeen') return;
     if (!videoId || message.url.indexOf('v=' + videoId) === -1) return;   // an ad, or a different tab's video
@@ -671,7 +697,10 @@ var TorvalSubtitles = (function () {
       // A site that is asked for its transcript is asked again. A site that
       // waits to be handed one waits a few seconds before settling for the
       // screen, since the file usually arrives about as fast as the video.
-      if (site.fetches) { if (attempts <= MAX_LOOKUP_ATTEMPTS) load(id); }
+      if (site.fetches) {
+        askForCaughtTrack();
+        if (attempts <= MAX_LOOKUP_ATTEMPTS) load(id);
+      }
       else if (attempts > WAIT_TO_BE_HANDED) fallBackToWatching();
     }
 
