@@ -27,7 +27,7 @@ await build({
   writtenUrl: 'https://raw.githubusercontent.com/adno/wikipedia-word-frequency-clean/main/results/eswiki-frequency-20221020-lower.tsv.xz',
   out: 'data-es',
   // Bumping this makes the extension rebuild its Spanish database on next start.
-  version: 6,
+  version: 7,
   // Where recorded pronunciations come from. The category is walked
   // once at build time; the id and ISO code are the two constants a
   // Lingua Libre filename is built from. See build-audio.mjs.

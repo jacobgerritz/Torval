@@ -147,7 +147,7 @@ async function main() {
   writeFileSync(join(OUT, 'tags.json'), JSON.stringify(tags));
   writeFileSync(join(OUT, 'meta.json'), JSON.stringify({
     // Bumping this number makes the extension rebuild its database on next start.
-    version: 5,
+    version: 6,
     built: new Date().toISOString().slice(0, 10),
     entries: entries.length,
     terms: index.size,

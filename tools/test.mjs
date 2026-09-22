@@ -3018,6 +3018,23 @@ const run = async () => {
       const already = await send({ type: 'keepDictionary', code: 'ja', keep: true });
       check('switching on the one already in use does nothing and says so',
         already.ok, JSON.stringify(already));
+
+      // --- an import belongs to one language -----------------------------
+      // It used to read the active language afresh at every step, so a
+      // language changed mid-import left one database holding one language's
+      // entries and another's index: every word opened on somebody else's
+      // dictionary entry, and the percentage collapsed.
+      const startSource = backgroundSource.slice(
+        backgroundSource.indexOf('async function start()'),
+        backgroundSource.indexOf('async function start()') + 3000);
+      check('the import captures its language once instead of re-reading it',
+        /const profile = TorvalLang\.profile\(\)/.test(startSource) &&
+        /openDatabase\('torval-dictionary' \+ profile\.dbSuffix\)/.test(startSource) &&
+        /fetchJson\('data\/meta\.json', profile\.dataPath\)/.test(startSource),
+        startSource.slice(0, 300));
+      check('and a run that has been superseded stops rather than finishing',
+        /if \(!wanted\(\)\) throw new Error/.test(backgroundSource) &&
+        (backgroundSource.match(/if \(!wanted\(\)\) throw new Error/g) || []).length === 2);
     }
 
     const before = JSON.stringify(stored);

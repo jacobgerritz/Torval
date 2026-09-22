@@ -45,7 +45,7 @@ await build({
   writtenUrl: 'https://raw.githubusercontent.com/adno/wikipedia-word-frequency-clean/main/results/itwiki-frequency-20221020-lower.tsv.xz',
   out: 'data-it',
   // Bumping this makes the extension rebuild its Italian database on next start.
-  version: 9,
+  version: 10,
   // Where recorded pronunciations come from. The category is walked
   // once at build time; the id and ISO code are the two constants a
   // Lingua Libre filename is built from. See build-audio.mjs.

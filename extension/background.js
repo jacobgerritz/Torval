@@ -1549,6 +1549,24 @@ async function wakeTracking() {
 }
 
 async function start() {
+  // Which language this run is for, decided once and carried the whole way.
+  //
+  // It used to be read afresh at every step, from TorvalLang, which answers
+  // for the language active right now. An import is a minute long and a
+  // language can be changed in the middle of one, and when that happened the
+  // database being written to stayed the language the import began in while
+  // the files being read switched to the new one. Italian entries and
+  // Spanish index, in one database, each half convinced it was right: the
+  // subtitle words matched, so the line looked read, and every word opened
+  // on somebody else's dictionary entry.
+  //
+  // So the profile is captured here, the generation with it, and a run that
+  // has been superseded stops rather than finishing into a database nobody
+  // is waiting for.
+  const generation = loadGeneration;
+  const profile = TorvalLang.profile();
+  const mine = () => generation === loadGeneration;
+
   // Before anything else: a list that has gone missing since last time is
   // put back, and a copy of both is written somewhere the extension cannot
   // lose. Neither depends on the dictionary, and both matter most in exactly
@@ -1557,20 +1575,22 @@ async function start() {
   await rescueLists().catch((err) => console.warn('Torval: could not check the word lists:', err && err.message));
   keepACopy().catch(() => {});
 
-  const db = await openDatabase();
-  const meta = await fetchJson('data/meta.json');
+  const db = await openDatabase('torval-dictionary' + profile.dbSuffix);
+  const meta = await fetchJson('data/meta.json', profile.dataPath);
   const installed = await get(db, STATE, 'meta');
 
   if (installed && installed.version === meta.version) {
-    status = { state: 'ready', progress: 1 };
-    setBadge('');
+    if (mine()) {
+      status = { state: 'ready', progress: 1 };
+      setBadge('');
+    }
     dropFormerDatabases().catch(() => {});
     return db;
   }
 
   const awake = keepAwake();
   try {
-    await importDictionary(db, meta);
+    await importDictionary(db, meta, profile.dataPath, null, mine);
   } finally {
     awake();
   }
@@ -1625,7 +1645,8 @@ function keepAwake() {
  * the next start picks up where this one left off. Each batch also nudges the
  * badge, which is a browser API call, which is what tells Firefox we are alive.
  */
-async function importDictionary(db, meta, dataPath, onProgress) {
+async function importDictionary(db, meta, dataPath, onProgress, stillWanted) {
+  const wanted = stillWanted || (() => true);
   const total = meta.entryChunks + meta.indexChunks;
   let progress = await get(db, STATE, 'import');
 
@@ -1648,6 +1669,7 @@ async function importDictionary(db, meta, dataPath, onProgress) {
   // Entry ids are positions in the build output, so the counter has to run
   // unbroken across chunks, which is why it is part of the saved progress.
   for (let i = progress.entries; i < meta.entryChunks; i++) {
+    if (!wanted()) throw new Error('language changed while the dictionary was being built');
     const rows = await fetchJson(`data/entries-${pad(i)}.json`, dataPath);
     let nextId = progress.nextId;
     const pairs = rows.map((entry) => {
@@ -1660,6 +1682,7 @@ async function importDictionary(db, meta, dataPath, onProgress) {
   }
 
   for (let i = progress.index; i < meta.indexChunks; i++) {
+    if (!wanted()) throw new Error('language changed while the dictionary was being built');
     const rows = await fetchJson(`data/index-${pad(i)}.json`, dataPath);   // [term, ids][]
     await putAll(db, INDEX, rows, (fraction) => report(fraction));
     progress = { ...progress, index: i + 1 };
