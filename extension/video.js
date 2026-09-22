@@ -495,16 +495,15 @@ var TorvalVideo = (function () {
    *
    * Stops at the player rather than the body: outside it is the page, and
    * the page is not in the crop anyway.
+   *
+   * The outermost player, not the nearest. Netflix nests three of them, and
+   * stopping at the innermost leaves everything hung off the two above it
+   * still on screen: the control bar, the title, and the card that slides
+   * in saying what you are watching. That card is why this is written down.
    */
   function besideTheVideo(video) {
     var out = [];
-    var player = null;
-    if (typeof TorvalSubtitles !== 'undefined' && TorvalSubtitles.playerSelector) {
-      try {
-        var selector = TorvalSubtitles.playerSelector();
-        if (selector) player = video.closest(selector);
-      } catch (err) { player = null; }
-    }
+    var player = outermost(video, selectorFor());
     if (!player) return out;
     var node = video;
     while (node && node !== player && node.parentElement) {
@@ -513,6 +512,24 @@ var TorvalVideo = (function () {
       node = node.parentElement;
     }
     return out;
+  }
+
+  /** What this site calls its player, if subtitles.js is here to say. */
+  function selectorFor() {
+    if (typeof TorvalSubtitles === 'undefined' || !TorvalSubtitles.playerSelector) return '';
+    try { return TorvalSubtitles.playerSelector() || ''; } catch (err) { return ''; }
+  }
+
+  /** The highest ancestor matching `selector`, rather than the nearest. */
+  function outermost(node, selector) {
+    if (!selector) return null;
+    var found = null;
+    var at = node.parentElement;
+    while (at) {
+      try { if (at.matches(selector)) found = at; } catch (err) { /* not a selector */ }
+      at = at.parentElement;
+    }
+    return found;
   }
 
   /**
@@ -890,7 +907,8 @@ var TorvalVideo = (function () {
     // Exposed for the tests: telling a picture from a black rectangle.
     _allOneColour: allOneColour,
     _trimHead: trimHead,
-    _videoBox: videoBox
+    _videoBox: videoBox,
+    _outermost: outermost
   };
 })();
 

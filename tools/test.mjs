@@ -2348,6 +2348,33 @@ const run = async () => {
     Video._allOneColour(new Uint8ClampedArray(0)) === true &&
     Video._allOneColour(null) === true);
 
+  // --- finding the player round the video ------------------------------------
+  // Netflix nests three elements that all answer to the player selector.
+  // Stopping at the nearest leaves everything hung off the two above it on
+  // screen, which is how the "you're watching" card got into screenshots.
+  const chainOf = (...names) => {
+    let child = null;
+    let innermost = null;
+    for (const name of names) {
+      const node = {
+        name: name,
+        parentElement: null,
+        matches: (selector) => selector.split(', ').includes('.' + name)
+      };
+      if (child) child.parentElement = node; else innermost = node;
+      child = node;
+    }
+    return innermost;                     // handed back to be walked upwards
+  };
+
+  const stack = chainOf('video', 'VideoContainer', 'watch-video--player-view', 'body');
+  const players = '.watch-video--player-view, .watch-video, .VideoContainer';
+  check('the outermost player wins, not the nearest',
+    Video._outermost(stack, players).name === 'watch-video--player-view');
+  check('and nothing matching means nothing found',
+    Video._outermost(stack, '.nothing-here') === null &&
+    Video._outermost(stack, '') === null);
+
   // --- where the picture is inside the element -------------------------------
   // A 21:9 film in a 16:9 window has black bars that belong to the element,
   // not the film, and cropping to the element puts them on the card.

@@ -230,7 +230,8 @@ var TorvalSubtitles = (function () {
       overlays: '.watch-video--bottom-controls-container, ' +
         '[data-uia="controls-standard"], .watch-video--back-to-browsing, ' +
         '.watch-video--evidence-overlay, .PlayerControlsNeo__layout, ' +
-        '.watch-video--skip-content, .advisory-text-container',
+        '.watch-video--skip-content, .advisory-text-container, ' +
+        '[data-uia*="evidence"], [data-uia="video-title"]',
       furniture: 'button, a, [role="button"]',
       player: '.watch-video--player-view, .watch-video, .VideoContainer',
       catches: true,
