@@ -249,12 +249,10 @@ looks like obfuscation if it is not explained. Say this:
 >     node tools/build-dict-es.mjs   # Spanish, from Wiktextract
 >     node tools/package.mjs --firefox
 >
-> Node 18 or later. The two Latin builds also call `xz` to unpack one of
-> their frequency lists, which is present on every Linux and on macOS.
->
 > Each build script downloads its own source data on first run; the URLs
-> are at the top of each file. Node 18 or later, no dependencies, no build
-> toolchain. tools/test.mjs runs the test suite against the built
+> are at the top of each file. Node 18 or later and no npm dependencies.
+> The two Latin builds also call `xz` to unpack one of their frequency
+> lists; it is present on every Linux and on macOS. tools/test.mjs runs the test suite against the built
 > dictionaries.
 >
 > The add-on is GPL-3.0. Its data keeps the licences of its sources, listed
