@@ -1886,7 +1886,7 @@
     if (reply && reply.ok && reply.result) {
       const note = document.createElement('div');
       note.className = 'note dup-note';
-      note.textContent = 'Already in your collection, adding it again too.';
+      note.textContent = 'Already in your collection; adding it again.';
       entryEl.appendChild(note);
       reflow();
     }
@@ -1922,21 +1922,16 @@
     // been invoked on. One click on the toolbar button fixes it for the
     // whole tab, and nothing else will, so it is worth its own sentence.
     if (blocked.invoke) {
-      return ' No picture or sound yet: click the Torval button in the ' +
-        'toolbar once on this tab, then try again.';
+      return ' No picture or sound: click the Torval button in the toolbar, ' +
+        'then try again.';
     }
-    if (blocked.image && blocked.audio) {
-      return ' No picture or sound: this video is copy-protected. ' +
-        'See Settings → Anki.';
-    }
-    if (blocked.image) {
-      return ' No picture: this video is copy-protected. See Settings → Anki.';
-    }
+    if (blocked.image && blocked.audio) return ' No picture or sound: copy-protected.';
+    if (blocked.image) return ' No picture: copy-protected.';
     // Deliberately not spelling out the rest here. Whether anything can be
     // done depends on the browser and on a permission, and the panel that
     // holds that switch is also the only place with room to say why Firefox
     // cannot do it at all.
-    return ' No sound: this video is copy-protected. See Settings → Anki.';
+    return ' No sound: copy-protected. See Settings → Anki.';
   }
 
   /**
@@ -1960,7 +1955,7 @@
 
     const turn = document.createElement('button');
     turn.className = 'turn-on';
-    turn.textContent = 'Let Torval record this tab';
+    turn.textContent = 'Record this tab';
     turn.addEventListener('click', () => {
       api.runtime.sendMessage({ type: 'openOptions', focus: 'tab-audio' }).catch(() => {});
     });

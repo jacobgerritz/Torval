@@ -35,14 +35,11 @@
     <section class="first-run">
       <h2>Which language are you reading?</h2>
       <p class="note">
-        Torval keeps one dictionary, one set of known words and one set of
-        Anki settings per language, and works on one at a time. You can
-        change this whenever you like, and nothing you have marked in one
-        language is lost by switching to another.
+        One language at a time. Changing it later loses nothing: each keeps
+        its own words and Anki settings.
       </p>
       <p class="note">
-        The first choice downloads that language's dictionary into this
-        browser, which takes a minute and then never happens again.
+        Reading in the dictionary takes about a minute, once.
       </p>
       <div id="first-languages" class="first-choices"></div>
     </section>
@@ -54,9 +51,8 @@
     <section>
       <h2>Keeping score</h2>
       <p class="note">
-        On, Torval colours what you have not marked and says what share of a
-        page you know. Off, it is a pop-up dictionary that makes Anki cards,
-        with nothing to set up.
+        Colours what you have not marked, and says what share of a page you
+        know. Off, Torval is a dictionary that makes Anki cards.
       </p>
       <label class="check">
         <input type="checkbox" id="track">
@@ -66,9 +62,7 @@
 
     <div id="words-rest">
     <div class="parting"><h2>Known words</h2><span class="count" id="count">…</span></div>
-    <p class="note count-note">
-      What a page is measured against. Press ✓ in the popup, or 2.
-    </p>
+    <p class="note count-note">Press ✓ in the popup, or 2.</p>
 
     <section>
       <h2>Add from a text</h2>
@@ -99,8 +93,8 @@
 
     <div class="parting"><h2>Ignored words</h2><span class="count" id="count-ignored">…</span></div>
     <p class="note count-note">
-      <span id="ignored-kinds">Names, English, misreadings</span>. Left out of
-      the score rather than counting either way. Press ⊘ in the popup, or 3.
+      <span id="ignored-kinds">Names, English, misreadings</span>. Press ⊘ in
+      the popup, or 3.
     </p>
 
     <section>
@@ -132,9 +126,9 @@
       </p>
 
       <p class="note">
-        Coming from Anki?
+        From Anki:
         <a href="https://ankiweb.net/shared/info/596526198">Export Known
-        Words</a> writes this file out of your collection.
+        Words</a>.
       </p>
     </section>
 
@@ -183,9 +177,8 @@
       <h2>What goes in each field</h2>
       <div id="mapping"></div>
       <p class="note">
-        No note type you like?
-        <a href="https://jacobgerritz.github.io/Torval/anki.html">Torval's
-        own</a> fills every field and maps itself.
+        No note type you like? Use
+        <a href="https://jacobgerritz.github.io/Torval/anki.html">Torval's</a>.
       </p>
     </section>
 
@@ -195,9 +188,7 @@
         <span>Audio lead-in</span>
         <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.1">
       </label>
-      <p class="note hint">
-        Seconds kept before the line, so the first word is not clipped.
-      </p>
+      <p class="note hint">Seconds kept before the line.</p>
 
       <label class="check" id="tab-audio-row">
         <input type="checkbox" id="tab-audio">
@@ -206,15 +197,12 @@
       <p class="note hint" id="tab-audio-note"></p>
 
       <!--
-        Not about this panel, and asked about more than anything on it: a
-        black screenshot is a browser setting, so the setting is named.
+        Asked about more than anything else on this panel, because without
+        the click there is neither picture nor sound and nothing says why.
       -->
       <p class="note">
-        Copy-protected video will not draw into a canvas, so Torval
-        photographs the window instead and crops the video out of it.
-        The browser won't photograph or record a tab until the extension
-        has been used on it, so click the Torval button in the toolbar
-        once after opening a video.
+        On copy-protected video, click the Torval button in the toolbar
+        once per tab. The browser allows no picture or sound until you do.
       </p>
     </section>
 
@@ -228,10 +216,7 @@
 
   <div class="panel" id="panel-video" hidden>
     <section>
-      <h2>Skip the quiet parts</h2>
-      <p class="note">
-        Stretches with nobody speaking play faster. Dialogue does not.
-      </p>
+      <h2>Speed up non-dialogue</h2>
 
       <label>
         <span>Speed</span>
@@ -239,9 +224,7 @@
       </label>
 
       <p class="note hint">
-        Turn it on with <b>»</b> on the bar, or press <b id="skip-key">S</b>.
-        Both need the whole transcript, so neither appears on a video Torval
-        has to read off the screen.
+        <b>»</b> on the bar, or <b id="skip-key">S</b>.
       </p>
     </section>
   </div>
@@ -257,10 +240,7 @@
   <div class="panel" id="panel-keys" hidden>
     <section>
       <h2>Keyboard shortcuts</h2>
-      <p class="note">
-        Click a key, then press the one you want. Escape leaves it as it
-        was, and a key that is already doing something else is refused.
-      </p>
+      <p class="note">Click a key, then press the one you want. Escape cancels.</p>
       <div id="shortcuts"></div>
     </section>
 
@@ -289,13 +269,11 @@
   <!-- ------------------------------------------------------------------ -->
 
   <!--
-    Where the words come from. This is not decoration: the dictionaries are
-    other people's work, shared on terms that ask to be named, and a copy of
-    Torval handed to anybody else carries that obligation with it. It is a
-    page in the settings rather than a file in the download because the
-    people who need to read it are the people using the program.
+    Where the words come from. Not decoration: the dictionaries are other
+    people's work, shared on terms that ask to be named, and a copy of
+    Torval handed to anybody else carries that obligation with it. Cloned
+    into each dictionary's card in About.
   -->
-  <!-- What each dictionary is made of, cloned into its card above. -->
   <template id="sources-ja">
     <b>JMdict</b>, from the Electronic Dictionary Research and Development
     Group, under
@@ -324,19 +302,14 @@
     <section>
       <h2>Torval <span id="version" class="quiet"></span></h2>
       <p class="note">
-        A pop-up dictionary that runs entirely on this machine. Nothing you
-        read, look up or mark is sent anywhere; there is no account, no
-        telemetry and no server. The dictionaries were downloaded once, when
-        they were built, and are read out of this browser's own storage.
+        A pop-up dictionary that runs entirely on this machine. No account,
+        no telemetry, no server; nothing you read or look up is sent
+        anywhere.
       </p>
       <p class="note">
-        The program is GPL-3.0 licensed: free to use, change and pass on,
-        and anything built on it stays free in the same way. Its source is at
+        GPL-3.0, at
         <a href="https://github.com/jacobgerritz/Torval">github.com/jacobgerritz/Torval</a>.
-      </p>
-      <p class="note">
-        The dictionaries are not the program, and each keeps its own
-        licence, below.
+        The dictionaries keep their own licences, below.
       </p>
     </section>
 
@@ -344,11 +317,8 @@
 
     <section>
       <p class="note">
-        One for each language. A dictionary is read into this browser the
-        first time you choose its language, and stays until you say
-        otherwise. Definitions, how common each word is, and for Japanese
-        its pitch accent, are built into the one file rather than kept
-        apart, so there is nothing separate to switch off.
+        One a language, read in when you first choose that language.
+        Frequency and pitch accent are part of each, not separate files.
       </p>
       <p class="note" id="dict-note" hidden></p>
     </section>
@@ -358,11 +328,7 @@
     <div class="parting"><h2>When something goes wrong</h2></div>
 
     <section>
-      <p class="note">
-        Torval says nothing in the console unless you can act on it. Turned
-        on, it narrates finding and reading a video's subtitles, which is
-        what to send with a bug report.
-      </p>
+      <p class="note">Narrates finding and reading subtitles. Send it with a bug report.</p>
       <label class="check">
         <input type="checkbox" id="verbose">
         <span>Say what it is doing in the console</span>

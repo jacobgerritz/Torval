@@ -107,7 +107,7 @@ justification from a claim into something checkable.
 **`storage`**
 > Your known and ignored word lists, where you have asked for those, your Anki deck and field settings,
 > which language you are reading, any keyboard shortcut you have changed,
-> how fast to play the quiet parts of a video, and where you dragged the
+> how fast to play non-dialogue, and where you dragged the
 > subtitle overlay. All of it local to the browser profile; none of it is sent
 > anywhere.
 

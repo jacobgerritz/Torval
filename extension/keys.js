@@ -44,7 +44,7 @@ var TorvalKeys = (function () {
     { name: 'browse', label: 'Find it in Anki', fallback: 'b' },
     { name: 'back', label: 'Previous subtitle line', fallback: 'a' },
     { name: 'forward', label: 'Next subtitle line', fallback: 'd' },
-    { name: 'skip', label: 'Skip the quiet parts', fallback: 's' }
+    { name: 'skip', label: 'Speed up non-dialogue', fallback: 's' }
   ];
 
   var chosen = {};       // only what has been changed from the default

@@ -613,16 +613,16 @@ var TorvalBar = (function () {
     if (!visible) return;
     els.skip.classList.toggle('on', !!on);
     var said = on
-      ? 'Playing the quiet parts at ' + speed + '×, click to stop'
-      : 'Play the quiet parts faster';
+      ? 'Non-dialogue at ' + speed + '×, click to stop'
+      : 'Speed up non-dialogue';
     if (said !== skipSaid) { els.skip.title = said; skipSaid = said; }
   }
 
   function paintPin() {
     els.pin.classList.toggle('on', pinned);
     els.pin.title = pinned
-      ? 'Pinned open, click to let it tuck away again'
-      : 'Pin open, instead of tucking away when the mouse leaves';
+      ? 'Pinned open, click to unpin'
+      : 'Pin open';
   }
 
   function button(text, title, onClick) {

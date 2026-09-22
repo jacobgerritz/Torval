@@ -434,7 +434,7 @@ if (shortcutList) TorvalKeys.ready().then(drawShortcuts);
 // ---------------------------------------------------------------------------
 
 /*
- * How fast the quiet parts go. One number, saved as it is typed, because a
+ * How fast non-dialogue goes. One number, saved as it is typed, because a
  * Save button for a single field is a button you forget to press.
  */
 const skipSpeed = document.getElementById('skip-speed');
@@ -676,9 +676,8 @@ async function paintTabAudio() {
   const row = document.getElementById('tab-audio-row');
   if (row) row.hidden = !state.can;
   tabAudioNote.textContent = state.can
-    ? 'The line is played back as it is recorded, so you hear what you are getting.'
-    : 'Recording a tab needs Chrome. Firefox has no way to do it, so cards ' +
-      'from a copy-protected video are made here without their sound.';
+    ? 'The line plays as it records, so you hear what you are getting.'
+    : 'Needs Chrome. Firefox cannot record a tab, so these cards have no sound.';
 }
 
 
@@ -798,13 +797,13 @@ function dayOf(text) {
 
 function whereItStands(dict) {
   if (dict.building !== null && dict.building !== undefined) {
-    return 'Reading it in, ' + Math.round(dict.building * 100) + '%…';
+    return 'Reading in, ' + Math.round(dict.building * 100) + '%.';
   }
-  if (dict.active) return 'The language you are reading.';
-  if (dict.stale) return 'An older copy, replaced next time you choose it.';
-  if (dict.ready) return 'In this browser.';
+  if (dict.active) return 'In use.';
+  if (dict.stale) return 'An older copy.';
+  if (dict.ready) return 'Here.';
   if (dict.here) return 'Half read in.';
-  return 'Not in this browser.';
+  return 'Not here.';
 }
 
 /** Italian and Spanish come from the same places, so they share a list. */
@@ -826,7 +825,7 @@ function dictionaryCard(dict) {
   box.checked = dict.here;
   box.disabled = dictBusy || dict.active;
   const what = document.createElement('span');
-  what.textContent = 'Keep in this browser';
+  what.textContent = 'Keep a copy here';
   keep.appendChild(box);
   keep.appendChild(what);
   box.addEventListener('change', () => keepDictionary(dict.code, box.checked));
@@ -835,9 +834,8 @@ function dictionaryCard(dict) {
   const hint = document.createElement('p');
   hint.className = 'hint';
   hint.textContent = whereItStands(dict) + (dict.entries
-    ? ' ' + countOf(dict.entries) + ' entries, ' + countOf(dict.terms) +
-      ' forms, built ' + dayOf(dict.built) + '.'
-    : ' Not built into this copy of Torval.');
+    ? ' ' + countOf(dict.entries) + ' entries, built ' + dayOf(dict.built) + '.'
+    : ' Not in this build.');
   section.appendChild(hint);
 
   const made = sourcesFor(dict.code);
@@ -853,7 +851,7 @@ function dictionaryCard(dict) {
 
 async function keepDictionary(code, keep) {
   dictBusy = true;
-  sayAboutDictionaries(keep ? 'Reading it in. This takes a minute.' : '');
+  sayAboutDictionaries(keep ? 'Reading it in, about a minute.' : '');
   await paintDictionaries();
   try {
     const reply = await api.runtime.sendMessage({ type: 'keepDictionary', code, keep });
