@@ -439,8 +439,9 @@ TorvalLang.register({
   // Two dictionaries in one file. Every entry carries its English
   // definition, and about half of them also carry a Spanish one, so this
   // answers a Spanish speaker learning English and an English speaker who
-  // wants a monolingual dictionary, and background.js picks which set to
-  // hand over by the reader's own language.
+  // wants a monolingual dictionary. Which set a reader gets, and whether
+  // an entry reaches them at all, is decided by their own language in
+  // `inOwnLanguage` in background.js.
   explains: ['en', 'es'],
   charClass: TorvalEnglish,
   scanWindow: TorvalEnglishMaxScan,

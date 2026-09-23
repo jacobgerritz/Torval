@@ -3097,10 +3097,60 @@ const run = async () => {
     // so the sandbox needs the same language-registry files the manifest
     // loads before background.js in the real extension.
     for (const f of ['japanese.js', 'scan.js', 'italian.js', 'italian-scan.js',
-      'spanish.js', 'spanish-scan.js', 'lang.js', 'track.js']) {
+      'spanish.js', 'spanish-scan.js', 'english.js', 'english-scan.js',
+      'lang.js', 'ui.js', 'track.js']) {
       vm.runInContext(readFileSync(join(ROOT, 'extension', f), 'utf8'), sandbox, { filename: f });
     }
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
+
+    // --- no English for a reader who does not read English ----------------
+    // Half the English entries carry a Spanish definition in `x` and half do
+    // not. A Spanish reader is handed the first half, in Spanish, and never
+    // the second: not a definition, and not the word either, so it is not
+    // marked on the page or counted in the score. The real reader is used,
+    // with the database stubbed, before the word-list tests replace it.
+    {
+      const stub = new Map([
+        ['casa', [{ k: 'house', s: [{ g: ['a building'] }], x: [{ g: ['casa'] }] }]],
+        ['either', [{ k: 'either', s: [{ g: ['any one of two'] }] }]]
+      ]);
+      vm.runInContext('var wasActive = TorvalLang.active, wasEntries = getEntries;', sandbox);
+      sandbox.stubEntries = async (terms) => {
+        const out = new Map();
+        for (const term of terms) if (stub.has(term)) out.set(term, stub.get(term));
+        return out;
+      };
+      // The active language is answered rather than switched: switching it
+      // starts a dictionary loading, which is a different test's business.
+      const read = (language, asking) => vm.runInContext(`(async function () {
+        TorvalLang.active = function () { return '${language.lang}'; };
+        TorvalUI.set('${language.ui}');
+        getEntries = stubEntries;
+        var found = await cachingReader().getEntries(${JSON.stringify(asking)});
+        var out = {};
+        found.forEach(function (entries, term) { out[term] = entries[0].s[0].g[0]; });
+        return out;
+      })()`, sandbox);
+
+      const mine = await read({ ui: 'es', lang: 'en' }, ['casa', 'either']);
+      check('a Spanish reader is given the Spanish definition',
+        mine.casa === 'casa', JSON.stringify(mine));
+      check('and an English-only entry is not handed over at all',
+        mine.either === undefined, JSON.stringify(mine));
+
+      const both = await read({ ui: 'en', lang: 'en' }, ['casa', 'either']);
+      check('an English reader keeps both entries, in English',
+        both.casa === 'a building' && both.either === 'any one of two',
+        JSON.stringify(both));
+
+      // Spanish interface, a language nobody has written up in Spanish. The
+      // alternative to leaving its definitions alone is a dictionary that
+      // answers nothing.
+      const other = await read({ ui: 'es', lang: 'ja' }, ['casa', 'either']);
+      check('a language with no Spanish behind it keeps its own definitions',
+        other.either === 'any one of two', JSON.stringify(other));
+      vm.runInContext("TorvalUI.set('en'); TorvalLang.active = wasActive; getEntries = wasEntries;", sandbox);
+    }
 
     // --- the fingerprints -------------------------------------------------
     // Reading a page asks about far more words than it finds: some thirty

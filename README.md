@@ -18,16 +18,24 @@ Italian and Spanish get word stress marked inline instead, since neither has
 lexical pitch accent to speak of. Only one language is active at a time.
 
 English is the odd one out and deliberately so. The other three are defined
-in English, for an English speaker reading them; English is defined in
-Spanish, from the Spanish Wiktionary, for a Spanish speaker learning it.
+in English, for an English speaker reading them. Every English entry carries
+its own English definition, and 70,605 of the 154,279 carry a Spanish one
+beside it, put together out of three sources by `tools/glosses-en-es.mjs`.
 
-Which means it is no use at all to somebody who does not read Spanish, so it
-is not offered to them. The interface has its own language setting, in
-`ui.js`, defaulting to English and asked rather than read off the browser;
-English appears among the languages to read only once that is set to
-Spanish. The profile says so with `forUI`, and `TorvalLang.offered(ui)` is
-what every picker asks. One setting, in About, gates the whole feature, and
-an English speaker never sees either half of it.
+Which of the two a reader gets follows from their own language rather than
+from the dictionary. The interface has its own setting, in `ui.js`,
+defaulting to English and asked rather than read off the browser. A profile
+lists the languages it can explain itself in with `explains`, and
+`TorvalLang.offered(ui)` is what every picker asks, so a Spanish reader is
+offered English and nothing else, and an English speaker never sees either
+half of the feature.
+
+A Spanish reader is given the Spanish definitions and only those. An entry
+with no Spanish is not handed over at all, so the word is not marked on the
+page and not counted in the score either, rather than being answered in a
+language they have just said they would rather not read. That happens in
+`inOwnLanguage`, on the way out of the one reader every lookup, page
+reading and word count goes through.
 
 ---
 

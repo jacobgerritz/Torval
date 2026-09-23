@@ -388,17 +388,8 @@ async function handleLookup(text, point) {
     // value per word, and the table or the entry itself is already in
     // memory, so it costs nothing to answer it here along with the
     // definitions.
-    // An English entry carries two sets of definitions: the English one it
-    // was written with, and the Spanish one assembled for it where
-    // somebody has written one. Which of the two a reader wants is their
-    // own language, not the dictionary's business, so the swap happens
-    // here and everything downstream goes on reading entry.s.
-    const inSpanish = TorvalUI.code() === 'es';
     for (const group of groups) {
       for (const hit of group.hits) {
-        if (inSpanish && hit.entry && hit.entry.x) {
-          hit.entry = Object.assign({}, hit.entry, { s: hit.entry.x });
-        }
         if (stress) hit.stress = TorvalStress.indexFor(hit.entry);
         else hit.pitch = await TorvalPitch.accentFor(hit.word, hit.reading);
         hit.band = lookup.frequencyBand(hit.q);
@@ -431,6 +422,33 @@ async function handleLookup(text, point) {
 // cruder than forgetting the oldest, and costs one slow hover an hour.
 const CACHE_LIMIT = 20000;
 
+/*
+ * What a reading of the dictionary is allowed to answer with.
+ *
+ * An English entry carries its English definition and, where somebody has
+ * written one, a Spanish one beside it in `x`. A reader whose own language
+ * is Spanish is handed the Spanish one, and an entry with none is not
+ * handed over at all: answering an English word in English is no answer to
+ * them. The word then behaves like one the dictionary has never heard of,
+ * which is the point of doing it here rather than in the popup. It is not
+ * marked on the page and not counted in the score either, so a word nobody
+ * can tell them the meaning of does not sit in their total for ever as one
+ * they do not know.
+ *
+ * The pairing is checked rather than assumed, so a profile left on a
+ * language nobody has written up in Spanish keeps its own definitions
+ * instead of emptying every lookup.
+ */
+function inOwnLanguage(entries) {
+  if (TorvalUI.code() !== 'es') return entries;
+  if (!TorvalLang.explainsIn(TorvalLang.active(), 'es')) return entries;
+  const said = [];
+  for (const entry of entries) {
+    if (entry && entry.x) said.push(Object.assign({}, entry, { s: entry.x }));
+  }
+  return said;
+}
+
 function cachingReader() {
   const cache = new Map();
   return {
@@ -444,10 +462,15 @@ function cachingReader() {
         const found = await getEntries(missing);
         for (const term of missing) cache.set(term, found.get(term) || null);
       }
+      // The cache holds the entries as they were stored, and the choice of
+      // language is made on the way out, because the reader kept for
+      // hovering outlives a change of that choice.
       const out = new Map();
       for (const term of terms) {
         const entries = cache.get(term);
-        if (entries) out.set(term, entries);
+        if (!entries) continue;
+        const said = inOwnLanguage(entries);
+        if (said.length) out.set(term, said);
       }
       return out;
     }
