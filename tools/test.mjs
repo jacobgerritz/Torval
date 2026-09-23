@@ -2908,8 +2908,8 @@ const run = async () => {
     const UI = require(join(ROOT, 'extension', 'ui.js'));
     check('the interface is English unless somebody says otherwise',
       UI.code() === 'en');
-    check('and Spanish is the other choice',
-      UI.languages.map((l) => l.code).join(',') === 'en,es');
+    check('and it is the only one shipped today',
+      UI.languages.map((l) => l.code).join(',') === 'en');
     check('an untranslated key falls back to what the page already says',
       UI.t('no.such.key', 'Keeping score') === 'Keeping score');
 
@@ -2934,17 +2934,18 @@ const run = async () => {
     // What somebody is offered to read is whatever can be explained in
     // the language they already have, which is the rule that stopped a
     // Spanish interface offering Japanese and then defining it in English.
+    // Everything is explained in English today, so everything is offered;
+    // the rule is kept because the `english-for-spanish` branch needs it
+    // and because it is what makes English monolingual a pair like the
+    // rest rather than a special case.
     const before = Lang.active();
     Lang._setActive('it');
     const forEnglish = Lang.offered('en').map((l) => l.code);
-    const forSpanish = Lang.offered('es').map((l) => l.code);
     check('an English speaker is offered everything explained in English',
       forEnglish.join(',') === 'ja,it,es,en', forEnglish.join(','));
-    check('a Spanish speaker is offered only what is explained in Spanish',
-      forSpanish.join(',') === 'it,en', forSpanish.join(','));
-    check('English can be explained either way, the others only in English',
-      Lang.explainsIn('en', 'es') && Lang.explainsIn('en', 'en') &&
-      !Lang.explainsIn('ja', 'es') && Lang.explainsIn('ja', 'en'));
+    check('and every language says which languages it can be explained in',
+      Lang.explainsIn('en', 'en') && Lang.explainsIn('ja', 'en') &&
+      !Lang.explainsIn('ja', 'es'));
     // Otherwise changing your own language would take the language you
     // are in the middle of reading out of its own picker.
     Lang._setActive('en');
@@ -2952,34 +2953,14 @@ const run = async () => {
       Lang.offered('es').map((l) => l.code).includes('en'));
     Lang._setActive(before);
 
-    // Every marker in the settings page has to have a Spanish line behind
-    // it, or switching language empties that element instead of wording it.
-    const page = readFileSync(join(ROOT, 'extension', 'options.html'), 'utf8');
-    const marked = [...page.matchAll(/data-t(?:-title|-placeholder)?="([^"]+)"/g)]
-      .map((m) => m[1]);
-    const untranslated = marked.filter((key) => !UI._strings.es[key]);
-    check('every marked string on the settings page is translated',
-      marked.length > 30 && untranslated.length === 0,
-      'missing Spanish for: ' + untranslated.join(', '));
-
-    // The toolbar popup is the first thing anybody opens, and was the
-    // last thing still in English when the interface was set to Spanish.
-    const popup = readFileSync(join(ROOT, 'extension', 'switch.html'), 'utf8');
-    const popupKeys = [...popup.matchAll(/data-t="([^"]+)"/g)].map((m) => m[1]);
-    const popupMissing = popupKeys.filter((key) => !UI._strings.es[key]);
-    check('and every string in the toolbar popup as well',
-      popupKeys.length >= 6 && popupMissing.length === 0,
-      'missing Spanish for: ' + popupMissing.join(', '));
-
-    // Strings built in script rather than marked in markup. These are the
-    // ones that went on reading English after everything visible had been
-    // translated, because nothing points at them from a page.
+    // Strings are marked in the markup with data-t and built in script
+    // through TorvalUI.t(). Both fall back to the English with one
+    // language loaded, and the table that made them worth marking is on
+    // the `english-for-spanish` branch. What still has to hold is that
+    // none of them is worked out once at load: a string fixed before the
+    // stored choice arrives stays in English for ever, which is how the
+    // subtitle notice went untranslated.
     const content = readFileSync(join(ROOT, 'extension', 'content.js'), 'utf8');
-    const asked = [...content.matchAll(/TorvalUI\.t\('([^']+)'/g)].map((m) => m[1]);
-    const contentMissing = asked.filter((key) => !UI._strings.es[key]);
-    check('the popup over a word is worded through the same table',
-      asked.length >= 8 && contentMissing.length === 0,
-      'missing Spanish for: ' + contentMissing.join(', '));
     check('and none of it is fixed at load, before the language arrives',
       !/const [A-Z_]+ = TorvalUI\.t\(/.test(content));
   }
@@ -3103,54 +3084,6 @@ const run = async () => {
     }
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
 
-    // --- no English for a reader who does not read English ----------------
-    // Half the English entries carry a Spanish definition in `x` and half do
-    // not. A Spanish reader is handed the first half, in Spanish, and never
-    // the second: not a definition, and not the word either, so it is not
-    // marked on the page or counted in the score. The real reader is used,
-    // with the database stubbed, before the word-list tests replace it.
-    {
-      const stub = new Map([
-        ['casa', [{ k: 'house', s: [{ g: ['a building'] }], x: [{ g: ['casa'] }] }]],
-        ['either', [{ k: 'either', s: [{ g: ['any one of two'] }] }]]
-      ]);
-      vm.runInContext('var wasActive = TorvalLang.active, wasEntries = getEntries;', sandbox);
-      sandbox.stubEntries = async (terms) => {
-        const out = new Map();
-        for (const term of terms) if (stub.has(term)) out.set(term, stub.get(term));
-        return out;
-      };
-      // The active language is answered rather than switched: switching it
-      // starts a dictionary loading, which is a different test's business.
-      const read = (language, asking) => vm.runInContext(`(async function () {
-        TorvalLang.active = function () { return '${language.lang}'; };
-        TorvalUI.set('${language.ui}');
-        getEntries = stubEntries;
-        var found = await cachingReader().getEntries(${JSON.stringify(asking)});
-        var out = {};
-        found.forEach(function (entries, term) { out[term] = entries[0].s[0].g[0]; });
-        return out;
-      })()`, sandbox);
-
-      const mine = await read({ ui: 'es', lang: 'en' }, ['casa', 'either']);
-      check('a Spanish reader is given the Spanish definition',
-        mine.casa === 'casa', JSON.stringify(mine));
-      check('and an English-only entry is not handed over at all',
-        mine.either === undefined, JSON.stringify(mine));
-
-      const both = await read({ ui: 'en', lang: 'en' }, ['casa', 'either']);
-      check('an English reader keeps both entries, in English',
-        both.casa === 'a building' && both.either === 'any one of two',
-        JSON.stringify(both));
-
-      // Spanish interface, a language nobody has written up in Spanish. The
-      // alternative to leaving its definitions alone is a dictionary that
-      // answers nothing.
-      const other = await read({ ui: 'es', lang: 'ja' }, ['casa', 'either']);
-      check('a language with no Spanish behind it keeps its own definitions',
-        other.either === 'any one of two', JSON.stringify(other));
-      vm.runInContext("TorvalUI.set('en'); TorvalLang.active = wasActive; getEntries = wasEntries;", sandbox);
-    }
 
     // --- the fingerprints -------------------------------------------------
     // Reading a page asks about far more words than it finds: some thirty

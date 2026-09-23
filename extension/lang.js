@@ -436,13 +436,12 @@ TorvalLang.register({
 TorvalLang.register({
   code: 'en',
   name: 'English',
-  // Two dictionaries in one file. Every entry carries its English
-  // definition, and about half of them also carry a Spanish one, so this
-  // answers a Spanish speaker learning English and an English speaker who
-  // wants a monolingual dictionary. Which set a reader gets, and whether
-  // an entry reaches them at all, is decided by their own language in
-  // `inOwnLanguage` in background.js.
-  explains: ['en', 'es'],
+  // A monolingual dictionary: English entries with their own English
+  // definitions, for a reader who would rather stop translating. The same
+  // file can also carry a Spanish definition on each entry, which is what
+  // the `english-for-spanish` branch builds and hands to a Spanish
+  // reader. Add 'es' here to offer that again.
+  explains: ['en'],
   charClass: TorvalEnglish,
   scanWindow: TorvalEnglishMaxScan,
   lookup: lazy('TorvalLookupLatin'),

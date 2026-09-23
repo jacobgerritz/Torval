@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Torval",
   "version": "1.1.0",
-  "description": "Hold Shift and hover any word (Japanese, Italian or Spanish) to see what it means.",
+  "description": "Hold Shift and hover any word (Japanese, Italian, Spanish or English) to see what it means.",
   "author": "Jacob Gerritz",
   "homepage_url": "https://jacobgerritz.github.io/Torval/",
   "icons": {

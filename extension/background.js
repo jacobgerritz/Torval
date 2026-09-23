@@ -422,33 +422,6 @@ async function handleLookup(text, point) {
 // cruder than forgetting the oldest, and costs one slow hover an hour.
 const CACHE_LIMIT = 20000;
 
-/*
- * What a reading of the dictionary is allowed to answer with.
- *
- * An English entry carries its English definition and, where somebody has
- * written one, a Spanish one beside it in `x`. A reader whose own language
- * is Spanish is handed the Spanish one, and an entry with none is not
- * handed over at all: answering an English word in English is no answer to
- * them. The word then behaves like one the dictionary has never heard of,
- * which is the point of doing it here rather than in the popup. It is not
- * marked on the page and not counted in the score either, so a word nobody
- * can tell them the meaning of does not sit in their total for ever as one
- * they do not know.
- *
- * The pairing is checked rather than assumed, so a profile left on a
- * language nobody has written up in Spanish keeps its own definitions
- * instead of emptying every lookup.
- */
-function inOwnLanguage(entries) {
-  if (TorvalUI.code() !== 'es') return entries;
-  if (!TorvalLang.explainsIn(TorvalLang.active(), 'es')) return entries;
-  const said = [];
-  for (const entry of entries) {
-    if (entry && entry.x) said.push(Object.assign({}, entry, { s: entry.x }));
-  }
-  return said;
-}
-
 function cachingReader() {
   const cache = new Map();
   return {
@@ -462,15 +435,10 @@ function cachingReader() {
         const found = await getEntries(missing);
         for (const term of missing) cache.set(term, found.get(term) || null);
       }
-      // The cache holds the entries as they were stored, and the choice of
-      // language is made on the way out, because the reader kept for
-      // hovering outlives a change of that choice.
       const out = new Map();
       for (const term of terms) {
         const entries = cache.get(term);
-        if (!entries) continue;
-        const said = inOwnLanguage(entries);
-        if (said.length) out.set(term, said);
+        if (entries) out.set(term, entries);
       }
       return out;
     }

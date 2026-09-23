@@ -19,13 +19,13 @@ recommends it, but the description below carries the detail, and a summary
 that repeats the description reads as padding.
 
 ```text
-Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. Free, private, and it never leaves your machine.
+Hold Shift and hover a word in Japanese, Italian, Spanish or English to see what it means. Free, and nothing leaves your machine.
 ```
 
 **Category.** Chrome: *Education*. Firefox: *Language support* (secondary:
 *Other*).
 
-**Tags** (Firefox). japanese, italian, spanish, dictionary, anki, language
+**Tags** (Firefox). japanese, italian, spanish, english, dictionary, anki, language
 learning, subtitles, immersion
 
 ---
@@ -33,18 +33,19 @@ learning, subtitles, immersion
 ## The description
 
 Chrome takes the long one below and renders no formatting. Firefox's field
-recommends 250 characters, so it gets its own, which is 236. It picks
+recommends 250 characters, so it gets its own, which is 245. It picks
 up where the summary stops rather than saying the same thing again:
 
 ```text
-A pop-up dictionary that handles conjugation, counts how much of a page you already know, times subtitles on YouTube and Netflix, and makes Anki cards in one click. Japanese, Italian and Spanish. No account, no server, nothing uploaded.
+A pop-up dictionary that handles conjugation, counts how much of a page you already know, times subtitles on YouTube and Netflix, and makes Anki cards in one click. Japanese, Italian, Spanish and English. No account, no server, nothing uploaded.
 ```
 
 The Firefox field has no hard limit, so the long version fits there too if
 the short one ever looks thin. The long one, for Chrome:
 
 ```text
-Torval is a pop-up dictionary for Japanese, Italian and Spanish. Hold
+Torval is a pop-up dictionary for Japanese, Italian, Spanish, and
+English explained in English. Hold
 Shift, hover a word, and it tells you what the word means, handling
 conjugation and inflection on the way, so 食べなかった finds 食べる and
 hablábamos finds hablar.
@@ -128,7 +129,7 @@ anywhere.
 
 **`unlimitedStorage`**
 ```text
-The dictionaries are large, around 120 MB across three languages once
+The dictionaries are large, around 160 MB across four languages once
 imported into IndexedDB. Without this, the import is refused partway
 through on most profiles.
 ```

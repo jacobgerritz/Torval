@@ -171,36 +171,10 @@ if (languageSelect) {
   TorvalLang.onChange(() => { fillLanguages(); fillExamples(); load(); });
 }
 
-/*
- * The language this page is written in, which is the whole of the
- * interface setting: pick it, the page repaints, and it is remembered.
- * A reload rather than a repaint for the parts drawn by script, which
- * is simpler than teaching every painter to undo itself.
- */
-const uiSelect = document.getElementById('ui-language');
-
-if (uiSelect) {
-  for (const { code, name } of TorvalUI.languages) {
-    const option = document.createElement('option');
-    option.value = code;
-    option.textContent = name;
-    uiSelect.appendChild(option);
-  }
-  TorvalUI.load().then((code) => {
-    uiSelect.value = code;
-    TorvalUI.paint();
-    // fillLanguages ran before the stored choice arrived, so the language
-    // names are still in English at this point.
-    if (languageSelect) fillLanguages();
-    drawFirstChoices();
-  });
-  uiSelect.addEventListener('change', () => {
-    TorvalUI.set(uiSelect.value);
-    // Which languages are on offer follows from this, and so does every
-    // word on the page. A reload is the honest way to redraw all of it.
-    location.reload();
-  });
-}
+// The page is written in the one interface language there is, so there is
+// nothing to load and nothing to repaint. The picker that stood in the
+// sidebar, and the Spanish it chose, are on the `english-for-spanish`
+// branch; TorvalUI.t() below is what they would come back through.
 
 // The chosen file’s name, said in the page’s own type. The browser will not
 // show it once its own control is out of the way, and a file picker that says

@@ -17,25 +17,23 @@ of whatever the others have. Japanese also gets pitch accent, from Kanjium;
 Italian and Spanish get word stress marked inline instead, since neither has
 lexical pitch accent to speak of. Only one language is active at a time.
 
-English is the odd one out and deliberately so. The other three are defined
-in English, for an English speaker reading them. Every English entry carries
-its own English definition, and 70,605 of the 154,279 carry a Spanish one
-beside it, put together out of three sources by `tools/glosses-en-es.mjs`.
+English is a fourth language and reads itself: English entries with their
+own English definitions, for somebody far enough along to stop
+translating. It is offered like any other language, and everything else
+about it works the same way.
 
-Which of the two a reader gets follows from their own language rather than
-from the dictionary. The interface has its own setting, in `ui.js`,
-defaulting to English and asked rather than read off the browser. A profile
-lists the languages it can explain itself in with `explains`, and
-`TorvalLang.offered(ui)` is what every picker asks, so a Spanish reader is
-offered English and nothing else, and an English speaker never sees either
-half of the feature.
-
-A Spanish reader is given the Spanish definitions and only those. An entry
-with no Spanish is not handed over at all, so the word is not marked on the
-page and not counted in the score either, rather than being answered in a
-language they have just said they would rather not read. That happens in
-`inOwnLanguage`, on the way out of the one reader every lookup, page
-reading and word count goes through.
+The same build can put a Spanish definition on each entry, which makes a
+dictionary for a Spanish speaker learning English, with a Spanish
+interface to read it in. That is written and working on the
+`english-for-spanish` branch and is not shipped: it was not good enough
+yet. What stayed behind here is the shape it needs. A profile says which
+languages it can be explained in with `explains`, and
+`TorvalLang.offered(ui)` is what every picker asks, so a dictionary is a
+pair rather than a language. The interface has its own setting in
+`ui.js`, defaulting to English and asked rather than read off the
+browser, with every string marked `data-t` or fetched through
+`TorvalUI.t()`. With one language and one table, all of that falls back
+to the English the pages are already written in.
 
 ---
 
