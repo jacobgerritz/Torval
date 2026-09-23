@@ -89,6 +89,70 @@ export async function build(lang) {
   // never heard of.
   const recordings = await ensureAudio(ROOT, lang);
 
+  /*
+   * Glosses in another language, from another Wiktionary.
+   *
+   * English is the one language here that is not being explained to an
+   * English speaker, so its definitions cannot come from the dump its
+   * words come from. The Spanish Wiktionary writes up English words in
+   * Spanish, which is exactly what is wanted and covers about twenty
+   * thousand of them; the English Wiktionary covers everything but says it
+   * in English. So both are read: the Spanish gloss wins wherever there is
+   * one, and the English definition stands where there is not, which for
+   * an advanced reader is a useful answer rather than no answer.
+   */
+  const glosses = new Map();   // word -> pos -> [gloss]
+  if (lang.glossSource) {
+    const GLOSSES = join(ROOT, 'data', lang.glossSource);
+    await ensure(GLOSSES, lang.glossUrl);
+    console.log('Reading', GLOSSES);
+    const unzip = createGunzip();
+    createReadStream(GLOSSES).pipe(unzip);
+    const lines = createInterface({ input: unzip, crlfDelay: Infinity });
+    for await (const line of lines) {
+      if (!line) continue;
+      let row;
+      try { row = JSON.parse(line); } catch { continue; }
+      const pos = POS_MAP[row.pos];
+      if (!pos || !row.word) continue;
+      const said = [];
+      for (const sense of row.senses || []) {
+        for (const gloss of sense.glosses || []) {
+          const tidy = lang.tidyGloss ? lang.tidyGloss(gloss) : gloss;
+          if (tidy && !said.includes(tidy)) said.push(tidy);
+        }
+      }
+      if (!said.length) continue;
+      let byPos = glosses.get(row.word);
+      if (!byPos) { byPos = new Map(); glosses.set(row.word, byPos); }
+      const already = byPos.get(pos);
+      if (already) already.push(...said.filter((g) => !already.includes(g)));
+      else byPos.set(pos, said);
+    }
+    console.log(`  ${glosses.size} words defined in the reader's own language`);
+  }
+
+  /*
+   * Which entries are worth shipping.
+   *
+   * The Japanese, Italian and Spanish dumps are a few hundred thousand
+   * entries and all of them go in. The English one is one and a half
+   * million, and half of those are rarer than the 285,000th commonest word
+   * in either corpus: species names, obsolete spellings, dialect forms
+   * nobody will meet in a lifetime of reading. Shipping them would add
+   * twenty megabytes to every copy of Torval, including the copies
+   * belonging to people who will never open this dictionary at all.
+   *
+   * `rankLimit` is where the line goes. At 150,000 it keeps perfunctory
+   * (77,000) and obfuscate (109,000), which is the register this is meant
+   * to serve, and lands at about the same size as the Italian and Spanish
+   * dictionaries. A word somebody has bothered to define in Spanish is
+   * kept whatever its rank, since that is a better signal than a corpus.
+   */
+  const rankOf = (word) => combineRanks(
+    frequency.get(word) || frequency.get(word.toLowerCase()),
+    written.get(word) || written.get(word.toLowerCase()));
+
   console.log('Reading', SOURCE);
   const entries = [];
   const index = new Map();     // term -> [entry ids]
@@ -96,6 +160,7 @@ export async function build(lang) {
   let lines = 0;
   let kept = 0;
   let stressed = 0;
+  let translated = 0;
 
   const gunzip = createGunzip();
   createReadStream(SOURCE).pipe(gunzip);
@@ -105,7 +170,7 @@ export async function build(lang) {
     if (!line) continue;
     let row;
     try { row = JSON.parse(line); } catch { continue; }
-    const entry = toEntry(row, lang, recordings);
+    const entry = toEntry(row, lang, recordings, glosses);
     if (!entry) {
       const target = aliasOf(row, lang);
       if (target && target !== row.word) {
@@ -113,6 +178,12 @@ export async function build(lang) {
       }
       continue;
     }
+
+    if (lang.rankLimit && !entry.tr) {
+      const rank = rankOf(entry.k[0]);
+      if (!rank || rank > lang.rankLimit) continue;
+    }
+    if (entry.tr) { translated++; delete entry.tr; }
 
     kept++;
     if (entry.st !== undefined) stressed++;
@@ -179,6 +250,10 @@ export async function build(lang) {
     if (rank) { entry.q = rank; ranked++; }
   }
   console.log(`  ${ranked} entries carry a frequency rank`);
+  if (lang.glossSource) {
+    console.log(`  ${translated} of ${kept} defined in the reader's own language, ` +
+      `the rest in English`);
+  }
 
   mkdirSync(OUT, { recursive: true });
   for (const f of readdirSync(OUT)) {
@@ -211,7 +286,7 @@ export async function build(lang) {
  * (form_of/alt_of, the equivalent of JMdict simply not listing conjugated
  * forms as their own entries), or a part of speech Torval has no use for.
  */
-function toEntry(row, lang, recordings) {
+function toEntry(row, lang, recordings, glosses) {
   if (row.lang_code !== lang.code || !row.word) return null;
   const pos = POS_MAP[row.pos];
   if (!pos) return null;
@@ -240,7 +315,23 @@ function toEntry(row, lang, recordings) {
   }
   if (!senses.length) return null;
 
+  // Said in the reader's own language where somebody has said it there.
+  // Per part of speech, because "book" the noun and "book" the verb are
+  // different words to a reader and the Spanish for one is not the
+  // Spanish for the other.
+  let translated = false;
+  if (glosses && glosses.size) {
+    const byPos = glosses.get(row.word);
+    const said = byPos && (byPos.get(pos) || (byPos.size === 1 ? [...byPos.values()][0] : null));
+    if (said && said.length) {
+      senses.length = 0;
+      senses.push({ p: [pos], g: said });
+      translated = true;
+    }
+  }
+
   const entry = { k: [row.word], r: [row.word], s: senses, f: 0, kv: 1 };
+  if (translated) entry.tr = 1;
   // A noun's gender, which is what puts the article on the card. Only
   // common nouns: "il Roma" is not a thing anybody says, so a proper noun
   // is left without one and article.js then has nothing to add. See

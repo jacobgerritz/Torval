@@ -195,6 +195,12 @@
     waitForDictionary().then(readPage);
   }
 
+  // The language Torval writes in, from storage. Everything worded on the
+  // page asks TorvalUI at the moment it draws, so nothing here has to wait
+  // for this; it only has to land before somebody hovers a word, which it
+  // does by a wide margin.
+  TorvalUI.load();
+
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 
   // Recording ahead of the user costs something, so ask first whether any card
@@ -1013,7 +1019,10 @@
 
   // What the bar says while a video's transcript is still on its way. Not
   // "reading this page": the page is read, it is the video that is not.
-  const SUBTITLES_COMING = 'Reading the subtitles…';
+  // A function, not a constant: the interface language arrives from
+  // storage a moment after this file runs, so a string fixed here would be
+  // the English one for ever.
+  const subtitlesComing = () => TorvalUI.t('page.subtitles', 'Reading the subtitles…');
 
   /** Is there a transcript still to come, which would change the number? */
   function waitingForSubtitles() {
@@ -1153,7 +1162,7 @@
     // silently did nothing, with no way to tell a slow fetch from a failed
     // one, which is exactly how this was found.
     if (!TorvalTrack.on()) {
-      if (waitingForSubtitles()) TorvalBar.busy(SUBTITLES_COMING);
+      if (waitingForSubtitles()) TorvalBar.busy(subtitlesComing());
       else TorvalBar.quiet(noSubtitlesHere());
       return;
     }
@@ -1207,7 +1216,7 @@
       // A video whose transcript has not arrived yet is the one case where
       // there genuinely is something still to come, so it keeps saying so
       // instead of falling silent and speaking up again seconds later.
-      if (!scored && waitingForSubtitles()) TorvalBar.busy(SUBTITLES_COMING);
+      if (!scored && waitingForSubtitles()) TorvalBar.busy(subtitlesComing());
       else if (!scored) TorvalBar.quiet(noSubtitlesHere());
       readingPage = false;
       reading = false;
@@ -1245,7 +1254,7 @@
       // was about the video being left, and on a video the transcript takes
       // seconds to arrive. Those seconds used to be spent showing the last
       // video's percentage and word counts as though they were this one's.
-      TorvalBar.forget(waitingForSubtitles() ? SUBTITLES_COMING : undefined);
+      TorvalBar.forget(waitingForSubtitles() ? subtitlesComing() : undefined);
       // A moment for the new page to put something on the screen. Reading
       // the instant the address changes reads the page being left.
       setTimeout(readPage, 1200);
@@ -1498,7 +1507,7 @@
 
     const label = document.createElement('span');
     label.className = 'context-label';
-    label.textContent = 'also on the card:';
+    label.textContent = TorvalUI.t('word.also', 'also on the card:');
     row.appendChild(label);
 
     if (before) row.appendChild(chip('before', '…' + tail(before)));
@@ -1611,7 +1620,7 @@
     const add = document.createElement('button');
     add.className = 'add';
     add.textContent = '+';
-    add.title = 'Add to Anki';
+    add.title = TorvalUI.t('word.add', 'Add to Anki');
     add.addEventListener('click', () => {
       // Fired off first, before the slower work of capturing the sentence
       // (and any video audio) even starts: a duplicate is not an error and
@@ -1654,13 +1663,14 @@
 
     const meta = [];
     if (hit.band) {
-      meta.push([hit.band, 'ranked #' + hit.q.toLocaleString('en-US') +
-        ' in a corpus of ' + TorvalLang.profile().name + ' media']);
+      meta.push([hit.band, TorvalUI.t('word.ranked',
+        'ranked #{rank} in a corpus of {language} media',
+        { rank: hit.q.toLocaleString('en-US'), language: TorvalLang.profile().name })]);
     }
     if (typeof hit.pitch === 'number') {
       meta.push(['[' + hit.pitch + ']', hit.pitch === 0
-        ? 'flat, the pitch never drops'
-        : 'the pitch drops after mora ' + hit.pitch]);
+        ? TorvalUI.t('word.flat', 'flat, the pitch never drops')
+        : TorvalUI.t('word.drop', 'the pitch drops after mora {at}', { at: hit.pitch })]);
     }
     for (const code of hit.shared || []) meta.push([label(code), tags[code] || code]);
     // Only the part of speech every sense actually has in common goes on the
@@ -1707,7 +1717,7 @@
       // Click a sense to put only that one on the card. 語 is "word; term" and
       // "language"; usually you met just one of them. Choosing nothing means
       // the whole entry, so the common case still needs no clicks at all.
-      li.title = 'click to put only this on the card';
+      li.title = TorvalUI.t('word.only', 'click to put only this on the card');
       li.addEventListener('click', () => {
         // Ignore the click that ends a drag over the text, or selecting a
         // definition to copy would silently change what gets mined.
@@ -1764,7 +1774,7 @@
 
     const link = document.createElement('button');
     link.textContent = entry.b;
-    link.title = 'Look up ' + entry.b;
+    link.title = TorvalUI.t('word.lookup', 'Look up {word}', { word: entry.b });
     link.addEventListener('click', () => { showWord(entry.b); });
     row.appendChild(link);
     return row;
@@ -1914,7 +1924,8 @@
     if (reply && reply.ok && reply.result) {
       const note = document.createElement('div');
       note.className = 'note dup-note';
-      note.textContent = 'Already in your collection; adding it again.';
+      note.textContent = TorvalUI.t('word.duplicate',
+        'Already in your collection; adding it again.');
       entryEl.appendChild(note);
       reflow();
     }
@@ -1983,7 +1994,7 @@
 
     const turn = document.createElement('button');
     turn.className = 'turn-on';
-    turn.textContent = 'Record this tab';
+    turn.textContent = TorvalUI.t('page.record', 'Record this tab');
     turn.addEventListener('click', () => {
       api.runtime.sendMessage({ type: 'openOptions', focus: 'tab-audio' }).catch(() => {});
     });

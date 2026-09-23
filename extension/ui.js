@@ -116,6 +116,25 @@ var TorvalUI = (function () {
       'about.wrong.note': 'Narra cómo encuentra y lee los subtítulos. Envíalo con el informe de error.',
       'about.verbose': 'Decir lo que hace en la consola',
 
+      // --- the toolbar popup --------------------------------------------
+      'popup.language': 'Idioma',
+      'popup.choose': 'Elige un idioma…',
+      'popup.on': 'Activado',
+      'popup.settings': 'Ajustes',
+      'popup.books': 'Libros',
+      'popup.pick': 'Elige un idioma arriba para empezar.',
+
+      // --- the word popup ------------------------------------------------
+      'word.also': 'también en la tarjeta:',
+      'word.add': 'Añadir a Anki',
+      'word.only': 'pulsa para poner solo esto en la tarjeta',
+      'word.lookup': 'Buscar {word}',
+      'word.duplicate': 'Ya está en tu colección; se añadirá otra vez.',
+      'word.ranked': 'puesto n.º {rank} en un corpus de medios en {language}',
+      'word.flat': 'plano, el tono no baja nunca',
+      'word.drop': 'el tono baja después de la mora {at}',
+      'band.rare': 'rara',
+
       // --- on the page -------------------------------------------------
       'page.reading': 'Leyendo esta página…',
       'page.subtitles': 'Leyendo los subtítulos…',

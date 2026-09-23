@@ -97,6 +97,7 @@
         "english.js",
         "english-scan.js",
         "lang.js",
+        "ui.js",
         "log.js",
         "track.js",
         "keys.js",

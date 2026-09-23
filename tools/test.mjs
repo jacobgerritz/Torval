@@ -2939,6 +2939,27 @@ const run = async () => {
     check('every marked string on the settings page is translated',
       marked.length > 30 && untranslated.length === 0,
       'missing Spanish for: ' + untranslated.join(', '));
+
+    // The toolbar popup is the first thing anybody opens, and was the
+    // last thing still in English when the interface was set to Spanish.
+    const popup = readFileSync(join(ROOT, 'extension', 'switch.html'), 'utf8');
+    const popupKeys = [...popup.matchAll(/data-t="([^"]+)"/g)].map((m) => m[1]);
+    const popupMissing = popupKeys.filter((key) => !UI._strings.es[key]);
+    check('and every string in the toolbar popup as well',
+      popupKeys.length >= 6 && popupMissing.length === 0,
+      'missing Spanish for: ' + popupMissing.join(', '));
+
+    // Strings built in script rather than marked in markup. These are the
+    // ones that went on reading English after everything visible had been
+    // translated, because nothing points at them from a page.
+    const content = readFileSync(join(ROOT, 'extension', 'content.js'), 'utf8');
+    const asked = [...content.matchAll(/TorvalUI\.t\('([^']+)'/g)].map((m) => m[1]);
+    const contentMissing = asked.filter((key) => !UI._strings.es[key]);
+    check('the popup over a word is worded through the same table',
+      asked.length >= 8 && contentMissing.length === 0,
+      'missing Spanish for: ' + contentMissing.join(', '));
+    check('and none of it is fixed at load, before the language arrives',
+      !/const [A-Z_]+ = TorvalUI\.t\(/.test(content));
   }
 
   // --- nothing enters that cannot leave ----------------------------------
