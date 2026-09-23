@@ -17,14 +17,14 @@
 
 <p class="lede" style="margin-bottom:40px">
   If you already have a note type you like, keep it. Torval works with
-  whatever you have. This is for people who do not.
+  whatever you have. This is for people who don't.
 </p>
 
 <p>
   It makes a sentence card: the line you met the word in on the front, the
-  word and what it means on the back. Every field is optional in the
-  templates, so a card with no picture or no pitch accent simply does not
-  show those rows rather than leaving a gap.
+  word and what it means on the back. It works for every language Torval
+  reads, and a card with no picture or no pitch accent simply leaves those
+  rows out.
 </p>
 
 <p>
@@ -48,21 +48,18 @@
     <code>Front</code> and <code>Back</code> once the others are in. Set
     <b>Sort by this field</b> on <code>Target Word</code>.
   </p>
-  <pre><code>Target Word
-Reading
-Sentence
+  <pre><code>Sentence
+Target Word
 Definitions
-Word Audio
-Sentence Audio
+Reading
 Pitch
-Stress
-Images
-Sentence Before
-Sentence After</code></pre>
+Sentence Audio
+Word Audio
+Images</code></pre>
   <p class="note">
-    Reading and Pitch are Japanese; Stress is Italian and Spanish. Leaving
-    in the ones your language does not use costs nothing, and means the same
-    note type works if you take up another.
+    Reading and Pitch are for Japanese. Keep them anyway: they cost nothing,
+    and the same note type then works for every language. Torval puts the
+    article in front of a noun itself, so no script is needed for il or la.
   </p>
 </section>
 
@@ -72,8 +69,8 @@ Sentence After</code></pre>
   <pre><code>&lt;div class="sentence"&gt;{{Sentence}}&lt;/div&gt;
 &lt;div class="target-word"&gt;{{Target Word}}&lt;/div&gt;</code></pre>
   <p class="note">
-    The sentence carries the word in bold, so you meet it in context first
-    and the word underneath names what is being asked about.
+    The word is in bold in the sentence, so you meet it in context first. The
+    word beneath, in grey, says which one is being asked about.
   </p>
 </section>
 
@@ -81,23 +78,19 @@ Sentence After</code></pre>
   <h2>4. The back</h2>
   <pre><code>{{FrontSide}}
 
-&lt;hr&gt;
+&lt;hr id="answer"&gt;
 
-&lt;div class="audio-line"&gt;{{Sentence Audio}} {{Word Audio}}&lt;/div&gt;
+&lt;div class="audio-line"&gt;{{Word Audio}} {{Sentence Audio}}&lt;/div&gt;
 
-{{#Reading}}&lt;div class="reading"&gt;{{Reading}}&lt;/div&gt;{{/Reading}}
-{{#Pitch}}&lt;div class="reading"&gt;{{Pitch}}&lt;/div&gt;{{/Pitch}}
-{{#Stress}}&lt;div class="reading"&gt;{{Stress}}&lt;/div&gt;{{/Stress}}
+{{#Pitch}}&lt;div class="pitch"&gt;{{Pitch}}&lt;/div&gt;{{/Pitch}}
+{{^Pitch}}{{#Reading}}&lt;div class="reading"&gt;{{Reading}}&lt;/div&gt;{{/Reading}}{{/Pitch}}
 
 &lt;div class="definition"&gt;{{Definitions}}&lt;/div&gt;
 
-{{#Images}}&lt;div class="image-block"&gt;{{Images}}&lt;/div&gt;{{/Images}}
-
-{{#Sentence Before}}&lt;div class="around"&gt;{{Sentence Before}}&lt;/div&gt;{{/Sentence Before}}
-{{#Sentence After}}&lt;div class="around"&gt;{{Sentence After}}&lt;/div&gt;{{/Sentence After}}</code></pre>
+{{#Images}}&lt;div class="image-block"&gt;{{Images}}&lt;/div&gt;{{/Images}}</code></pre>
   <p class="note">
-    Every row is wrapped in its field, so a card with no picture or no pitch
-    accent leaves no gap where one would have been.
+    The pitch diagram already spells out the reading, so the reading only
+    shows when there is no diagram. Rows with nothing in them leave no gap.
   </p>
 </section>
 
@@ -105,52 +98,66 @@ Sentence After</code></pre>
   <h2>5. The styling</h2>
   <p>Same screen, the <b>Styling</b> box.</p>
   <pre><code>.card {
-  font-family: arial, sans-serif;
-  font-size: 25px;
+  font-family: -apple-system, "Hiragino Sans", "Helvetica Neue", Arial, sans-serif;
   line-height: 1.6;
   text-align: center;
-  color: black;
-  background-color: white;
+  color: #111;
+  background-color: #fff;
+  padding: 0 12px;
 }
 
-.sentence b { font-weight: 600; }
-
-.target-word { font-size: 28px; margin-top: 15px; }
-
-.reading { font-size: 30px; }
-
-.definition {
-  font-size: 25px;
-  margin-bottom: 6px;
-  max-width: 500px;
-  margin-left: auto;
-  margin-right: auto;
-  word-wrap: break-word;
+.sentence {
+  font-size: clamp(26px, 8vw, 40px);
+  margin-top: 10px;
 }
 
-.around { font-size: 16px; color: #666; margin-top: 10px; }
+.target-word {
+  font-size: clamp(26px, 8vw, 40px);
+  color: #999;
+  margin-top: 10px;
+}
 
-.image-block { margin-top: 6px; }
-
-img { max-width: 25%; height: auto; margin: 5px auto; display: block; }
+hr#answer {
+  border: none;
+  border-top: 2px solid #ccc;
+  width: 80%;
+  margin: 16px auto;
+}
 
 .audio-line {
-  margin-top: 10px;
   display: flex;
   justify-content: center;
   gap: 15px;
+  margin-bottom: 14px;
 }
 
-hr {
-  margin: 8px auto;
-  border: none;
-  border-top: 2px solid #888;
-  width: 80%;
+.pitch svg {
+  width: clamp(140px, 30vw, 240px) !important;
+  height: auto !important;
+}
+
+.reading {
+  font-size: clamp(24px, 7vw, 32px);
+  margin-bottom: 10px;
+}
+
+.definition {
+  font-size: clamp(18px, 4.5vw, 22px);
+  max-width: 560px;
+  margin: 0 auto 10px;
+  word-wrap: break-word;
+}
+
+.image-block img {
+  width: clamp(110px, 28vw, 190px);
+  height: auto;
+  margin: 5px auto;
+  display: block;
 }
 
 .nightMode.card { color: #e8e6e3; background-color: #1c1d20; }
-.nightMode .around { color: #98948c; }
-.nightMode hr { border-top-color: #3d4149; }</code></pre>
+.nightMode .target-word { color: #98948c; }
+.nightMode hr#answer { border-top-color: #3d4149; }</code></pre>
 </section>
 
 <section>
@@ -165,11 +172,11 @@ hr {
 <div class="claim aside">
   <p>
     <strong>No recording for a word?</strong>
-    Italian and Spanish pronunciations come from volunteers, and they have
-    not read everything. Adding <code>{{tts it_IT:Target Word}}</code> to the back
-    template makes Anki say the word itself, with the voices already on your
-    phone or computer. Use <code>es_ES</code> or <code>ja_JP</code> as it
-    suits.
+    Italian and Spanish pronunciations come from volunteers, and they
+    haven't recorded everything. Adding <code>{{tts it_IT:Target Word}}</code>
+    to the back template makes Anki say the word itself, with the voices
+    already on your phone or computer. Use <code>es_ES</code> or
+    <code>ja_JP</code> as it suits.
   </p>
 </div>
 
