@@ -2913,6 +2913,23 @@ const run = async () => {
     check('an untranslated key falls back to what the page already says',
       UI.t('no.such.key', 'Keeping score') === 'Keeping score');
 
+    // English is defined in Spanish, so it is no use to somebody who does
+    // not read Spanish, and an English speaker's language picker should
+    // not carry it. The interface language is what decides.
+    const inEnglish = Lang.offered('en').map((l) => l.code);
+    const inSpanish = Lang.offered('es').map((l) => l.code);
+    check('an English interface is offered the three defined in English',
+      inEnglish.join(',') === 'ja,it,es', inEnglish.join(','));
+    check('a Spanish one is offered English as well',
+      inSpanish.join(',') === 'ja,it,es,en', inSpanish.join(','));
+    // Otherwise putting the interface back to English would lose the
+    // language you are in the middle of reading.
+    const before = Lang.active();
+    Lang._setActive('en');
+    check('and the language in use is never hidden from its own picker',
+      Lang.offered('en').map((l) => l.code).includes('en'));
+    Lang._setActive(before);
+
     // Every marker in the settings page has to have a Spanish line behind
     // it, or switching language empties that element instead of wording it.
     const page = readFileSync(join(ROOT, 'extension', 'options.html'), 'utf8');

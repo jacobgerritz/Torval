@@ -65,6 +65,28 @@ var TorvalLang = (function () {
     return order.map(function (code) { return { code: code, name: registry[code].name }; });
   }
 
+  /*
+   * The languages worth offering to somebody reading the interface in
+   * `ui`.
+   *
+   * English is defined in Spanish, so it is of no use at all to a reader
+   * who does not have Spanish, and putting it in an English speaker's
+   * language picker is clutter they can do nothing with. A profile says so
+   * with `forUI`, and the pickers ask here rather than filtering for
+   * themselves.
+   *
+   * The language in use is always offered, whatever the interface says.
+   * Otherwise somebody studying English who put the interface back to
+   * English would find the language they are in the middle of missing from
+   * its own picker.
+   */
+  function offered(ui) {
+    return list().filter(function (item) {
+      var want = registry[item.code].forUI;
+      return !want || item.code === current || want === ui;
+    });
+  }
+
   /** The active language's code. Synchronous: always answers from the cache. */
   function active() { return current; }
 
@@ -140,6 +162,7 @@ var TorvalLang = (function () {
     register: register,
     get: get,
     list: list,
+    offered: offered,
     active: active,
     profile: profile,
     onChange: onChange,
@@ -392,6 +415,9 @@ TorvalLang.register({
 TorvalLang.register({
   code: 'en',
   name: 'English',
+  // Offered only while the interface is in Spanish: the definitions are in
+  // Spanish, so to anybody else this is a dictionary they cannot read.
+  forUI: 'es',
   charClass: TorvalEnglish,
   scanWindow: TorvalEnglishMaxScan,
   lookup: lazy('TorvalLookupLatin'),

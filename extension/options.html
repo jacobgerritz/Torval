@@ -10,16 +10,6 @@
       <span data-t="sidebar.language">Language</span>
       <select id="language"></select>
     </label>
-    <!--
-      The language Torval is written in, which is not the language being
-      read: a Spanish speaker learning English wants both, one each way
-      round. English unless somebody says otherwise; the browser's own
-      setting says where a person lives, not what they want to read here.
-    -->
-    <label class="sidebar-language">
-      <span data-t="sidebar.interface">Interface</span>
-      <select id="ui-language"></select>
-    </label>
     <button class="tab" data-panel="words" data-t="tab.words">Words</button>
     <button class="tab" data-panel="anki" data-t="tab.anki">Anki</button>
     <button class="tab" data-panel="video" data-t="tab.video">Video</button>
@@ -339,6 +329,24 @@
         <a href="https://jacobgerritz.github.io/Torval/#support">Support the
         work</a> if you would like to.
       </p>
+    </section>
+
+    <!--
+      The language Torval itself is written in, which is not the language
+      being read. Here rather than in the sidebar: for almost everybody it
+      is already right, and a second picker beside the one that matters is
+      clutter on every visit to save one visit here. A Spanish speaker
+      looking for it will look in the settings, which is where it is.
+
+      Choosing Español also puts English into the list of languages to
+      read, since English is the one dictionary here defined in Spanish.
+      See forUI in lang.js.
+    -->
+    <section>
+      <label>
+        <span data-t="sidebar.interface">Interface</span>
+        <select id="ui-language"></select>
+      </label>
     </section>
 
     <div class="parting"><h2 data-t="about.dictionaries">Dictionaries</h2></div>

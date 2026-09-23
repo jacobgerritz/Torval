@@ -1,8 +1,8 @@
 # Torval
 
-A pop-up dictionary for Firefox and Chrome, for Japanese, Italian, Spanish
-and English. Hold **Shift** and point at a word; its meaning appears next to
-the cursor. Everything is on your own machine, the whole dictionary lives in the
+A pop-up dictionary for Firefox and Chrome, for Japanese, Italian and
+Spanish, and for English the other way round. Hold **Shift** and point at a
+word; its meaning appears next to the cursor. Everything is on your own machine, the whole dictionary lives in the
 browser. It works with the network off, and it collects nothing: see
 [PRIVACY.md](PRIVACY.md).
 
@@ -19,11 +19,15 @@ lexical pitch accent to speak of. Only one language is active at a time.
 
 English is the odd one out and deliberately so. The other three are defined
 in English, for an English speaker reading them; English is defined in
-Spanish, from the Spanish Wiktionary, for a Spanish speaker learning it. The
-interface has a language of its own for the same reason, in `ui.js`: which
-language somebody wants the buttons in does not follow from which language
-they are studying, so it is asked rather than guessed, and it defaults to
-English.
+Spanish, from the Spanish Wiktionary, for a Spanish speaker learning it.
+
+Which means it is no use at all to somebody who does not read Spanish, so it
+is not offered to them. The interface has its own language setting, in
+`ui.js`, defaulting to English and asked rather than read off the browser;
+English appears among the languages to read only once that is set to
+Spanish. The profile says so with `forUI`, and `TorvalLang.offered(ui)` is
+what every picker asks. One setting, in About, gates the whole feature, and
+an English speaker never sees either half of it.
 
 ---
 

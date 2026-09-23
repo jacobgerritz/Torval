@@ -126,7 +126,7 @@ const languageSelect = document.getElementById('language');
 
 function fillLanguages() {
   languageSelect.textContent = '';
-  for (const { code, name } of TorvalLang.list()) {
+  for (const { code, name } of TorvalLang.offered(TorvalUI.code())) {
     const option = document.createElement('option');
     option.value = code;
     // Named in the interface language, not in its own: somebody reading a
@@ -192,6 +192,7 @@ if (uiSelect) {
     // fillLanguages ran before the stored choice arrived, so the language
     // names are still in English at this point.
     if (languageSelect) fillLanguages();
+    drawFirstChoices();
   });
   uiSelect.addEventListener('change', () => {
     TorvalUI.set(uiSelect.value);
@@ -788,10 +789,10 @@ function drawFirstChoices() {
   // Redrawn rather than built once, since which languages exist is
   // TorvalLang's to know and this page should not keep a copy.
   firstChoices.textContent = '';
-  for (const { code, name } of TorvalLang.list()) {
+  for (const { code, name } of TorvalLang.offered(TorvalUI.code())) {
     const button = document.createElement('button');
     button.className = 'first-choice';
-    button.textContent = name;
+    button.textContent = TorvalUI.t('lang.' + code, name);
     button.addEventListener('click', () => TorvalLang.set(code));
     firstChoices.appendChild(button);
   }
@@ -926,6 +927,13 @@ async function paintDictionaries() {
     if (reply && reply.ok) dicts = reply.result;
   } catch (err) { /* the background is asleep; the list stands as it was */ }
   if (!dicts) return;
+
+  // A language nobody here can be offered has no row, or the English
+  // speaker this page is mostly read by gets a card about a dictionary
+  // written in Spanish. One already read in keeps its row either way, so
+  // it can still be thrown away.
+  const offered = new Set(TorvalLang.offered(TorvalUI.code()).map((l) => l.code));
+  dicts = dicts.filter((d) => offered.has(d.code) || d.here);
 
   dictList.textContent = '';
   for (const dict of dicts) dictList.appendChild(dictionaryCard(dict));
