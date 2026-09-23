@@ -152,13 +152,39 @@ var TorvalUI = (function () {
 
   var current = 'en';
 
-  /** The stored choice, or English. Pages await this before painting. */
+  /**
+   * The stored choice, or English. Pages await this before painting.
+   *
+   * Written to survive anything storage does, because this is called at
+   * the top level of the content script: a throw here takes the whole of
+   * Torval off the page, bar and popup and all, on every site. It threw
+   * once, when `get` answered through a callback rather than with a
+   * promise and there was nothing to call `.then` on.
+   */
   function load() {
-    if (!api || !api.storage) return Promise.resolve(current);
-    return api.storage.local.get('uiLanguage').then(function (stored) {
-      if (stored && STRINGS[stored.uiLanguage]) current = stored.uiLanguage;
-      return current;
-    }).catch(function () { return current; });
+    return new Promise(function (done) {
+      if (!api || !api.storage || !api.storage.local) return done(current);
+      var answer;
+      try {
+        answer = api.storage.local.get('uiLanguage', function (stored) {
+          done(keep(stored));
+        });
+      } catch (err) {
+        return done(current);
+      }
+      // Firefox, and Chrome when no callback is taken: the same call hands
+      // back a promise instead of answering the callback.
+      if (answer && typeof answer.then === 'function') {
+        answer.then(function (stored) { done(keep(stored)); },
+          function () { done(current); });
+      }
+    });
+  }
+
+  function keep(stored) {
+    var next = stored && stored.uiLanguage;
+    if (next && STRINGS[next]) current = next;
+    return current;
   }
 
   function code() { return current; }
@@ -166,17 +192,23 @@ var TorvalUI = (function () {
   // A background page lives for hours and would otherwise answer with
   // whatever was stored when it woke. The settings page writes this key
   // and the popup reads it back a moment later.
-  if (api && api.storage && api.storage.onChanged) {
-    api.storage.onChanged.addListener(function (changes, area) {
-      if (area !== 'local' || !changes.uiLanguage) return;
-      var next = changes.uiLanguage.newValue;
-      if (STRINGS[next] || next === 'en') current = next;
-    });
-  }
+  try {
+    if (api && api.storage && api.storage.onChanged) {
+      api.storage.onChanged.addListener(function (changes, area) {
+        if (area !== 'local' || !changes.uiLanguage) return;
+        var next = changes.uiLanguage.newValue;
+        if (STRINGS[next]) current = next;
+      });
+    }
+  } catch (err) { /* no listener; the stored value is read at load anyway */ }
 
   function set(next) {
     current = STRINGS[next] ? next : 'en';
-    if (api && api.storage) api.storage.local.set({ uiLanguage: current });
+    try {
+      if (api && api.storage && api.storage.local) {
+        api.storage.local.set({ uiLanguage: current });
+      }
+    } catch (err) { /* the choice still holds for this page */ }
     return current;
   }
 

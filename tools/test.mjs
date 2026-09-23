@@ -2913,6 +2913,23 @@ const run = async () => {
     check('an untranslated key falls back to what the page already says',
       UI.t('no.such.key', 'Keeping score') === 'Keeping score');
 
+    // This is called at the top level of the content script, so anything
+    // it throws takes the bar, the popup and the subtitles off the page
+    // with it. It threw once, on a storage API that answers a callback
+    // rather than handing back a promise.
+    check('reading the stored choice survives every shape of storage',
+      [['callback', (k, cb) => cb({ uiLanguage: 'es' })],
+       ['promise', () => Promise.resolve({ uiLanguage: 'es' })],
+       ['throwing', () => { throw new Error('no'); }],
+       ['nothing', () => undefined]].every(([, get]) => {
+        const was = globalThis.chrome;
+        globalThis.chrome = { storage: { local: { get, set() {} } } };
+        let threw = false;
+        try { UI.load(); } catch { threw = true; }
+        globalThis.chrome = was;
+        return !threw;
+      }));
+
     // A dictionary here is a pair: it explains one language in another.
     // What somebody is offered to read is whatever can be explained in
     // the language they already have, which is the rule that stopped a
@@ -3995,10 +4012,10 @@ const run = async () => {
     JSON.stringify(Look.all().map((s) => s.value)));
   check('and the defaults change nothing about the popup',
     Look.get('popupSize').unit === 1 && Look.get('popupWidth').px === 400);
-  // Straight onto the picture, outlined, which is what every other player
-  // does and what a film looks best under.
+  // A wash of dark under outlined text, which is what a film looks best
+  // under and what most players do.
   check('nor about the subtitles', Look.subtitleScale() === 1 &&
-    Look.subtitleSkin().background === 'transparent' &&
+    /rgba\(10,11,13/.test(Look.subtitleSkin().background) &&
     /rgba\(0,0,0,\.9\)/.test(Look.subtitleSkin().textShadow));
 
   await Look.set('subtitleSize', 'huge');
@@ -4009,10 +4026,11 @@ const run = async () => {
   check('and asking for the box gets a box, with no outline under it',
     boxed.background === '#16171a' && boxed.textShadow === 'none',
     JSON.stringify(boxed));
-  await Look.set('subtitleBackdrop', 'shaded');
-  check('shaded sits between the two: a wash, and the outline kept',
-    /rgba\(10,11,13/.test(Look.subtitleSkin().background) &&
-    /rgba\(0,0,0,\.9\)/.test(Look.subtitleSkin().textShadow));
+  await Look.set('subtitleBackdrop', 'none');
+  const bare = Look.subtitleSkin();
+  check('transparent drops the wash and keeps the outline',
+    bare.background === 'transparent' && bare.boxShadow === 'none' &&
+    /rgba\(0,0,0,\.9\)/.test(bare.textShadow), JSON.stringify(bare));
 
   await Look.set('popupSize', 'large');
   check('a larger popup scales every size at once, and none of them twice',

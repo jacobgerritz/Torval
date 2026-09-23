@@ -55,21 +55,21 @@ var TorvalLook = (function () {
       name: 'subtitleBackdrop',
       label: 'Subtitle background',
       where: 'Subtitles',
-      fallback: 'none',
-      // Straight onto the picture, with the text outlined, which is what
-      // every other player in the world does and what looks best over a
-      // film. The two backed options are there for anybody who would
-      // rather have the line fenced off from the picture, and Torval's own
+      fallback: 'shaded',
+      // A wash of dark under outlined text, which is what most players
+      // do and what sits best over a film: the words stay readable over a
+      // bright scene without a hard edge cutting the picture in two.
+      // Transparent is the same thing without the wash, and Torval's own
       // box additionally says where the line can be hovered.
       //
-      // Listed with the default first, and named for what they look like
-      // rather than for what they are made of: "None" described the
-      // implementation, and nobody choosing between three pictures wants
-      // the one labelled none.
+      // Listed with the default in the middle, darkest to lightest, and
+      // named for what they look like rather than for what they are made
+      // of: "None" described the implementation, and nobody choosing
+      // between three pictures wants the one labelled none.
       choices: [
-        { value: 'none', label: 'Transparent' },
+        { value: 'box', label: 'Box' },
         { value: 'shaded', label: 'Shaded' },
-        { value: 'box', label: 'Box' }
+        { value: 'none', label: 'Transparent' }
       ]
     },
     {

@@ -199,7 +199,12 @@
   // page asks TorvalUI at the moment it draws, so nothing here has to wait
   // for this; it only has to land before somebody hovers a word, which it
   // does by a wide margin.
-  TorvalUI.load();
+  //
+  // Guarded because this is top-level code: anything that throws on this
+  // line stops the rest of the file running, and the rest of the file is
+  // the bar, the popup and the subtitles. It threw once, and Torval simply
+  // was not there.
+  try { TorvalUI.load(); } catch (err) { /* English, then */ }
 
   api.runtime.sendMessage({ type: 'tags' }).then((t) => { if (t) tags = t; }).catch(() => {});
 

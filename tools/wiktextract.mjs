@@ -305,7 +305,14 @@ function toEntry(row, lang, recordings, glosses) {
   let own = null;
   if (glosses && glosses.size) {
     const byPos = glosses.get(row.word);
-    const said = byPos && (byPos.get(pos) || (byPos.size === 1 ? [...byPos.values()][0] : null));
+    // The right part of speech first, then any of them. "either" is a
+    // determiner, a conjunction and an adverb, and the sources had Spanish
+    // for two of the three: asking only for the determiner's got nothing
+    // and the entry fell back to its English definition, which is the one
+    // thing a Spanish reader did not want. A gloss from the neighbouring
+    // sense of the same word is a far better answer than that, and the
+    // part of speech is printed beside it either way.
+    const said = byPos && (byPos.get(pos) || [...byPos.values()][0]);
     if (said && said.length) own = [{ p: [pos], g: said }];
   }
 

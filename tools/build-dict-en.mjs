@@ -48,7 +48,7 @@ await build({
   writtenUrl: 'https://raw.githubusercontent.com/adno/wikipedia-word-frequency-clean/main/results/enwiki-frequency-20221020-lower.tsv.xz',
   out: 'data-en',
   // Bumping this makes the extension rebuild its English database on next start.
-  version: 3,
+  version: 4,
   sourceNote: 'Wiktextract (kaikki.org), from the English and Spanish Wiktionaries, ' +
     'CC BY-SA 4.0; word frequency from hermitdave/FrequencyWords (OpenSubtitles), MIT, ' +
     'and Wikipedia word frequency (adno/wikipedia-word-frequency-clean), CC BY-SA 4.0',
