@@ -46,17 +46,17 @@
   <p>
     <b>Fields…</b>, then add these, exactly as spelled. Delete Basic's own
     <code>Front</code> and <code>Back</code> once the others are in. Set
-    <b>Sort by this field</b> on <code>Word</code>.
+    <b>Sort by this field</b> on <code>Target Word</code>.
   </p>
-  <pre><code>Word
+  <pre><code>Target Word
 Reading
 Sentence
-Definition
+Definitions
 Word Audio
 Sentence Audio
 Pitch
 Stress
-Image
+Images
 Sentence Before
 Sentence After</code></pre>
   <p class="note">
@@ -70,63 +70,87 @@ Sentence After</code></pre>
   <h2>3. The front</h2>
   <p><b>Cards…</b>, then paste this over the front template.</p>
   <pre><code>&lt;div class="sentence"&gt;{{Sentence}}&lt;/div&gt;
-
-{{#Image}}&lt;div class="shot"&gt;{{Image}}&lt;/div&gt;{{/Image}}
-{{#Sentence Audio}}&lt;div class="play"&gt;{{Sentence Audio}}&lt;/div&gt;{{/Sentence Audio}}</code></pre>
+&lt;div class="target-word"&gt;{{Target Word}}&lt;/div&gt;</code></pre>
+  <p class="note">
+    The sentence carries the word in bold, so you meet it in context first
+    and the word underneath names what is being asked about.
+  </p>
 </section>
 
 <section>
   <h2>4. The back</h2>
   <pre><code>{{FrontSide}}
 
-&lt;hr id="answer"&gt;
+&lt;hr&gt;
 
-&lt;div class="word"&gt;
-  {{Word}}{{#Reading}} &lt;span class="reading"&gt;{{Reading}}&lt;/span&gt;{{/Reading}}
-  {{#Word Audio}}&lt;span class="play"&gt;{{Word Audio}}&lt;/span&gt;{{/Word Audio}}
-&lt;/div&gt;
+&lt;div class="audio-line"&gt;{{Sentence Audio}} {{Word Audio}}&lt;/div&gt;
 
-{{#Pitch}}&lt;div class="accent"&gt;{{Pitch}}&lt;/div&gt;{{/Pitch}}
-{{#Stress}}&lt;div class="accent"&gt;{{Stress}}&lt;/div&gt;{{/Stress}}
+{{#Reading}}&lt;div class="reading"&gt;{{Reading}}&lt;/div&gt;{{/Reading}}
+{{#Pitch}}&lt;div class="reading"&gt;{{Pitch}}&lt;/div&gt;{{/Pitch}}
+{{#Stress}}&lt;div class="reading"&gt;{{Stress}}&lt;/div&gt;{{/Stress}}
 
-&lt;div class="meaning"&gt;{{Definition}}&lt;/div&gt;
+&lt;div class="definition"&gt;{{Definitions}}&lt;/div&gt;
+
+{{#Images}}&lt;div class="image-block"&gt;{{Images}}&lt;/div&gt;{{/Images}}
 
 {{#Sentence Before}}&lt;div class="around"&gt;{{Sentence Before}}&lt;/div&gt;{{/Sentence Before}}
 {{#Sentence After}}&lt;div class="around"&gt;{{Sentence After}}&lt;/div&gt;{{/Sentence After}}</code></pre>
+  <p class="note">
+    Every row is wrapped in its field, so a card with no picture or no pitch
+    accent leaves no gap where one would have been.
+  </p>
 </section>
 
 <section>
   <h2>5. The styling</h2>
   <p>Same screen, the <b>Styling</b> box.</p>
   <pre><code>.card {
-  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-  font-size: 20px;
-  line-height: 1.7;
+  font-family: arial, sans-serif;
+  font-size: 25px;
+  line-height: 1.6;
   text-align: center;
-  color: #1c1d20;
-  background: #fbfaf8;
-  padding: 24px 16px;
+  color: black;
+  background-color: white;
 }
 
-.sentence { font-size: 24px; margin-bottom: 18px; }
-.sentence b { color: #b8763a; font-weight: 600; }
+.sentence b { font-weight: 600; }
 
-.shot img { max-width: 100%; max-height: 320px; border-radius: 6px; }
-.play { margin-top: 12px; }
+.target-word { font-size: 28px; margin-top: 15px; }
 
-hr#answer { border: 0; border-top: 1px solid #dcd8d1; margin: 24px 0; }
+.reading { font-size: 30px; }
 
-.word { font-size: 30px; font-weight: 600; }
-.reading { font-size: 20px; font-weight: 400; color: #6d6a64; }
-.accent { margin-top: 6px; }
-.meaning { font-size: 18px; margin-top: 14px; text-align: left; }
-.around { font-size: 15px; color: #6d6a64; margin-top: 10px; }
+.definition {
+  font-size: 25px;
+  margin-bottom: 6px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  word-wrap: break-word;
+}
 
-.nightMode.card { color: #e8e6e3; background: #1c1d20; }
-.nightMode .sentence b { color: #e6b578; }
-.nightMode .reading,
+.around { font-size: 16px; color: #666; margin-top: 10px; }
+
+.image-block { margin-top: 6px; }
+
+img { max-width: 25%; height: auto; margin: 5px auto; display: block; }
+
+.audio-line {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+hr {
+  margin: 8px auto;
+  border: none;
+  border-top: 2px solid #888;
+  width: 80%;
+}
+
+.nightMode.card { color: #e8e6e3; background-color: #1c1d20; }
 .nightMode .around { color: #98948c; }
-.nightMode hr#answer { border-top-color: #3d4149; }</code></pre>
+.nightMode hr { border-top-color: #3d4149; }</code></pre>
 </section>
 
 <section>
@@ -142,7 +166,7 @@ hr#answer { border: 0; border-top: 1px solid #dcd8d1; margin: 24px 0; }
   <p>
     <strong>No recording for a word?</strong>
     Italian and Spanish pronunciations come from volunteers, and they have
-    not read everything. Adding <code>{{tts it_IT:Word}}</code> to the back
+    not read everything. Adding <code>{{tts it_IT:Target Word}}</code> to the back
     template makes Anki say the word itself, with the voices already on your
     phone or computer. Use <code>es_ES</code> or <code>ja_JP</code> as it
     suits.
