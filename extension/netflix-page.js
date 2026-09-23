@@ -645,9 +645,25 @@
     // [DOOR CREAKS] and the speakers' names and is not the dialogue.
     var best = pick(list, wanted, false) || pick(list, wanted, true);
     if (!best) return false;
+    // Once only.
+    //
+    // subtitles.js asks again every second until it is told yes, and
+    // getTimedTextTrack does not always report the new track straight
+    // away, so this could set the same track a dozen times over. Every
+    // one of those tears down the player's caption renderer and builds it
+    // again, and since Torval reads Netflix's lines off the screen, that
+    // is the screen being wiped under it: lines went uncommitted and A
+    // stepped back to the wrong place, or nowhere, for the first quarter
+    // minute of a video.
+    if (chosen) return true;
     try { moving.setTimedTextTrack(best); } catch (err) { return false; }
+    chosen = true;
     return true;
   }
+
+  // Set for as long as this page lives. Netflix keeps a subtitle choice
+  // across episodes, so there is nothing to do again on the next one.
+  var chosen = false;
 
   function pick(list, wanted, allowAssistive) {
     for (var i = 0; i < list.length; i++) {

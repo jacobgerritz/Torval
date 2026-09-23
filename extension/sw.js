@@ -29,6 +29,7 @@ importScripts(
   'english.js',
   'english-scan.js',
   'lang.js',
+  'ui.js',
   'deinflect.js',
   'deinflect-latin.js',
   'deinflect-it.js',

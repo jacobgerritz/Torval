@@ -1,5 +1,5 @@
 /*
- * Torval, the language the interface is written in
+ * Torval, the language the reader already has
  *
  * Separate from the language being studied, and deliberately so. A Spanish
  * speaker learning English wants the buttons in Spanish and the dictionary
@@ -27,11 +27,15 @@ var TorvalUI = (function () {
   ];
 
   var STRINGS = {
+    // English is the language the pages are written in, so it needs no
+    // table: t() falls back to what the markup already says. It is listed
+    // so that code asking "is this a language Torval speaks" gets a yes.
+    en: {},
     es: {
       // --- the frame ---------------------------------------------------
       'settings.title': 'Ajustes de Torval',
-      'sidebar.language': 'Idioma que lees',
-      'sidebar.interface': 'Idioma de la interfaz',
+      'sidebar.mine': 'Tu idioma',
+      'sidebar.language': 'Aprendiendo',
       'sidebar.books': 'Abrir tus libros',
       'tab.words': 'Palabras',
       'tab.anki': 'Anki',
@@ -158,6 +162,17 @@ var TorvalUI = (function () {
   }
 
   function code() { return current; }
+
+  // A background page lives for hours and would otherwise answer with
+  // whatever was stored when it woke. The settings page writes this key
+  // and the popup reads it back a moment later.
+  if (api && api.storage && api.storage.onChanged) {
+    api.storage.onChanged.addListener(function (changes, area) {
+      if (area !== 'local' || !changes.uiLanguage) return;
+      var next = changes.uiLanguage.newValue;
+      if (STRINGS[next] || next === 'en') current = next;
+    });
+  }
 
   function set(next) {
     current = STRINGS[next] ? next : 'en';

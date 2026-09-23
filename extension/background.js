@@ -388,8 +388,17 @@ async function handleLookup(text, point) {
     // value per word, and the table or the entry itself is already in
     // memory, so it costs nothing to answer it here along with the
     // definitions.
+    // An English entry carries two sets of definitions: the English one it
+    // was written with, and the Spanish one assembled for it where
+    // somebody has written one. Which of the two a reader wants is their
+    // own language, not the dictionary's business, so the swap happens
+    // here and everything downstream goes on reading entry.s.
+    const inSpanish = TorvalUI.code() === 'es';
     for (const group of groups) {
       for (const hit of group.hits) {
+        if (inSpanish && hit.entry && hit.entry.x) {
+          hit.entry = Object.assign({}, hit.entry, { s: hit.entry.x });
+        }
         if (stress) hit.stress = TorvalStress.indexFor(hit.entry);
         else hit.pitch = await TorvalPitch.accentFor(hit.word, hit.reading);
         hit.band = lookup.frequencyBand(hit.q);

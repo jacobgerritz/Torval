@@ -2913,21 +2913,26 @@ const run = async () => {
     check('an untranslated key falls back to what the page already says',
       UI.t('no.such.key', 'Keeping score') === 'Keeping score');
 
-    // English is defined in Spanish, so it is no use to somebody who does
-    // not read Spanish, and an English speaker's language picker should
-    // not carry it. The interface language is what decides.
-    const inEnglish = Lang.offered('en').map((l) => l.code);
-    const inSpanish = Lang.offered('es').map((l) => l.code);
-    check('an English interface is offered the three defined in English',
-      inEnglish.join(',') === 'ja,it,es', inEnglish.join(','));
-    check('a Spanish one is offered English as well',
-      inSpanish.join(',') === 'ja,it,es,en', inSpanish.join(','));
-    // Otherwise putting the interface back to English would lose the
-    // language you are in the middle of reading.
+    // A dictionary here is a pair: it explains one language in another.
+    // What somebody is offered to read is whatever can be explained in
+    // the language they already have, which is the rule that stopped a
+    // Spanish interface offering Japanese and then defining it in English.
     const before = Lang.active();
+    Lang._setActive('it');
+    const forEnglish = Lang.offered('en').map((l) => l.code);
+    const forSpanish = Lang.offered('es').map((l) => l.code);
+    check('an English speaker is offered everything explained in English',
+      forEnglish.join(',') === 'ja,it,es,en', forEnglish.join(','));
+    check('a Spanish speaker is offered only what is explained in Spanish',
+      forSpanish.join(',') === 'it,en', forSpanish.join(','));
+    check('English can be explained either way, the others only in English',
+      Lang.explainsIn('en', 'es') && Lang.explainsIn('en', 'en') &&
+      !Lang.explainsIn('ja', 'es') && Lang.explainsIn('ja', 'en'));
+    // Otherwise changing your own language would take the language you
+    // are in the middle of reading out of its own picker.
     Lang._setActive('en');
     check('and the language in use is never hidden from its own picker',
-      Lang.offered('en').map((l) => l.code).includes('en'));
+      Lang.offered('es').map((l) => l.code).includes('en'));
     Lang._setActive(before);
 
     // Every marker in the settings page has to have a Spanish line behind
@@ -3990,17 +3995,24 @@ const run = async () => {
     JSON.stringify(Look.all().map((s) => s.value)));
   check('and the defaults change nothing about the popup',
     Look.get('popupSize').unit === 1 && Look.get('popupWidth').px === 400);
+  // Straight onto the picture, outlined, which is what every other player
+  // does and what a film looks best under.
   check('nor about the subtitles', Look.subtitleScale() === 1 &&
-    Look.subtitleSkin().background === '#16171a');
+    Look.subtitleSkin().background === 'transparent' &&
+    /rgba\(0,0,0,\.9\)/.test(Look.subtitleSkin().textShadow));
 
   await Look.set('subtitleSize', 'huge');
   check('a larger subtitle is a larger share of the player',
     Look.subtitleScale() === 1.5, String(Look.subtitleScale()));
-  await Look.set('subtitleBackdrop', 'none');
-  const bare = Look.subtitleSkin();
-  check('and with no box the words keep an outline instead',
-    bare.background === 'transparent' && bare.boxShadow === 'none' &&
-    /rgba\(0,0,0,\.9\)/.test(bare.textShadow), JSON.stringify(bare));
+  await Look.set('subtitleBackdrop', 'box');
+  const boxed = Look.subtitleSkin();
+  check('and asking for the box gets a box, with no outline under it',
+    boxed.background === '#16171a' && boxed.textShadow === 'none',
+    JSON.stringify(boxed));
+  await Look.set('subtitleBackdrop', 'shaded');
+  check('shaded sits between the two: a wash, and the outline kept',
+    /rgba\(10,11,13/.test(Look.subtitleSkin().background) &&
+    /rgba\(0,0,0,\.9\)/.test(Look.subtitleSkin().textShadow));
 
   await Look.set('popupSize', 'large');
   check('a larger popup scales every size at once, and none of them twice',

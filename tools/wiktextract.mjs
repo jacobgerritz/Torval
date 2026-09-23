@@ -90,46 +90,24 @@ export async function build(lang) {
   const recordings = await ensureAudio(ROOT, lang);
 
   /*
-   * Glosses in another language, from another Wiktionary.
+   * Glosses in the reader's own language.
    *
-   * English is the one language here that is not being explained to an
-   * English speaker, so its definitions cannot come from the dump its
-   * words come from. The Spanish Wiktionary writes up English words in
-   * Spanish, which is exactly what is wanted and covers about twenty
-   * thousand of them; the English Wiktionary covers everything but says it
-   * in English. So both are read: the Spanish gloss wins wherever there is
-   * one, and the English definition stands where there is not, which for
-   * an advanced reader is a useful answer rather than no answer.
+   * Three of the four dictionaries here are Wiktionary explaining a
+   * language to an English speaker, so the dump they are built from is
+   * already in the right language and there is nothing to do. English is
+   * the one being explained to somebody who does not have it, and no
+   * single dump says that, so the language supplies a function that goes
+   * and assembles one. See tools/glosses-en-es.mjs.
+   *
+   * The English definition is kept either way, on `x`: a reader far
+   * enough along to want uncommon words is better served by an English
+   * definition than by nothing, and which of the two is shown is the
+   * reader's own setting rather than the dictionary's business.
    */
-  const glosses = new Map();   // word -> pos -> [gloss]
-  if (lang.glossSource) {
-    const GLOSSES = join(ROOT, 'data', lang.glossSource);
-    await ensure(GLOSSES, lang.glossUrl);
-    console.log('Reading', GLOSSES);
-    const unzip = createGunzip();
-    createReadStream(GLOSSES).pipe(unzip);
-    const lines = createInterface({ input: unzip, crlfDelay: Infinity });
-    for await (const line of lines) {
-      if (!line) continue;
-      let row;
-      try { row = JSON.parse(line); } catch { continue; }
-      const pos = POS_MAP[row.pos];
-      if (!pos || !row.word) continue;
-      const said = [];
-      for (const sense of row.senses || []) {
-        for (const gloss of sense.glosses || []) {
-          const tidy = lang.tidyGloss ? lang.tidyGloss(gloss) : gloss;
-          if (tidy && !said.includes(tidy)) said.push(tidy);
-        }
-      }
-      if (!said.length) continue;
-      let byPos = glosses.get(row.word);
-      if (!byPos) { byPos = new Map(); glosses.set(row.word, byPos); }
-      const already = byPos.get(pos);
-      if (already) already.push(...said.filter((g) => !already.includes(g)));
-      else byPos.set(pos, said);
-    }
-    console.log(`  ${glosses.size} words defined in the reader's own language`);
+  let glosses = new Map();   // word -> pos -> [gloss]
+  if (lang.glosses) {
+    glosses = await lang.glosses({ root: ROOT, ensure });
+    console.log(`  ${glosses.size} words in all, in the reader's own language`);
   }
 
   /*
@@ -250,9 +228,9 @@ export async function build(lang) {
     if (rank) { entry.q = rank; ranked++; }
   }
   console.log(`  ${ranked} entries carry a frequency rank`);
-  if (lang.glossSource) {
-    console.log(`  ${translated} of ${kept} defined in the reader's own language, ` +
-      `the rest in English`);
+  if (lang.glosses) {
+    console.log(`  ${translated} of ${kept} carry a gloss in the reader's own ` +
+      `language; the rest have the English definition only`);
   }
 
   mkdirSync(OUT, { recursive: true });
@@ -319,19 +297,20 @@ function toEntry(row, lang, recordings, glosses) {
   // Per part of speech, because "book" the noun and "book" the verb are
   // different words to a reader and the Spanish for one is not the
   // Spanish for the other.
-  let translated = false;
+  //
+  // Kept beside the English definition rather than replacing it. Which one
+  // a popup shows is decided by the reader's own language at the moment it
+  // draws, and a dictionary that threw one of them away could not answer
+  // both questions.
+  let own = null;
   if (glosses && glosses.size) {
     const byPos = glosses.get(row.word);
     const said = byPos && (byPos.get(pos) || (byPos.size === 1 ? [...byPos.values()][0] : null));
-    if (said && said.length) {
-      senses.length = 0;
-      senses.push({ p: [pos], g: said });
-      translated = true;
-    }
+    if (said && said.length) own = [{ p: [pos], g: said }];
   }
 
   const entry = { k: [row.word], r: [row.word], s: senses, f: 0, kv: 1 };
-  if (translated) entry.tr = 1;
+  if (own) { entry.x = own; entry.tr = 1; }
   // A noun's gender, which is what puts the article on the card. Only
   // common nouns: "il Roma" is not a thing anybody says, so a proper noun
   // is left without one and article.js then has nothing to add. See

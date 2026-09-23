@@ -196,6 +196,8 @@ if (uiSelect) {
   });
   uiSelect.addEventListener('change', () => {
     TorvalUI.set(uiSelect.value);
+    // Which languages are on offer follows from this, and so does every
+    // word on the page. A reload is the honest way to redraw all of it.
     location.reload();
   });
 }
@@ -538,7 +540,7 @@ function drawAppearance() {
   for (const where of TorvalLook.groups()) {
     const section = document.createElement('section');
     section.appendChild(Object.assign(document.createElement('h2'), {
-      textContent: where
+      textContent: TorvalUI.t('look.group.' + where.toLowerCase().replace(/[^a-z]+/g, '-'), where)
     }));
     for (const setting of settings.filter((s) => s.where === where)) {
       section.appendChild(lookRow(setting));
@@ -551,7 +553,7 @@ function lookRow(setting) {
   const row = document.createElement('div');
   row.className = 'look-row';
   row.appendChild(Object.assign(document.createElement('span'), {
-    textContent: setting.label
+    textContent: TorvalUI.t('look.' + setting.name, setting.label)
   }));
 
   const choices = document.createElement('div');
@@ -559,7 +561,7 @@ function lookRow(setting) {
   for (const choice of setting.choices) {
     const button = document.createElement('button');
     button.className = 'look-choice' + (choice.value === setting.value ? ' on' : '');
-    button.textContent = choice.label;
+    button.textContent = TorvalUI.t('look.' + setting.name + '.' + choice.value, choice.label);
     button.addEventListener('click', async () => {
       if (choice.value === setting.value) return;
       await TorvalLook.set(setting.name, choice.value);

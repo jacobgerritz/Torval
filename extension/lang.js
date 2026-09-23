@@ -66,25 +66,36 @@ var TorvalLang = (function () {
   }
 
   /*
-   * The languages worth offering to somebody reading the interface in
-   * `ui`.
+   * The languages worth offering to somebody whose own language is `mine`.
    *
-   * English is defined in Spanish, so it is of no use at all to a reader
-   * who does not have Spanish, and putting it in an English speaker's
-   * language picker is clutter they can do nothing with. A profile says so
-   * with `forUI`, and the pickers ask here rather than filtering for
-   * themselves.
+   * A dictionary is a pair, not a language: it explains one language in
+   * another. Japanese, Italian and Spanish here are all explained in
+   * English, so they are for English speakers. English is explained in
+   * Spanish, and also in English, so it is for both, and means something
+   * different to each.
    *
-   * The language in use is always offered, whatever the interface says.
-   * Otherwise somebody studying English who put the interface back to
-   * English would find the language they are in the middle of missing from
-   * its own picker.
+   * A profile says which languages it can explain itself in, and a
+   * language is offered to somebody who reads one of them. That is the
+   * whole rule, and it is what stops a Spanish interface offering
+   * Japanese and then defining it in English, which was true for a while
+   * and made no sense to anybody.
+   *
+   * The language in use is always offered, whatever else is true, or
+   * changing your own language would take the language you are studying
+   * out of its own picker.
    */
-  function offered(ui) {
+  function offered(mine) {
     return list().filter(function (item) {
-      var want = registry[item.code].forUI;
-      return !want || item.code === current || want === ui;
+      var explains = registry[item.code].explains;
+      if (!explains || item.code === current) return true;
+      return explains.indexOf(mine || 'en') !== -1;
     });
+  }
+
+  /** Can this language be explained in the language somebody reads? */
+  function explainsIn(code, mine) {
+    var explains = registry[code] && registry[code].explains;
+    return !explains || explains.indexOf(mine || 'en') !== -1;
   }
 
   /** The active language's code. Synchronous: always answers from the cache. */
@@ -163,6 +174,7 @@ var TorvalLang = (function () {
     get: get,
     list: list,
     offered: offered,
+    explainsIn: explainsIn,
     active: active,
     profile: profile,
     onChange: onChange,
@@ -271,6 +283,9 @@ function latinPlausible(text, matched) {
 
 TorvalLang.register({
   code: 'ja',
+  // Wiktionary explaining it to an English speaker, which is the only
+  // language it is written up in here.
+  explains: ['en'],
   name: 'Japanese',
   charClass: TorvalJapanese,
   scanWindow: TorvalMaxScan,
@@ -316,6 +331,9 @@ TorvalLang.register({
 
 TorvalLang.register({
   code: 'it',
+  // Wiktionary explaining it to an English speaker, which is the only
+  // language it is written up in here.
+  explains: ['en'],
   name: 'Italian',
   charClass: TorvalItalian,
   scanWindow: TorvalItalianMaxScan,
@@ -364,6 +382,9 @@ TorvalLang.register({
  */
 TorvalLang.register({
   code: 'es',
+  // Wiktionary explaining it to an English speaker, which is the only
+  // language it is written up in here.
+  explains: ['en'],
   name: 'Spanish',
   charClass: TorvalSpanish,
   scanWindow: TorvalSpanishMaxScan,
@@ -415,9 +436,12 @@ TorvalLang.register({
 TorvalLang.register({
   code: 'en',
   name: 'English',
-  // Offered only while the interface is in Spanish: the definitions are in
-  // Spanish, so to anybody else this is a dictionary they cannot read.
-  forUI: 'es',
+  // Two dictionaries in one file. Every entry carries its English
+  // definition, and about half of them also carry a Spanish one, so this
+  // answers a Spanish speaker learning English and an English speaker who
+  // wants a monolingual dictionary, and background.js picks which set to
+  // hand over by the reader's own language.
+  explains: ['en', 'es'],
   charClass: TorvalEnglish,
   scanWindow: TorvalEnglishMaxScan,
   lookup: lazy('TorvalLookupLatin'),
