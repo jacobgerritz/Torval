@@ -170,6 +170,12 @@ if (typeof TorvalSpanish === 'undefined' && typeof require !== 'undefined') {
 if (typeof TorvalSpanishMaxScan === 'undefined' && typeof require !== 'undefined') {
   var TorvalSpanishMaxScan = require('./spanish-scan.js');
 }
+if (typeof TorvalEnglish === 'undefined' && typeof require !== 'undefined') {
+  var TorvalEnglish = require('./english.js');
+}
+if (typeof TorvalEnglishMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var TorvalEnglishMaxScan = require('./english-scan.js');
+}
 
 /*
  * A language's deinflector and lookup engine, fetched when they are wanted
@@ -204,6 +210,7 @@ var FILES = {
   TorvalDeinflect: 'deinflect.js',
   TorvalDeinflectIt: 'deinflect-it.js',
   TorvalDeinflectEs: 'deinflect-es.js',
+  TorvalDeinflectEn: 'deinflect-en.js',
   TorvalLookup: 'lookup.js',
   TorvalLookupLatin: 'lookup-latin.js'
 };
@@ -362,6 +369,45 @@ TorvalLang.register({
   examples: {
     paste: 'Pega aquí un texto en español…',
     known: 'hablar', ignored: 'Guillermo',
+    ignoredKinds: 'Names, foreign words, misreadings'
+  }
+});
+
+/*
+ * English, for people whose own language is not English.
+ *
+ * The other three languages here are defined in English, for an English
+ * speaker reading them. This one is the other way round: English words
+ * defined in Spanish, from the Spanish Wiktionary rather than the English
+ * one. The interface has its own language setting, in ui.js, because which
+ * language somebody reads a settings page in does not follow from which
+ * one they are studying.
+ *
+ * No accent marking and no recordings. English stress is not written down
+ * in the spelling the way Spanish stress is, so there is nothing to derive,
+ * and the Spanish Wiktionary does not carry the pronunciation audio the
+ * other two get from Lingua Libre. An Anki note type can say the word with
+ * {{tts en_US:Target Word}} instead, which every phone and computer has.
+ */
+TorvalLang.register({
+  code: 'en',
+  name: 'English',
+  charClass: TorvalEnglish,
+  scanWindow: TorvalEnglishMaxScan,
+  lookup: lazy('TorvalLookupLatin'),
+  deinflector: lazy('TorvalDeinflectEn'),
+  accent: null,
+  audio: false,
+  build: 'node tools/build-dict-en.mjs',
+  dbSuffix: '-en',
+  dataPath: 'data-en',
+  storageSuffix: '_en',
+  seams: false,
+  subtitles: ['en', 'en-US', 'en-GB'],
+  plausible: latinPlausible,
+  examples: {
+    paste: 'Paste an English text here…',
+    known: 'speak', ignored: 'Jonathan',
     ignoredKinds: 'Names, foreign words, misreadings'
   }
 });

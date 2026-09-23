@@ -20,7 +20,7 @@
 import { createReadStream, readFileSync, writeFileSync,
   existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { createGunzip } from 'node:zlib';
+import { createGunzip, gzipSync } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -459,6 +459,14 @@ async function ensure(file, url) {
   if (url.endsWith('.xz')) {
     writeFileSync(file + '.xz', body);
     execFileSync('xz', ['--decompress', '--force', file + '.xz']);
+    return;
+  }
+  // One source is published as plain .jsonl rather than gzipped, and the
+  // reader gunzips whatever it is given. Compressing it here, once, is a
+  // smaller change than teaching the reader to look at the filename, and
+  // it leaves the cached copy the same shape as every other one.
+  if (file.endsWith('.gz') && !url.endsWith('.gz')) {
+    writeFileSync(file, gzipSync(body));
     return;
   }
   writeFileSync(file, body);

@@ -129,7 +129,10 @@ function fillLanguages() {
   for (const { code, name } of TorvalLang.list()) {
     const option = document.createElement('option');
     option.value = code;
-    option.textContent = name;
+    // Named in the interface language, not in its own: somebody reading a
+    // Spanish settings page is choosing "Japonés", not "Japanese".
+    option.textContent = typeof TorvalUI !== 'undefined'
+      ? TorvalUI.t('lang.' + code, name) : name;
     if (code === TorvalLang.active()) option.selected = true;
     languageSelect.appendChild(option);
   }
@@ -166,6 +169,34 @@ if (languageSelect) {
   // toolbar popup or this same page in another tab, so there is exactly one
   // place that reloads the Anki panel rather than two racing each other.
   TorvalLang.onChange(() => { fillLanguages(); fillExamples(); load(); });
+}
+
+/*
+ * The language this page is written in, which is the whole of the
+ * interface setting: pick it, the page repaints, and it is remembered.
+ * A reload rather than a repaint for the parts drawn by script, which
+ * is simpler than teaching every painter to undo itself.
+ */
+const uiSelect = document.getElementById('ui-language');
+
+if (uiSelect) {
+  for (const { code, name } of TorvalUI.languages) {
+    const option = document.createElement('option');
+    option.value = code;
+    option.textContent = name;
+    uiSelect.appendChild(option);
+  }
+  TorvalUI.load().then((code) => {
+    uiSelect.value = code;
+    TorvalUI.paint();
+    // fillLanguages ran before the stored choice arrived, so the language
+    // names are still in English at this point.
+    if (languageSelect) fillLanguages();
+  });
+  uiSelect.addEventListener('change', () => {
+    TorvalUI.set(uiSelect.value);
+    location.reload();
+  });
 }
 
 // The chosen file’s name, said in the page’s own type. The browser will not

@@ -1,8 +1,8 @@
 # Torval
 
-A pop-up dictionary for Firefox and Chrome, for Japanese, Italian and
-Spanish. Hold **Shift** and point at a word; its meaning appears next to the
-cursor. Everything is on your own machine, the whole dictionary lives in the
+A pop-up dictionary for Firefox and Chrome, for Japanese, Italian, Spanish
+and English. Hold **Shift** and point at a word; its meaning appears next to
+the cursor. Everything is on your own machine, the whole dictionary lives in the
 browser. It works with the network off, and it collects nothing: see
 [PRIVACY.md](PRIVACY.md).
 
@@ -14,8 +14,16 @@ finds *decir*. The languages are otherwise built the same way and behave the
 same way: pick one from the toolbar popup and its own dictionary,
 deinflector, known/ignored word lists and Anki settings load, independently
 of whatever the others have. Japanese also gets pitch accent, from Kanjium;
-the other two get word stress marked inline instead, since neither has
+Italian and Spanish get word stress marked inline instead, since neither has
 lexical pitch accent to speak of. Only one language is active at a time.
+
+English is the odd one out and deliberately so. The other three are defined
+in English, for an English speaker reading them; English is defined in
+Spanish, from the Spanish Wiktionary, for a Spanish speaker learning it. The
+interface has a language of its own for the same reason, in `ui.js`: which
+language somebody wants the buttons in does not follow from which language
+they are studying, so it is asked rather than guessed, and it defaults to
+English.
 
 ---
 

@@ -2864,6 +2864,66 @@ const run = async () => {
       /if \(CAN_BLOCK &&/.test(background));
   }
 
+  // --- English, and the interface language -------------------------------
+  // The other three languages are defined in English for an English
+  // speaker. This one is English defined in Spanish, which is why the
+  // interface has a language of its own: the two no longer follow from
+  // each other.
+  {
+    const DeinflectEn = require(join(ROOT, 'extension', 'deinflect-en.js'));
+    const forms = (word) => DeinflectEn.deinflect(word).map((r) => r.term);
+    const undoes = (word, lemma) => forms(word).includes(lemma);
+
+    check('regular past and continuous come apart',
+      undoes('walked', 'walk') && undoes('walking', 'walk'));
+    check('a silent e is put back',
+      undoes('liked', 'like') && undoes('making', 'make'));
+    check('y becomes ie before a suffix, and back again',
+      undoes('tried', 'try') && undoes('cities', 'city') && undoes('happiest', 'happy'));
+    check('a doubled consonant is undone',
+      undoes('stopping', 'stop') && undoes('bigger', 'big') && undoes('running', 'run'));
+    check('f and fe plurals',
+      undoes('knives', 'knife') && undoes('wolves', 'wolf'));
+    // Written as one word, listed in no dictionary, and the commonest
+    // thing on an English page that a learner would hover.
+    check('a contraction leaves the word it was built on',
+      undoes("don't", 'do') && undoes("we'll", 'we') && undoes("dog's", 'dog'));
+    check('and the curly apostrophe sites actually publish',
+      undoes('don\u2019t', 'do') && undoes('dog\u2019s', 'dog'));
+
+    const english = Lang.list().find((l) => l.code === 'en');
+    check('English is a language Torval offers', !!english);
+    const was = Lang.active();
+    Lang._setActive('en');
+    const profile = Lang.profile();
+    check('English marks no accent, since its spelling does not say where it falls',
+      profile.accent === null);
+    check('and carries no recordings, unlike the two Romance languages',
+      profile.audio === false);
+    check('its words are spaced, so no seam is drawn',
+      profile.seams === false);
+    Lang._setActive(was);
+
+    // --- the interface language ------------------------------------------
+    const UI = require(join(ROOT, 'extension', 'ui.js'));
+    check('the interface is English unless somebody says otherwise',
+      UI.code() === 'en');
+    check('and Spanish is the other choice',
+      UI.languages.map((l) => l.code).join(',') === 'en,es');
+    check('an untranslated key falls back to what the page already says',
+      UI.t('no.such.key', 'Keeping score') === 'Keeping score');
+
+    // Every marker in the settings page has to have a Spanish line behind
+    // it, or switching language empties that element instead of wording it.
+    const page = readFileSync(join(ROOT, 'extension', 'options.html'), 'utf8');
+    const marked = [...page.matchAll(/data-t(?:-title|-placeholder)?="([^"]+)"/g)]
+      .map((m) => m[1]);
+    const untranslated = marked.filter((key) => !UI._strings.es[key]);
+    check('every marked string on the settings page is translated',
+      marked.length > 30 && untranslated.length === 0,
+      'missing Spanish for: ' + untranslated.join(', '));
+  }
+
   // --- nothing enters that cannot leave ----------------------------------
   // The licence is GPL-3.0 today and the copyright is one person's, which
   // means it could be something else later. Two things would end that
@@ -3104,8 +3164,8 @@ const run = async () => {
       const listed = await send({ type: 'dictionaries' });
       const all = listed.result;
       check('every language has a dictionary row',
-        listed.ok && all.length === 3 &&
-        all.map((d) => d.code).join(',') === 'ja,it,es',
+        listed.ok && all.length === 4 &&
+        all.map((d) => d.code).join(',') === 'ja,it,es,en',
         JSON.stringify(listed).slice(0, 200));
       check('the language being read is marked as such',
         all.filter((d) => d.active).length === 1 && all[0].active);

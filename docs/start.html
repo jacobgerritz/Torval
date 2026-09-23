@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started with Torval</title>
+<meta name="description" content="A step by step guide for people who have never installed a browser add-on or used Anki before.">
+<link rel="icon" href="icon-32.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="./">← Torval</a>
+
+<h1>Getting started</h1>
+
+<p class="lede" style="margin-bottom:40px">
+  Written for people who have never installed a browser add-on or opened
+  Anki. Nothing here assumes you know what any of it means. If you get stuck
+  at a step, that step is the problem, not you.
+</p>
+
+<p>
+  You can stop after part two. Torval is useful as a plain dictionary, and
+  everything after that is optional. Parts three and four are for people who
+  want to remember the words they look up.
+</p>
+
+<section>
+  <h2>Part 1. Install it</h2>
+
+  <ol class="steps">
+    <li>
+      <h3>Open the store page for your browser</h3>
+      <p>
+        Firefox users want the Firefox Add-ons page; Chrome, Edge, Brave and
+        Opera users want the Chrome Web Store page. Both are linked from the
+        <a href="./">front page</a>. Click <b>Add to Firefox</b> or <b>Add to
+        Chrome</b> and confirm.
+      </p>
+    </li>
+    <li>
+      <h3>Pin the button to your toolbar</h3>
+      <p>
+        After installing you will see a small puzzle-piece icon near the top
+        right of the browser. Click it, find Torval, and click the pin beside
+        it. The Torval button now sits in your toolbar where you can reach
+        it. You need it for video later, and it is the quickest way into the
+        settings.
+      </p>
+    </li>
+    <li>
+      <h3>Say which language you are reading</h3>
+      <p>
+        Click the Torval button. It asks once, on the first run. Pick the
+        language you are learning, not the one you already speak.
+      </p>
+      <p class="note">
+        If you are a Spanish speaker learning English, pick <b>English</b>
+        here, and see part five for putting the buttons into Spanish.
+      </p>
+    </li>
+    <li>
+      <h3>Wait about a minute</h3>
+      <p>
+        The dictionary is copying itself into your browser. A percentage
+        counts up on the toolbar button. This happens once, not every time,
+        and afterwards Torval works with your internet off.
+      </p>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>Part 2. Look words up</h2>
+
+  <ol class="steps">
+    <li>
+      <h3>Open a page in that language</h3>
+      <p>
+        Anything at all: a news site, a blog, a Wikipedia article. Not a PDF
+        and not a picture of text, since Torval reads the words on the page
+        rather than looking at it.
+      </p>
+    </li>
+    <li>
+      <h3>Hold Shift and point at a word</h3>
+      <p>
+        Do not click. Hold the <kbd>Shift</kbd> key down and move the mouse
+        over a word. A small box appears next to it with what the word means.
+        Let go of Shift and the box goes away.
+      </p>
+      <p class="note">
+        Nothing happening? The likeliest reason is that the page is in a
+        different language from the one you picked. Torval stays quiet rather
+        than guessing.
+      </p>
+    </li>
+    <li>
+      <h3>Read what the box tells you</h3>
+      <p>
+        The word in its dictionary form at the top, what kind of word it is,
+        then the meanings in order. If the word on the page was a changed
+        form, walked or hablábamos, the box shows the plain form it comes
+        from.
+      </p>
+    </li>
+  </ol>
+
+  <div class="claim aside">
+    <p>
+      <strong>That is the whole of the basic use.</strong>
+      No account, nothing to set up, nothing sent anywhere. If that is all
+      you wanted, you are finished.
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>Part 3. Anki, if you want to keep the words</h2>
+
+  <p>
+    Anki is a separate, free program for memorising things. It shows you a
+    word, you say whether you remembered it, and it works out when to show it
+    again. Torval can put words into it in one click, but Anki has to be
+    installed first, and it has to be running at the moment you click.
+  </p>
+
+  <ol class="steps">
+    <li>
+      <h3>Install Anki</h3>
+      <p>
+        From <a href="https://apps.ankiweb.net/">apps.ankiweb.net</a>. It is
+        free on computers. Open it once and let it create your first deck.
+      </p>
+      <p class="note">
+        This has to be the computer version. The phone apps cannot talk to a
+        browser add-on. Your cards will sync to your phone afterwards.
+      </p>
+    </li>
+    <li>
+      <h3>Install AnkiConnect inside Anki</h3>
+      <p>
+        This is the part that lets Torval and Anki speak to each other. In
+        Anki: <b>Tools</b>, then <b>Add-ons</b>, then <b>Get Add-ons…</b>,
+        and paste this code into the box:
+      </p>
+      <pre><code>2055492159</code></pre>
+      <p>
+        Click OK, then restart Anki. Nothing visible changes, which is
+        correct. AnkiConnect has no window of its own.
+      </p>
+    </li>
+    <li>
+      <h3>Make a note type, or use the one we suggest</h3>
+      <p>
+        A note type is the shape of a card: which boxes it has, and what the
+        front and back look like. If you already have one you like, keep it.
+        If not, <a href="anki.html">this page</a> walks through making one
+        that Torval fills in completely.
+      </p>
+    </li>
+    <li>
+      <h3>Point Torval at it</h3>
+      <p>
+        With Anki open, click the Torval button, then the settings, then
+        <b>Anki</b>. Choose your deck and your note type. Torval matches up
+        the boxes by itself. Press <b>Save</b>.
+      </p>
+      <p class="note">
+        A message saying Anki is not answering almost always means Anki is
+        closed, or AnkiConnect was installed without restarting Anki
+        afterwards.
+      </p>
+    </li>
+    <li>
+      <h3>Make your first card</h3>
+      <p>
+        Back on a page, hold Shift, hover a word, and click the <b>+</b> in
+        the corner of the box. The card appears in Anki straight away, with
+        the sentence you found the word in.
+      </p>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>Part 4. Video, if you watch in that language</h2>
+
+  <p>
+    On YouTube and Netflix, Torval reads the subtitles and works out when
+    each line is spoken. The line appears under the video where you can hover
+    the words in it, <kbd>A</kbd> steps back a line and <kbd>D</kbd> steps
+    forward, and a card made from a subtitle can carry the picture and the
+    sound of the line itself.
+  </p>
+
+  <div class="claim aside">
+    <strong>Two things protected services ask of you.</strong>
+    <p>
+      <b>Click the Torval button once per tab</b> when you open a video on
+      Netflix. Without that click the browser will not let any add-on take a
+      picture or record sound, so the card arrives without them.
+    </p>
+    <p>
+      <b>The subtitles have to be switched on in the player</b>, in the
+      language you are learning. Torval tries to turn them on for you; where
+      that does not take, choose them in the player's own menu.
+    </p>
+  </div>
+
+  <p class="note">
+    Recording the sound from a protected video works in Chrome only. Firefox
+    has never given add-ons access to a tab's audio. Everything else works
+    the same in both.
+  </p>
+</section>
+
+<section>
+  <h2>Part 5. If you would rather not read English</h2>
+
+  <p>
+    Torval's own buttons and settings can be in Spanish while the dictionary
+    stays in the language you are learning. Open the settings and use the
+    <b>Interface</b> picker at the top left. It is separate from the language
+    you are reading, on purpose: a Spanish speaker learning English wants one
+    of each, the opposite way round from an English speaker learning Spanish.
+  </p>
+
+  <p>
+    Picking <b>English</b> as the language you are reading gives you an
+    English dictionary explained in Spanish.
+  </p>
+</section>
+
+<section>
+  <h2>When something is not working</h2>
+
+  <div class="things">
+    <div>
+      <h3>No box when I hold Shift</h3>
+      <p>
+        The page is probably in a different language from the one you picked,
+        or the dictionary is still loading. Check the toolbar button: a
+        percentage there means it is still working.
+      </p>
+    </div>
+    <div>
+      <h3>The box appears but says nothing useful</h3>
+      <p>
+        Names, brand names and foreign words are not in any dictionary. Press
+        <kbd>3</kbd> to tell Torval to stop counting that word against you.
+      </p>
+    </div>
+    <div>
+      <h3>Anki says it is not answering</h3>
+      <p>
+        Anki has to be open on the same computer, with AnkiConnect installed
+        and Anki restarted since. Those three together fix nearly every case.
+      </p>
+    </div>
+    <div>
+      <h3>The card has no picture or sound</h3>
+      <p>
+        On a protected video, click the Torval button in the toolbar once for
+        that tab, then make the card again. The card itself says which of the
+        two was missing.
+      </p>
+    </div>
+  </div>
+
+  <p style="margin-top:28px">
+    Still stuck? <a href="https://github.com/jacobgerritz/Torval/issues">Open
+    an issue</a> and say what you did and what happened. It helps more than
+    you would think.
+  </p>
+</section>
+
+<footer>
+  <p>© 2026 Jacob Gerritz · <a href="./">Torval</a></p>
+</footer>
+
+</div>
+</body>
+</html>

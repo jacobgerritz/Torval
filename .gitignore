@@ -13,6 +13,10 @@ extension/data-it/
 #   node tools/build-dict-es.mjs
 extension/data-es/
 
+# Built English dictionary data, regenerate with:
+#   node tools/build-dict-en.mjs
+extension/data-en/
+
 node_modules/
 *.log
 

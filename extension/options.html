@@ -7,17 +7,27 @@
   <nav class="sidebar">
     <h1>Torval</h1>
     <label class="sidebar-language">
-      <span>Language</span>
+      <span data-t="sidebar.language">Language</span>
       <select id="language"></select>
     </label>
-    <button class="tab" data-panel="words">Words</button>
-    <button class="tab" data-panel="anki">Anki</button>
-    <button class="tab" data-panel="video">Video</button>
-    <button class="tab" data-panel="keys">Keys</button>
-    <button class="tab" data-panel="look">Appearance</button>
-    <button class="tab" data-panel="about">About</button>
+    <!--
+      The language Torval is written in, which is not the language being
+      read: a Spanish speaker learning English wants both, one each way
+      round. English unless somebody says otherwise; the browser's own
+      setting says where a person lives, not what they want to read here.
+    -->
+    <label class="sidebar-language">
+      <span data-t="sidebar.interface">Interface</span>
+      <select id="ui-language"></select>
+    </label>
+    <button class="tab" data-panel="words" data-t="tab.words">Words</button>
+    <button class="tab" data-panel="anki" data-t="tab.anki">Anki</button>
+    <button class="tab" data-panel="video" data-t="tab.video">Video</button>
+    <button class="tab" data-panel="keys" data-t="tab.keys">Keys</button>
+    <button class="tab" data-panel="look" data-t="tab.look">Appearance</button>
+    <button class="tab" data-panel="about" data-t="tab.about">About</button>
     <span class="sidebar-spacer"></span>
-    <button id="open-reader" class="sidebar-action">Open your books</button>
+    <button id="open-reader" class="sidebar-action" data-t="sidebar.books">Open your books</button>
     <p id="dictionary" class="sidebar-note" hidden></p>
   </nav>
 
@@ -33,12 +43,12 @@
   -->
   <div class="panel" id="panel-first" hidden>
     <section class="first-run">
-      <h2>Which language are you reading?</h2>
-      <p class="note">
+      <h2 data-t="first.question">Which language are you reading?</h2>
+      <p class="note" data-t="first.one">
         One language at a time. Changing it later loses nothing: each keeps
         its own words and Anki settings.
       </p>
-      <p class="note">
+      <p class="note" data-t="first.minute">
         Reading in the dictionary takes about a minute, once.
       </p>
       <div id="first-languages" class="first-choices"></div>
@@ -49,33 +59,33 @@
 
   <div class="panel" id="panel-words">
     <section>
-      <h2>Keeping score</h2>
-      <p class="note">
+      <h2 data-t="words.score">Keeping score</h2>
+      <p class="note" data-t="words.score.note">
         Colours what you have not marked, and says what share of a page you
         know. Off, Torval is a dictionary that makes Anki cards.
       </p>
       <label class="check">
         <input type="checkbox" id="track">
-        <span>Keep track of the words I know</span>
+        <span data-t="words.score.check">Keep track of the words I know</span>
       </label>
     </section>
 
     <div id="words-rest">
-    <div class="parting"><h2>Known words</h2><span class="count" id="count">…</span></div>
-    <p class="note count-note">Press ✓ in the popup, or 2.</p>
+    <div class="parting"><h2 data-t="words.known">Known words</h2><span class="count" id="count">…</span></div>
+    <p class="note count-note" data-t="words.known.note">Press ✓ in the popup, or 2.</p>
 
     <section>
-      <h2>Add from a text</h2>
+      <h2 data-t="words.add">Add from a text</h2>
 
       <textarea id="text" rows="6" spellcheck="false"
         placeholder="日本語のテキストをここに貼り付けてください…"></textarea>
 
       <p class="row">
-        <label class="pick" for="file">Choose a file</label>
+        <label class="pick" for="file" data-t="words.file">Choose a file</label>
         <input type="file" id="file" accept=".txt,text/plain">
-        <span class="picked" id="file-name">or paste the text above</span>
+        <span class="picked" id="file-name" data-t="words.file.none">or paste the text above</span>
         <span class="spacer"></span>
-        <button id="add" class="primary">Add these words</button>
+        <button id="add" class="primary" data-t="words.add.button">Add these words</button>
       </p>
 
       <p id="result" class="note"></p>
@@ -91,7 +101,7 @@
       <p id="more" class="note more" hidden></p>
     </section>
 
-    <div class="parting"><h2>Ignored words</h2><span class="count" id="count-ignored">…</span></div>
+    <div class="parting"><h2 data-t="words.ignored">Ignored words</h2><span class="count" id="count-ignored">…</span></div>
     <p class="note count-note">
       <span id="ignored-kinds">Names, English, misreadings</span>. Press ⊘ in
       the popup, or 3.
@@ -107,7 +117,7 @@
       <p id="more-ignored" class="note more" hidden></p>
     </section>
 
-    <div class="parting"><h2>Keeping a copy</h2></div>
+    <div class="parting"><h2 data-t="words.copy">Keeping a copy</h2></div>
 
     <section>
       <!--
@@ -117,12 +127,12 @@
         mostly empty space.
       -->
       <p class="row">
-        <label class="pick" for="load-words">Load from a file</label>
+        <label class="pick" for="load-words" data-t="words.load">Load from a file</label>
         <input type="file" id="load-words" accept=".json,application/json">
         <span id="load-note" class="note"></span>
         <span class="spacer"></span>
         <span id="save-note" class="note"></span>
-        <button id="save-words" class="primary">Save to a file</button>
+        <button id="save-words" class="primary" data-t="words.save">Save to a file</button>
       </p>
 
       <p class="note">
@@ -132,7 +142,7 @@
       </p>
     </section>
 
-    <div class="parting"><h2>Starting over</h2></div>
+    <div class="parting"><h2 data-t="words.restart">Starting over</h2></div>
 
     <section>
       <!--
@@ -143,8 +153,8 @@
       <p class="row">
         <span id="clear-note" class="note"></span>
         <span class="spacer"></span>
-        <button id="clear-known">Forget all known words</button>
-        <button id="clear-ignored">Forget all ignored words</button>
+        <button id="clear-known" data-t="words.forget.known">Forget all known words</button>
+        <button id="clear-ignored" data-t="words.forget.ignored">Forget all ignored words</button>
       </p>
     </section>
     </div>
@@ -154,29 +164,29 @@
 
   <div class="panel" id="panel-anki" hidden>
     <section>
-      <h2>Where cards go</h2>
-      <p class="note">Anki has to be open, with AnkiConnect installed.</p>
+      <h2 data-t="anki.where">Where cards go</h2>
+      <p class="note" data-t="anki.open">Anki has to be open, with AnkiConnect installed.</p>
 
       <label>
-        <span>Deck</span>
+        <span data-t="anki.deck">Deck</span>
         <select id="deck"></select>
       </label>
 
       <label>
-        <span>Note type</span>
+        <span data-t="anki.model">Note type</span>
         <select id="model"></select>
       </label>
 
       <label>
-        <span>Tags</span>
+        <span data-t="anki.tags">Tags</span>
         <input id="tags" type="text" placeholder="torval" spellcheck="false">
       </label>
     </section>
 
     <section id="mapping-section" hidden>
-      <h2>What goes in each field</h2>
+      <h2 data-t="anki.fields">What goes in each field</h2>
       <div id="mapping"></div>
-      <p class="note">
+      <p class="note" data-t="anki.none">
         No note type you like? Use
         <a href="https://jacobgerritz.github.io/Torval/anki.html">Torval's</a>.
       </p>
@@ -184,7 +194,7 @@
 
 
     <p class="actions">
-      <button id="save" class="primary">Save</button>
+      <button id="save" class="primary" data-t="anki.save">Save</button>
       <span id="status" role="status"></span>
     </p>
   </div>
@@ -193,29 +203,29 @@
 
   <div class="panel" id="panel-video" hidden>
     <section>
-      <h2>Speed up non-dialogue</h2>
+      <h2 data-t="video.speed">Speed up non-dialogue</h2>
 
       <label>
-        <span>Speed</span>
+        <span data-t="video.speed.label">Speed</span>
         <input id="skip-speed" type="number" min="1.25" max="8" step="0.25" placeholder="2">
       </label>
 
-      <p class="note hint">
+      <p class="note hint" data-t="video.speed.hint.before">
         Turn it on with <b>»</b> on the bar, or press <b id="skip-key">S</b>.
       </p>
     </section>
 
     <section>
-      <h2>Recording from video</h2>
+      <h2 data-t="video.recording">Recording from video</h2>
       <label>
-        <span>Audio lead-in</span>
+        <span data-t="video.lead">Audio lead-in</span>
         <input id="lead" type="number" min="0" max="3" step="0.05" placeholder="0.1">
       </label>
-      <p class="note hint">Seconds kept before the line.</p>
+      <p class="note hint" data-t="video.lead.hint">Seconds kept before the line.</p>
 
       <label class="check" id="tab-audio-row">
         <input type="checkbox" id="tab-audio">
-        <span>Record sound from copy-protected video</span>
+        <span data-t="video.tab.check">Record sound from copy-protected video</span>
       </label>
       <p class="note hint" id="tab-audio-note"></p>
 
@@ -223,11 +233,11 @@
         Asked about more than anything else on this panel, because without
         the click there is neither picture nor sound and nothing says why.
       -->
-      <p class="note">
+      <p class="note" data-t="video.invoke">
         On copy-protected video, click the Torval button in the toolbar
         once per tab. The browser allows no picture or sound until you do.
       </p>
-      <p class="note">
+      <p class="note" data-t="video.netflix">
         Netflix's lines are read off the screen, so its subtitles have to be
         showing. Torval asks the player to turn them on; where that does not
         take, choose the language in the player's own menu.
@@ -245,13 +255,13 @@
   -->
   <div class="panel" id="panel-keys" hidden>
     <section>
-      <h2>Keyboard shortcuts</h2>
-      <p class="note">Click a key, then press the one you want. Escape cancels.</p>
+      <h2 data-t="keys.title">Keyboard shortcuts</h2>
+      <p class="note" data-t="keys.note">Click a key, then press the one you want. Escape cancels.</p>
       <div id="shortcuts"></div>
     </section>
 
     <p class="actions">
-      <button id="reset-keys">Reset to defaults</button>
+      <button id="reset-keys" data-t="keys.reset">Reset to defaults</button>
       <span id="keys-status" role="status"></span>
     </p>
   </div>
@@ -267,7 +277,7 @@
     <div id="appearance"></div>
 
     <p class="actions">
-      <button id="reset-look">Reset to defaults</button>
+      <button id="reset-look" data-t="keys.reset">Reset to defaults</button>
       <span id="look-status" role="status"></span>
     </p>
   </div>
@@ -307,7 +317,7 @@
   <div class="panel" id="panel-about" hidden>
     <section>
       <h2>Torval <span id="version" class="quiet"></span></h2>
-      <p class="note">
+      <p class="note" data-t="about.what">
         A pop-up dictionary that runs entirely on this machine. No account,
         no telemetry, no server; nothing you read or look up is sent
         anywhere.
@@ -331,10 +341,10 @@
       </p>
     </section>
 
-    <div class="parting"><h2>Dictionaries</h2></div>
+    <div class="parting"><h2 data-t="about.dictionaries">Dictionaries</h2></div>
 
     <section>
-      <p class="note">
+      <p class="note" data-t="about.dictionaries.note">
         One a language, read in when you first choose that language.
         Frequency and pitch accent are part of each, not separate files.
       </p>
@@ -343,13 +353,13 @@
 
     <div id="dict-list"></div>
 
-    <div class="parting"><h2>When something goes wrong</h2></div>
+    <div class="parting"><h2 data-t="about.wrong">When something goes wrong</h2></div>
 
     <section>
-      <p class="note">Narrates finding and reading subtitles. Send it with a bug report.</p>
+      <p class="note" data-t="about.wrong.note">Narrates finding and reading subtitles. Send it with a bug report.</p>
       <label class="check">
         <input type="checkbox" id="verbose">
-        <span>Say what it is doing in the console</span>
+        <span data-t="about.verbose">Say what it is doing in the console</span>
       </label>
     </section>
   </div>
@@ -363,7 +373,10 @@
 <script src="italian-scan.js"></script>
 <script src="spanish.js"></script>
 <script src="spanish-scan.js"></script>
+<script src="english.js"></script>
+<script src="english-scan.js"></script>
 <script src="lang.js"></script>
+<script src="ui.js"></script>
 <script src="log.js"></script>
 <script src="track.js"></script>
 <script src="keys.js"></script>
