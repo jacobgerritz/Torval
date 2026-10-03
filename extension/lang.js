@@ -65,6 +65,39 @@ var TorvalLang = (function () {
     return order.map(function (code) { return { code: code, name: registry[code].name }; });
   }
 
+  /*
+   * The languages worth offering to somebody whose own language is `mine`.
+   *
+   * A dictionary is a pair, not a language: it explains one language in
+   * another. Japanese, Italian and Spanish here are all explained in
+   * English, so they are for English speakers. English is explained in
+   * Spanish, and also in English, so it is for both, and means something
+   * different to each.
+   *
+   * A profile says which languages it can explain itself in, and a
+   * language is offered to somebody who reads one of them. That is the
+   * whole rule, and it is what stops a Spanish interface offering
+   * Japanese and then defining it in English, which was true for a while
+   * and made no sense to anybody.
+   *
+   * The language in use is always offered, whatever else is true, or
+   * changing your own language would take the language you are studying
+   * out of its own picker.
+   */
+  function offered(mine) {
+    return list().filter(function (item) {
+      var explains = registry[item.code].explains;
+      if (!explains || item.code === current) return true;
+      return explains.indexOf(mine || 'en') !== -1;
+    });
+  }
+
+  /** Can this language be explained in the language somebody reads? */
+  function explainsIn(code, mine) {
+    var explains = registry[code] && registry[code].explains;
+    return !explains || explains.indexOf(mine || 'en') !== -1;
+  }
+
   /** The active language's code. Synchronous: always answers from the cache. */
   function active() { return current; }
 
@@ -140,6 +173,8 @@ var TorvalLang = (function () {
     register: register,
     get: get,
     list: list,
+    offered: offered,
+    explainsIn: explainsIn,
     active: active,
     profile: profile,
     onChange: onChange,
@@ -169,6 +204,12 @@ if (typeof TorvalSpanish === 'undefined' && typeof require !== 'undefined') {
 }
 if (typeof TorvalSpanishMaxScan === 'undefined' && typeof require !== 'undefined') {
   var TorvalSpanishMaxScan = require('./spanish-scan.js');
+}
+if (typeof TorvalEnglish === 'undefined' && typeof require !== 'undefined') {
+  var TorvalEnglish = require('./english.js');
+}
+if (typeof TorvalEnglishMaxScan === 'undefined' && typeof require !== 'undefined') {
+  var TorvalEnglishMaxScan = require('./english-scan.js');
 }
 
 /*
@@ -204,6 +245,7 @@ var FILES = {
   TorvalDeinflect: 'deinflect.js',
   TorvalDeinflectIt: 'deinflect-it.js',
   TorvalDeinflectEs: 'deinflect-es.js',
+  TorvalDeinflectEn: 'deinflect-en.js',
   TorvalLookup: 'lookup.js',
   TorvalLookupLatin: 'lookup-latin.js'
 };
@@ -241,6 +283,9 @@ function latinPlausible(text, matched) {
 
 TorvalLang.register({
   code: 'ja',
+  // Wiktionary explaining it to an English speaker, which is the only
+  // language it is written up in here.
+  explains: ['en'],
   name: 'Japanese',
   charClass: TorvalJapanese,
   scanWindow: TorvalMaxScan,
@@ -286,6 +331,9 @@ TorvalLang.register({
 
 TorvalLang.register({
   code: 'it',
+  // Wiktionary explaining it to an English speaker, which is the only
+  // language it is written up in here.
+  explains: ['en'],
   name: 'Italian',
   charClass: TorvalItalian,
   scanWindow: TorvalItalianMaxScan,
@@ -334,6 +382,9 @@ TorvalLang.register({
  */
 TorvalLang.register({
   code: 'es',
+  // Wiktionary explaining it to an English speaker, which is the only
+  // language it is written up in here.
+  explains: ['en'],
   name: 'Spanish',
   charClass: TorvalSpanish,
   scanWindow: TorvalSpanishMaxScan,
@@ -362,6 +413,51 @@ TorvalLang.register({
   examples: {
     paste: 'Pega aquí un texto en español…',
     known: 'hablar', ignored: 'Guillermo',
+    ignoredKinds: 'Names, foreign words, misreadings'
+  }
+});
+
+/*
+ * English, for people whose own language is not English.
+ *
+ * The other three languages here are defined in English, for an English
+ * speaker reading them. This one is the other way round: English words
+ * defined in Spanish, from the Spanish Wiktionary rather than the English
+ * one. The interface has its own language setting, in ui.js, because which
+ * language somebody reads a settings page in does not follow from which
+ * one they are studying.
+ *
+ * No accent marking and no recordings. English stress is not written down
+ * in the spelling the way Spanish stress is, so there is nothing to derive,
+ * and the Spanish Wiktionary does not carry the pronunciation audio the
+ * other two get from Lingua Libre. An Anki note type can say the word with
+ * {{tts en_US:Target Word}} instead, which every phone and computer has.
+ */
+TorvalLang.register({
+  code: 'en',
+  name: 'English',
+  // A monolingual dictionary: English entries with their own English
+  // definitions, for a reader who would rather stop translating. The same
+  // file can also carry a Spanish definition on each entry, which is what
+  // the `english-for-spanish` branch builds and hands to a Spanish
+  // reader. Add 'es' here to offer that again.
+  explains: ['en'],
+  charClass: TorvalEnglish,
+  scanWindow: TorvalEnglishMaxScan,
+  lookup: lazy('TorvalLookupLatin'),
+  deinflector: lazy('TorvalDeinflectEn'),
+  accent: null,
+  audio: false,
+  build: 'node tools/build-dict-en.mjs',
+  dbSuffix: '-en',
+  dataPath: 'data-en',
+  storageSuffix: '_en',
+  seams: false,
+  subtitles: ['en', 'en-US', 'en-GB'],
+  plausible: latinPlausible,
+  examples: {
+    paste: 'Paste an English text here…',
+    known: 'speak', ignored: 'Jonathan',
     ignoredKinds: 'Names, foreign words, misreadings'
   }
 });
