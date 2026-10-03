@@ -122,7 +122,7 @@ that actually reaches it.
 | point at a word | a quiet highlight, no popup yet |
 | **click** a word, or **Shift** + point at it | open the dictionary |
 | **click** it again | close it |
-| **Shift** with text selected | look up the selection |
+| **Shift** with text selected | look up exactly the selection, a word or a phrase; with no entry it still opens, and **+** makes a card from the text and its sentence, without a definition |
 | **Esc**, a click outside, a scroll | close |
 | **other matches** | other words that start at the same place |
 | **A** / **D** | the line before, and the line after |

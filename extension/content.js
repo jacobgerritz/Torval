@@ -67,6 +67,8 @@
   // the same way `off` already is.
   let JAPANESE = TorvalLang.profile().charClass;
   let MAX_SCAN = TorvalLang.profile().scanWindow;
+  // The most of a selection that is looked up or put on a card.
+  const MAX_SELECTION = 200;
   const SENTENCE_END = /[。．.！!？?…\n\r\t]/;
   const SKIP_TAGS = new Set(['RT', 'RP', 'SCRIPT', 'STYLE', 'NOSCRIPT', 'SELECT', 'TEXTAREA', 'OPTION']);
   const INLINE_DISPLAY = new Set(['inline', 'inline-block', 'inline-flex', 'contents', 'ruby', 'ruby-base', 'ruby-text']);
@@ -113,6 +115,9 @@
   // right now, kept up to date on every mouse movement so that a click or a
   // press of 3 has an answer ready rather than a fresh lookup to wait on.
   let hoverToken = 0;
+  // The text of the selection the popup is open on, while it is. Shift held and
+  // the mouse nudged must not swap it for whatever word the cursor drifts over.
+  let selectionHeld = null;
   let hoverWord = null;   // the dictionary form of whatever is under the cursor
   let hoverState = 'unknown';   // and whether it is already known or ignored
   // The stretch of the page the current answer covers, so that moving the
@@ -483,6 +488,10 @@
     const found = textAtPoint(pointer.x, pointer.y);
 
     if (shiftDown) {
+      // A selection was asked for by name; the popup stays on it until the
+      // selection is cleared or the popup is closed.
+      if (selectionHeld && ui && ui.host.style.display === 'block' &&
+        String(window.getSelection() || '').trim()) return;
       // While Shift is held the popup follows what you point at, so pointing
       // at something that is not a word closes it rather than leaving the
       // last result stranded behind the cursor. Let go of Shift and it stays
@@ -829,21 +838,46 @@
     return el || document.body || document.documentElement;
   }
 
-  /** Keep the run of Japanese from the start; stop at the first thing that isn't. */
-  function leadingJapanese(text) {
-    if (!text || !JAPANESE.test(text[0])) return null;
-    let i = 1;
-    while (i < text.length && JAPANESE.test(text[i])) i++;
-    return text.slice(0, i);
-  }
-
+  /**
+   * Exactly what is selected: one word or a phrase, whether or not the
+   * dictionary has anything for it.
+   *
+   * This used to keep only the leading run of the language's own characters,
+   * which cut a phrase off at its first space and made a selection that
+   * happened to have no entry indistinguishable from no selection at all.
+   * Now the selection is taken whole, with the line breaks a subtitle puts in
+   * the middle of it joined the way the language joins words. It still has to
+   * contain at least one character of the active language, so Shift with some
+   * unrelated text selected goes on reading under the cursor as before.
+   */
   function selectionText() {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return null;
-    const text = leadingJapanese(sel.toString().trim().slice(0, MAX_SCAN));
-    if (!text) return null;
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+    const raw = sel.toString();
+    const gap = TorvalLang.profile().seams ? '' : ' ';
+    const text = raw.trim().replace(/\s*[\r\n]+\s*/g, gap).replace(/\s+/g, ' ').slice(0, MAX_SELECTION);
+    if (!text || !Array.from(text).some((c) => JAPANESE.test(c))) return null;
+
+    // Where it starts, as a text node and an offset into it, which is what
+    // the sentence is found from. A selection can begin on an element
+    // boundary, and the leading whitespace trimmed above sits in the node too.
     const range = sel.getRangeAt(0);
-    return { text, node: range.startContainer, offset: range.startOffset };
+    let node = range.startContainer;
+    let offset = range.startOffset;
+    if (node.nodeType !== Node.TEXT_NODE) {
+      const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT);
+      node = null;
+      while (walker.nextNode()) {
+        if (range.intersectsNode(walker.currentNode) && walker.currentNode.data.trim()) {
+          node = walker.currentNode;
+          break;
+        }
+      }
+      if (!node) return null;
+      offset = node === range.startContainer ? range.startOffset : 0;
+    }
+    offset = Math.min(node.data.length, offset + (raw.length - raw.trimStart().length));
+    return { text, node, offset, selection: true };
   }
 
   function selectionAnchor() {
@@ -1289,6 +1323,19 @@
     // inside it, and the sentence context has to move with it or the bold
     // in an exported card would land in the wrong place.
     context = where ? sentenceAt(where.node, where.offset) : null;
+    selectionHeld = where && where.selection ? text : null;
+    if (where && where.selection) {
+      // Nothing under the cursor is in play while a selection is: a stale
+      // word from an earlier hover would be what 1, 2 and 3 marked.
+      hoverWord = null;
+      hoverState = null;
+      // Bold what was selected, wherever it falls in the line, rather than
+      // the character count of a different run of text.
+      if (context) {
+        const found = context.text.indexOf(text);
+        if (found >= 0) context = Object.assign({}, context, { index: found });
+      }
+    }
     // The popup asks with the lines either side of a subtitle, exactly as
     // plain hovering does. This was the one place still reading a caption
     // line on its own, which is why hovering わけじゃない opened a popup
@@ -1351,6 +1398,11 @@
       showMessage(`Building dictionary… ${Math.round(reply.status.progress * 100)}%`, at);
     } else if (reply.status.state === 'error') {
       showMessage('Dictionary failed to load, see the extension console.', at);
+    } else if (where && where.selection && !(top && top.length === text.length)) {
+      // A selection is a request for exactly that text. When the dictionary
+      // has nothing for all of it, the popup is about the selection anyway,
+      // and can still make a card from it: just the text and the sentence.
+      showSelection(text, reply.groups || [], at);
     } else if (reply.groups && reply.groups.length) {
       showResults(reply.groups, at);
     } else {
@@ -1438,6 +1490,7 @@
   function hide() {
     if (ui) ui.host.style.display = 'none';
     shown = null;
+    selectionHeld = null;
   }
 
   // The word the popup is showing, while it is showing one.
@@ -1474,6 +1527,74 @@
       // put a longer reading down here too, when a much rarer entry is being
       // passed over in favour of a common word plus an ordinary particle.
       toggle.textContent = `${groups.length - 1} other ${groups.length === 2 ? 'match' : 'matches'}`;
+      toggle.addEventListener('click', () => {
+        rest.hidden = !rest.hidden;
+        toggle.classList.toggle('open', !rest.hidden);
+        reflow();
+      });
+      card.append(toggle, rest);
+    }
+
+    const beside = contextRow();
+    if (beside) card.appendChild(beside);
+    place(at);
+  }
+
+  /**
+   * The popup for a selection the dictionary has no entry for as a whole.
+   *
+   *     per sempre                                         +
+   *     No dictionary entry for this selection.
+   *
+   * The selection is the headword, and + makes a card from it without a
+   * definition: the Target Word, the sentence with the selection in bold, and
+   * whatever was captured from the video, which is the point of being able to
+   * mine a phrase or a word the dictionary does not know. Any entries found
+   * for the words inside it follow, folded away, for the case where one of them
+   * is what was wanted after all.
+   */
+  async function showSelection(text, groups, at) {
+    const { card } = await build();
+    card.textContent = '';
+    card.scrollTop = 0;
+    chosenList = null;
+
+    const el = document.createElement('div');
+    el.className = 'entry';
+    const head = document.createElement('div');
+    head.className = 'head';
+    head.appendChild(Object.assign(document.createElement('span'), {
+      className: 'word', textContent: text
+    }));
+    const buttons = document.createElement('span');
+    buttons.className = 'buttons';
+    const add = document.createElement('button');
+    add.className = 'add';
+    add.textContent = '+';
+    add.title = TorvalUI.t('word.add', 'Add to Anki');
+    add.addEventListener('click', () => {
+      warnIfDuplicate(el, text);
+      mineSafely(add, el, { word: text, reading: '', entry: null, surface: text, senses: [] });
+    });
+    buttons.appendChild(add);
+    head.appendChild(buttons);
+    el.appendChild(head);
+    el.appendChild(Object.assign(document.createElement('div'), {
+      className: 'note',
+      textContent: groups.length
+        ? TorvalUI.t('word.noneWhole', 'No dictionary entry for the whole selection; the words inside it are below.')
+        : TorvalUI.t('word.none', 'No dictionary entry for this selection.')
+    }));
+    card.appendChild(el);
+
+    if (groups.length) {
+      const rest = document.createElement('div');
+      rest.className = 'shorter';
+      rest.hidden = true;
+      for (const group of groups) rest.appendChild(renderGroup(group, false));
+      const toggle = document.createElement('button');
+      toggle.className = 'toggle';
+      toggle.textContent = `${groups.length} ${groups.length === 1 ? 'match' : 'matches'} inside`;
       toggle.addEventListener('click', () => {
         rest.hidden = !rest.hidden;
         toggle.classList.toggle('open', !rest.hidden);
@@ -1635,20 +1756,12 @@
       // all, since that is what an existing card made by Torval says.
       warnIfDuplicate(el, typeof TorvalArticle !== 'undefined'
         ? TorvalArticle.withArticle(hit.word, entry) : hit.word);
-      mine(add, el, {
+      mineSafely(add, el, {
         word: hit.word,
         reading: hit.reading || '',
         entry,
         surface,
         senses: chosenSenses(list)
-      }).catch((err) => {
-        // Whatever went wrong in there, the one thing that must not happen
-        // is the button sitting on a dot with nothing said.
-        add.classList.remove('working');
-        add.textContent = '+';
-        add.disabled = false;
-        const failed = saying(el, (err && err.message) || 'Something went wrong making the card.');
-        failed.className = 'error';
       });
     });
 
@@ -2020,6 +2133,19 @@
     return said;
   }
 
+  /** mine(), with whatever goes wrong said under the entry rather than lost. */
+  function mineSafely(add, el, args) {
+    mine(add, el, args).catch((err) => {
+      // Whatever went wrong in there, the one thing that must not happen
+      // is the button sitting on a dot with nothing said.
+      add.classList.remove('working');
+      add.textContent = '+';
+      add.disabled = false;
+      const failed = saying(el, (err && err.message) || 'Something went wrong making the card.');
+      failed.className = 'error';
+    });
+  }
+
   async function mine(button, entryEl, { word, reading, entry, surface, senses }) {
     button.disabled = true;
     button.textContent = '·';
@@ -2094,7 +2220,7 @@
     // rather than "cane": the gender is half of what there is to know about
     // a noun, and the article is how it is actually carried around. Nothing
     // else gets one, see TorvalArticle.forEntry.
-    const article = typeof TorvalArticle !== 'undefined'
+    const article = entry && typeof TorvalArticle !== 'undefined'
       ? TorvalArticle.forEntry(entry, word) : '';
     const headword = article ? TorvalArticle.join(article, word) : word;
 
@@ -2110,7 +2236,8 @@
       // Only ever used if a field on your note type asks for them.
       sentenceBefore: context ? escapeHtml(context.before || '') : '',
       sentenceAfter: context ? escapeHtml(context.after || '') : '',
-      definition: definitionHtml(entry, senses),
+      // A selection with no entry has no definition: the field is left empty.
+      definition: entry ? definitionHtml(entry, senses) : '',
       // Computed here rather than in background.js: unlike the pitch accent,
       // which background.js fetches from its own table by word and reading,
       // the stress index lives right on the dictionary entry, which is
@@ -2120,12 +2247,12 @@
       // word name the same thing; the bold still falls on the word's own
       // vowel, since the article is put back in front afterwards rather
       // than counted into the index.
-      stress: stressGraph(word, entry, article),
+      stress: entry ? stressGraph(word, entry, article) : '',
       // Who said this word and where Commons keeps it, for the languages
       // whose recordings are known in advance. The bare dictionary form
       // travels with it because `word` above may have grown an article,
       // and it is "cane" that somebody recorded, not "il cane".
-      voice: entry.a ? { word: word, at: entry.a } : null
+      voice: entry && entry.a ? { word: word, at: entry.a } : null
     };
 
     let reply;
