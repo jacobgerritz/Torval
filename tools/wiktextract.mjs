@@ -20,7 +20,7 @@
 import { createReadStream, readFileSync, writeFileSync,
   existsSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { createGunzip } from 'node:zlib';
+import { createGunzip, gzipSync } from 'node:zlib';
 import { createInterface } from 'node:readline';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,6 +89,48 @@ export async function build(lang) {
   // never heard of.
   const recordings = await ensureAudio(ROOT, lang);
 
+  /*
+   * Glosses in the reader's own language.
+   *
+   * Three of the four dictionaries here are Wiktionary explaining a
+   * language to an English speaker, so the dump they are built from is
+   * already in the right language and there is nothing to do. English is
+   * the one being explained to somebody who does not have it, and no
+   * single dump says that, so the language supplies a function that goes
+   * and assembles one. See tools/glosses-en-es.mjs.
+   *
+   * The English definition is kept either way, on `x`: a reader far
+   * enough along to want uncommon words is better served by an English
+   * definition than by nothing, and which of the two is shown is the
+   * reader's own setting rather than the dictionary's business.
+   */
+  let glosses = new Map();   // word -> pos -> [gloss]
+  if (lang.glosses) {
+    glosses = await lang.glosses({ root: ROOT, ensure });
+    console.log(`  ${glosses.size} words in all, in the reader's own language`);
+  }
+
+  /*
+   * Which entries are worth shipping.
+   *
+   * The Japanese, Italian and Spanish dumps are a few hundred thousand
+   * entries and all of them go in. The English one is one and a half
+   * million, and half of those are rarer than the 285,000th commonest word
+   * in either corpus: species names, obsolete spellings, dialect forms
+   * nobody will meet in a lifetime of reading. Shipping them would add
+   * twenty megabytes to every copy of Torval, including the copies
+   * belonging to people who will never open this dictionary at all.
+   *
+   * `rankLimit` is where the line goes. At 150,000 it keeps perfunctory
+   * (77,000) and obfuscate (109,000), which is the register this is meant
+   * to serve, and lands at about the same size as the Italian and Spanish
+   * dictionaries. A word somebody has bothered to define in Spanish is
+   * kept whatever its rank, since that is a better signal than a corpus.
+   */
+  const rankOf = (word) => combineRanks(
+    frequency.get(word) || frequency.get(word.toLowerCase()),
+    written.get(word) || written.get(word.toLowerCase()));
+
   console.log('Reading', SOURCE);
   const entries = [];
   const index = new Map();     // term -> [entry ids]
@@ -96,6 +138,7 @@ export async function build(lang) {
   let lines = 0;
   let kept = 0;
   let stressed = 0;
+  let translated = 0;
 
   const gunzip = createGunzip();
   createReadStream(SOURCE).pipe(gunzip);
@@ -105,7 +148,7 @@ export async function build(lang) {
     if (!line) continue;
     let row;
     try { row = JSON.parse(line); } catch { continue; }
-    const entry = toEntry(row, lang, recordings);
+    const entry = toEntry(row, lang, recordings, glosses);
     if (!entry) {
       const target = aliasOf(row, lang);
       if (target && target !== row.word) {
@@ -113,6 +156,12 @@ export async function build(lang) {
       }
       continue;
     }
+
+    if (lang.rankLimit && !entry.tr) {
+      const rank = rankOf(entry.k[0]);
+      if (!rank || rank > lang.rankLimit) continue;
+    }
+    if (entry.tr) { translated++; delete entry.tr; }
 
     kept++;
     if (entry.st !== undefined) stressed++;
@@ -179,6 +228,10 @@ export async function build(lang) {
     if (rank) { entry.q = rank; ranked++; }
   }
   console.log(`  ${ranked} entries carry a frequency rank`);
+  if (lang.glosses) {
+    console.log(`  ${translated} of ${kept} carry a gloss in the reader's own ` +
+      `language; the rest have the English definition only`);
+  }
 
   mkdirSync(OUT, { recursive: true });
   for (const f of readdirSync(OUT)) {
@@ -211,7 +264,7 @@ export async function build(lang) {
  * (form_of/alt_of, the equivalent of JMdict simply not listing conjugated
  * forms as their own entries), or a part of speech Torval has no use for.
  */
-function toEntry(row, lang, recordings) {
+function toEntry(row, lang, recordings, glosses) {
   if (row.lang_code !== lang.code || !row.word) return null;
   const pos = POS_MAP[row.pos];
   if (!pos) return null;
@@ -240,7 +293,31 @@ function toEntry(row, lang, recordings) {
   }
   if (!senses.length) return null;
 
+  // Said in the reader's own language where somebody has said it there.
+  // Per part of speech, because "book" the noun and "book" the verb are
+  // different words to a reader and the Spanish for one is not the
+  // Spanish for the other.
+  //
+  // Kept beside the English definition rather than replacing it. Which one
+  // a popup shows is decided by the reader's own language at the moment it
+  // draws, and a dictionary that threw one of them away could not answer
+  // both questions.
+  let own = null;
+  if (glosses && glosses.size) {
+    const byPos = glosses.get(row.word);
+    // The right part of speech first, then any of them. "either" is a
+    // determiner, a conjunction and an adverb, and the sources had Spanish
+    // for two of the three: asking only for the determiner's got nothing
+    // and the entry fell back to its English definition, which is the one
+    // thing a Spanish reader did not want. A gloss from the neighbouring
+    // sense of the same word is a far better answer than that, and the
+    // part of speech is printed beside it either way.
+    const said = byPos && (byPos.get(pos) || [...byPos.values()][0]);
+    if (said && said.length) own = [{ p: [pos], g: said }];
+  }
+
   const entry = { k: [row.word], r: [row.word], s: senses, f: 0, kv: 1 };
+  if (own) { entry.x = own; entry.tr = 1; }
   // A noun's gender, which is what puts the article on the card. Only
   // common nouns: "il Roma" is not a thing anybody says, so a proper noun
   // is left without one and article.js then has nothing to add. See
@@ -459,6 +536,14 @@ async function ensure(file, url) {
   if (url.endsWith('.xz')) {
     writeFileSync(file + '.xz', body);
     execFileSync('xz', ['--decompress', '--force', file + '.xz']);
+    return;
+  }
+  // One source is published as plain .jsonl rather than gzipped, and the
+  // reader gunzips whatever it is given. Compressing it here, once, is a
+  // smaller change than teaching the reader to look at the filename, and
+  // it leaves the cached copy the same shape as every other one.
+  if (file.endsWith('.gz') && !url.endsWith('.gz')) {
+    writeFileSync(file, gzipSync(body));
     return;
   }
   writeFileSync(file, body);

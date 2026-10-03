@@ -25,7 +25,9 @@
   const pickHint = document.getElementById('pick-hint');
   const languageSelect = document.getElementById('language');
 
-  fillLanguages();
+  // The list depends on which language the interface is in, so it waits
+  // for that rather than being drawn twice. See TorvalLang.offered.
+  TorvalUI.load().then(function () { fillLanguages(); TorvalUI.paint(); });
   paintLanguage();
   TorvalLang.onChange(paintLanguage);
 
@@ -35,10 +37,10 @@
   });
 
   function fillLanguages() {
-    for (const { code, name } of TorvalLang.list()) {
+    for (const { code, name } of TorvalLang.offered(TorvalUI.code())) {
       const option = document.createElement('option');
       option.value = code;
-      option.textContent = name;
+      option.textContent = TorvalUI.t('lang.' + code, name);
       languageSelect.appendChild(option);
     }
   }

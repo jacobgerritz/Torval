@@ -2864,6 +2864,107 @@ const run = async () => {
       /if \(CAN_BLOCK &&/.test(background));
   }
 
+  // --- English, and the interface language -------------------------------
+  // The other three languages are defined in English for an English
+  // speaker. This one is English defined in Spanish, which is why the
+  // interface has a language of its own: the two no longer follow from
+  // each other.
+  {
+    const DeinflectEn = require(join(ROOT, 'extension', 'deinflect-en.js'));
+    const forms = (word) => DeinflectEn.deinflect(word).map((r) => r.term);
+    const undoes = (word, lemma) => forms(word).includes(lemma);
+
+    check('regular past and continuous come apart',
+      undoes('walked', 'walk') && undoes('walking', 'walk'));
+    check('a silent e is put back',
+      undoes('liked', 'like') && undoes('making', 'make'));
+    check('y becomes ie before a suffix, and back again',
+      undoes('tried', 'try') && undoes('cities', 'city') && undoes('happiest', 'happy'));
+    check('a doubled consonant is undone',
+      undoes('stopping', 'stop') && undoes('bigger', 'big') && undoes('running', 'run'));
+    check('f and fe plurals',
+      undoes('knives', 'knife') && undoes('wolves', 'wolf'));
+    // Written as one word, listed in no dictionary, and the commonest
+    // thing on an English page that a learner would hover.
+    check('a contraction leaves the word it was built on',
+      undoes("don't", 'do') && undoes("we'll", 'we') && undoes("dog's", 'dog'));
+    check('and the curly apostrophe sites actually publish',
+      undoes('don\u2019t', 'do') && undoes('dog\u2019s', 'dog'));
+
+    const english = Lang.list().find((l) => l.code === 'en');
+    check('English is a language Torval offers', !!english);
+    const was = Lang.active();
+    Lang._setActive('en');
+    const profile = Lang.profile();
+    check('English marks no accent, since its spelling does not say where it falls',
+      profile.accent === null);
+    check('and carries no recordings, unlike the two Romance languages',
+      profile.audio === false);
+    check('its words are spaced, so no seam is drawn',
+      profile.seams === false);
+    Lang._setActive(was);
+
+    // --- the interface language ------------------------------------------
+    const UI = require(join(ROOT, 'extension', 'ui.js'));
+    check('the interface is English unless somebody says otherwise',
+      UI.code() === 'en');
+    check('and it is the only one shipped today',
+      UI.languages.map((l) => l.code).join(',') === 'en');
+    check('an untranslated key falls back to what the page already says',
+      UI.t('no.such.key', 'Keeping score') === 'Keeping score');
+
+    // This is called at the top level of the content script, so anything
+    // it throws takes the bar, the popup and the subtitles off the page
+    // with it. It threw once, on a storage API that answers a callback
+    // rather than handing back a promise.
+    check('reading the stored choice survives every shape of storage',
+      [['callback', (k, cb) => cb({ uiLanguage: 'es' })],
+       ['promise', () => Promise.resolve({ uiLanguage: 'es' })],
+       ['throwing', () => { throw new Error('no'); }],
+       ['nothing', () => undefined]].every(([, get]) => {
+        const was = globalThis.chrome;
+        globalThis.chrome = { storage: { local: { get, set() {} } } };
+        let threw = false;
+        try { UI.load(); } catch { threw = true; }
+        globalThis.chrome = was;
+        return !threw;
+      }));
+
+    // A dictionary here is a pair: it explains one language in another.
+    // What somebody is offered to read is whatever can be explained in
+    // the language they already have, which is the rule that stopped a
+    // Spanish interface offering Japanese and then defining it in English.
+    // Everything is explained in English today, so everything is offered;
+    // the rule is kept because the `english-for-spanish` branch needs it
+    // and because it is what makes English monolingual a pair like the
+    // rest rather than a special case.
+    const before = Lang.active();
+    Lang._setActive('it');
+    const forEnglish = Lang.offered('en').map((l) => l.code);
+    check('an English speaker is offered everything explained in English',
+      forEnglish.join(',') === 'ja,it,es,en', forEnglish.join(','));
+    check('and every language says which languages it can be explained in',
+      Lang.explainsIn('en', 'en') && Lang.explainsIn('ja', 'en') &&
+      !Lang.explainsIn('ja', 'es'));
+    // Otherwise changing your own language would take the language you
+    // are in the middle of reading out of its own picker.
+    Lang._setActive('en');
+    check('and the language in use is never hidden from its own picker',
+      Lang.offered('es').map((l) => l.code).includes('en'));
+    Lang._setActive(before);
+
+    // Strings are marked in the markup with data-t and built in script
+    // through TorvalUI.t(). Both fall back to the English with one
+    // language loaded, and the table that made them worth marking is on
+    // the `english-for-spanish` branch. What still has to hold is that
+    // none of them is worked out once at load: a string fixed before the
+    // stored choice arrives stays in English for ever, which is how the
+    // subtitle notice went untranslated.
+    const content = readFileSync(join(ROOT, 'extension', 'content.js'), 'utf8');
+    check('and none of it is fixed at load, before the language arrives',
+      !/const [A-Z_]+ = TorvalUI\.t\(/.test(content));
+  }
+
   // --- nothing enters that cannot leave ----------------------------------
   // The licence is GPL-3.0 today and the copyright is one person's, which
   // means it could be something else later. Two things would end that
@@ -2977,10 +3078,12 @@ const run = async () => {
     // so the sandbox needs the same language-registry files the manifest
     // loads before background.js in the real extension.
     for (const f of ['japanese.js', 'scan.js', 'italian.js', 'italian-scan.js',
-      'spanish.js', 'spanish-scan.js', 'lang.js', 'track.js']) {
+      'spanish.js', 'spanish-scan.js', 'english.js', 'english-scan.js',
+      'lang.js', 'ui.js', 'track.js']) {
       vm.runInContext(readFileSync(join(ROOT, 'extension', f), 'utf8'), sandbox, { filename: f });
     }
     vm.runInContext(backgroundSource, sandbox, { filename: 'background.js' });
+
 
     // --- the fingerprints -------------------------------------------------
     // Reading a page asks about far more words than it finds: some thirty
@@ -3104,8 +3207,8 @@ const run = async () => {
       const listed = await send({ type: 'dictionaries' });
       const all = listed.result;
       check('every language has a dictionary row',
-        listed.ok && all.length === 3 &&
-        all.map((d) => d.code).join(',') === 'ja,it,es',
+        listed.ok && all.length === 4 &&
+        all.map((d) => d.code).join(',') === 'ja,it,es,en',
         JSON.stringify(listed).slice(0, 200));
       check('the language being read is marked as such',
         all.filter((d) => d.active).length === 1 && all[0].active);
@@ -3892,15 +3995,23 @@ const run = async () => {
     JSON.stringify(Look.all().map((s) => s.value)));
   check('and the defaults change nothing about the popup',
     Look.get('popupSize').unit === 1 && Look.get('popupWidth').px === 400);
+  // A wash of dark under outlined text, which is what a film looks best
+  // under and what most players do.
   check('nor about the subtitles', Look.subtitleScale() === 1 &&
-    Look.subtitleSkin().background === '#16171a');
+    /rgba\(10,11,13/.test(Look.subtitleSkin().background) &&
+    /rgba\(0,0,0,\.9\)/.test(Look.subtitleSkin().textShadow));
 
   await Look.set('subtitleSize', 'huge');
   check('a larger subtitle is a larger share of the player',
     Look.subtitleScale() === 1.5, String(Look.subtitleScale()));
+  await Look.set('subtitleBackdrop', 'box');
+  const boxed = Look.subtitleSkin();
+  check('and asking for the box gets a box, with no outline under it',
+    boxed.background === '#16171a' && boxed.textShadow === 'none',
+    JSON.stringify(boxed));
   await Look.set('subtitleBackdrop', 'none');
   const bare = Look.subtitleSkin();
-  check('and with no box the words keep an outline instead',
+  check('transparent drops the wash and keeps the outline',
     bare.background === 'transparent' && bare.boxShadow === 'none' &&
     /rgba\(0,0,0,\.9\)/.test(bare.textShadow), JSON.stringify(bare));
 

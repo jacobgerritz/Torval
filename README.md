@@ -1,8 +1,8 @@
 # Torval
 
 A pop-up dictionary for Firefox and Chrome, for Japanese, Italian and
-Spanish. Hold **Shift** and point at a word; its meaning appears next to the
-cursor. Everything is on your own machine, the whole dictionary lives in the
+Spanish, and for English the other way round. Hold **Shift** and point at a
+word; its meaning appears next to the cursor. Everything is on your own machine, the whole dictionary lives in the
 browser. It works with the network off, and it collects nothing: see
 [PRIVACY.md](PRIVACY.md).
 
@@ -14,8 +14,26 @@ finds *decir*. The languages are otherwise built the same way and behave the
 same way: pick one from the toolbar popup and its own dictionary,
 deinflector, known/ignored word lists and Anki settings load, independently
 of whatever the others have. Japanese also gets pitch accent, from Kanjium;
-the other two get word stress marked inline instead, since neither has
+Italian and Spanish get word stress marked inline instead, since neither has
 lexical pitch accent to speak of. Only one language is active at a time.
+
+English is a fourth language and reads itself: English entries with their
+own English definitions, for somebody far enough along to stop
+translating. It is offered like any other language, and everything else
+about it works the same way.
+
+The same build can put a Spanish definition on each entry, which makes a
+dictionary for a Spanish speaker learning English, with a Spanish
+interface to read it in. That is written and working on the
+`english-for-spanish` branch and is not shipped: it was not good enough
+yet. What stayed behind here is the shape it needs. A profile says which
+languages it can be explained in with `explains`, and
+`TorvalLang.offered(ui)` is what every picker asks, so a dictionary is a
+pair rather than a language. The interface has its own setting in
+`ui.js`, defaulting to English and asked rather than read off the
+browser, with every string marked `data-t` or fetched through
+`TorvalUI.t()`. With one language and one table, all of that falls back
+to the English the pages are already written in.
 
 ---
 

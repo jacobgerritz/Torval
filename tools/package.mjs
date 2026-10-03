@@ -38,7 +38,8 @@ const DIST = join(ROOT, 'dist');
 const DICTIONARIES = [
   ['data', 'node tools/build-dict.mjs && node tools/build-pitch.mjs'],
   ['data-it', 'node tools/build-dict-it.mjs'],
-  ['data-es', 'node tools/build-dict-es.mjs']
+  ['data-es', 'node tools/build-dict-es.mjs'],
+  ['data-en', 'node tools/build-dict-en.mjs']
 ];
 
 const manifest = JSON.parse(readFileSync(join(EXTENSION, 'manifest.json'), 'utf8'));

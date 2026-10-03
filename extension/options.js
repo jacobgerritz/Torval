@@ -126,10 +126,13 @@ const languageSelect = document.getElementById('language');
 
 function fillLanguages() {
   languageSelect.textContent = '';
-  for (const { code, name } of TorvalLang.list()) {
+  for (const { code, name } of TorvalLang.offered(TorvalUI.code())) {
     const option = document.createElement('option');
     option.value = code;
-    option.textContent = name;
+    // Named in the interface language, not in its own: somebody reading a
+    // Spanish settings page is choosing "Japonés", not "Japanese".
+    option.textContent = typeof TorvalUI !== 'undefined'
+      ? TorvalUI.t('lang.' + code, name) : name;
     if (code === TorvalLang.active()) option.selected = true;
     languageSelect.appendChild(option);
   }
@@ -167,6 +170,11 @@ if (languageSelect) {
   // place that reloads the Anki panel rather than two racing each other.
   TorvalLang.onChange(() => { fillLanguages(); fillExamples(); load(); });
 }
+
+// The page is written in the one interface language there is, so there is
+// nothing to load and nothing to repaint. The picker that stood in the
+// sidebar, and the Spanish it chose, are on the `english-for-spanish`
+// branch; TorvalUI.t() below is what they would come back through.
 
 // The chosen file’s name, said in the page’s own type. The browser will not
 // show it once its own control is out of the way, and a file picker that says
@@ -506,7 +514,7 @@ function drawAppearance() {
   for (const where of TorvalLook.groups()) {
     const section = document.createElement('section');
     section.appendChild(Object.assign(document.createElement('h2'), {
-      textContent: where
+      textContent: TorvalUI.t('look.group.' + where.toLowerCase().replace(/[^a-z]+/g, '-'), where)
     }));
     for (const setting of settings.filter((s) => s.where === where)) {
       section.appendChild(lookRow(setting));
@@ -519,7 +527,7 @@ function lookRow(setting) {
   const row = document.createElement('div');
   row.className = 'look-row';
   row.appendChild(Object.assign(document.createElement('span'), {
-    textContent: setting.label
+    textContent: TorvalUI.t('look.' + setting.name, setting.label)
   }));
 
   const choices = document.createElement('div');
@@ -527,7 +535,7 @@ function lookRow(setting) {
   for (const choice of setting.choices) {
     const button = document.createElement('button');
     button.className = 'look-choice' + (choice.value === setting.value ? ' on' : '');
-    button.textContent = choice.label;
+    button.textContent = TorvalUI.t('look.' + setting.name + '.' + choice.value, choice.label);
     button.addEventListener('click', async () => {
       if (choice.value === setting.value) return;
       await TorvalLook.set(setting.name, choice.value);
@@ -757,10 +765,10 @@ function drawFirstChoices() {
   // Redrawn rather than built once, since which languages exist is
   // TorvalLang's to know and this page should not keep a copy.
   firstChoices.textContent = '';
-  for (const { code, name } of TorvalLang.list()) {
+  for (const { code, name } of TorvalLang.offered(TorvalUI.code())) {
     const button = document.createElement('button');
     button.className = 'first-choice';
-    button.textContent = name;
+    button.textContent = TorvalUI.t('lang.' + code, name);
     button.addEventListener('click', () => TorvalLang.set(code));
     firstChoices.appendChild(button);
   }
@@ -895,6 +903,13 @@ async function paintDictionaries() {
     if (reply && reply.ok) dicts = reply.result;
   } catch (err) { /* the background is asleep; the list stands as it was */ }
   if (!dicts) return;
+
+  // A language nobody here can be offered has no row, or the English
+  // speaker this page is mostly read by gets a card about a dictionary
+  // written in Spanish. One already read in keeps its row either way, so
+  // it can still be thrown away.
+  const offered = new Set(TorvalLang.offered(TorvalUI.code()).map((l) => l.code));
+  dicts = dicts.filter((d) => offered.has(d.code) || d.here);
 
   dictList.textContent = '';
   for (const dict of dicts) dictList.appendChild(dictionaryCard(dict));

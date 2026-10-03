@@ -107,7 +107,7 @@ var TorvalLookupCommon = (function () {
     for (var i = 0; i < BANDS.length; i++) {
       if (rank <= BANDS[i][0]) return BANDS[i][1];
     }
-    return 'rare';
+    return typeof TorvalUI !== 'undefined' ? TorvalUI.t('band.rare', 'rare') : 'rare';
   }
 
   // -------------------------------------------------------------------------
