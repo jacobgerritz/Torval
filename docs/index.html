@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Torval, a pop-up dictionary that stays on your machine</title>
-<meta name="description" content="Hold Shift and hover any Japanese, Italian or Spanish word to see what it means. Free, open source, and nothing leaves your computer.">
+<title>Torval, a pop-up dictionary for language learners</title>
+<meta name="description" content="Point at any Japanese, Italian or Spanish word to see what it means. Works on websites, YouTube and Netflix. Free, and nothing leaves your computer.">
 <link rel="icon" href="icon-32.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -14,212 +14,101 @@
 <header>
   <div class="mark"><img src="icon-48.png" alt=""> Torval</div>
 
-  <h1>Hold Shift and hover any word.</h1>
+  <h1>Point at a word. See what it means.</h1>
 
   <p class="lede">
-    A pop-up dictionary for <b>Japanese</b>, <b>Italian</b> and <b>Spanish</b>
-    that runs entirely in your browser, tells you how much of a page you
-    already know, and puts any word onto an Anki card in one click.
+    A free pop-up dictionary for <b>Japanese</b>, <b>Italian</b> and
+    <b>Spanish</b>. It works on any website, on YouTube and on Netflix.
   </p>
 
   <div class="actions">
-    <a class="button primary" href="https://github.com/jacobgerritz/Torval">Get it from GitHub</a>
-    <a class="button" aria-disabled="true" href="#">Firefox Add-ons, soon</a>
-    <a class="button" aria-disabled="true" href="#">Chrome Web Store, soon</a>
+    <a class="button primary" href="https://addons.mozilla.org/firefox/addon/torval/">Add to Firefox</a>
+    <a class="button primary" href="https://chromewebstore.google.com/detail/torval/ehcpakgcdehhcpgcmakofljdkjlhfame">Add to Chrome</a>
   </div>
-
-  <p class="pending">
-    Not in the stores yet. Until then the repository has a build you can load
-    yourself.
-  </p>
 </header>
 
 <figure>
   <img src="shots/popup.png" width="1600" height="1000" alt="A Japanese news
-    article with the Torval bar across the top reading 77 per cent, and the
-    popup open over the word 登る showing its readings and meanings.">
-  <figcaption>
-    The word, what kind of word it is, what it means, and one button to send
-    it to Anki.
-  </figcaption>
+    article with the Torval popup open over a word, showing its reading and
+    meanings.">
+  <figcaption>Hold Shift and point at a word.</figcaption>
 </figure>
 
 <section>
   <h2>What it does</h2>
   <div class="things">
     <div>
-      <h3>Looks words up</h3>
-      <p>
-        Hold Shift, hover, read. Conjugation and inflection are handled, so
-        <i>食べなかった</i> finds 食べる and <i>hablábamos</i> finds
-        <i>hablar</i>. Italian and Spanish nouns come with their article.
-      </p>
+      <h3>Explains any word</h3>
+      <p>Even when it's conjugated: <i>hablábamos</i> finds <i>hablar</i>.</p>
     </div>
     <div>
-      <h3>Says what you already know</h3>
-      <p>
-        One number across the top: how much of the page is built from words
-        you have marked as known. On a video it is measured against the whole
-        transcript before you press play. Optional, and off until you ask.
-      </p>
+      <h3>Helps with videos</h3>
+      <p>Look up words in the subtitles on YouTube and Netflix, and replay a line with one key.</p>
     </div>
     <div>
-      <h3>Mines subtitles</h3>
-      <p>
-        On YouTube and Netflix it times every line itself. Step between them
-        with <kbd>A</kbd> and <kbd>D</kbd>, replay the one you are on, and
-        hover the words in it like any other text.
-      </p>
+      <h3>Makes flashcards</h3>
+      <p>One click puts a word on an Anki card, with the sentence, and the picture and sound from a video.</p>
     </div>
     <div>
-      <h3>Talks to Anki</h3>
-      <p>
-        Into your own collection through AnkiConnect, into whatever note type
-        you use. Pitch accent for Japanese, the stressed vowel for Italian
-        and Spanish.
-      </p>
+      <h3>Tracks your progress</h3>
+      <p>If you like, it shows how much of a page or video you already understand.</p>
     </div>
   </div>
 </section>
 
 <figure>
   <img src="shots/video.jpg" width="1600" height="763" loading="lazy" alt="An
-    Italian video on YouTube with the Torval bar reading 95 per cent, and the
-    subtitle line below it with two words underlined as unknown.">
-  <figcaption>
-    How much of this video you know, worked out before you start watching.
-  </figcaption>
+    Italian video on YouTube with Torval's subtitle line and score.">
+  <figcaption>Know how much of a video you'll understand before you press play.</figcaption>
 </figure>
 
 <section>
-  <h2>Getting started</h2>
-
+  <h2>How to use it</h2>
   <ol class="steps">
     <li>
-      <h3>Say what you are learning</h3>
-      <p>
-        The first screen asks. The answer reads that language's dictionary
-        into your browser, which takes a minute once. Changing language later
-        loses nothing: each keeps its own words.
-      </p>
+      <h3>Add it to your browser</h3>
+      <p>Then choose the language you're learning. That's all the setup there is.</p>
     </li>
     <li>
-      <h3>Hold <kbd>Shift</kbd> and hover a word</h3>
-      <p>
-        That is the whole of it. No clicking, no selecting. Let go and the
-        popup goes away. Anywhere there is text.
-      </p>
+      <h3>Hold <kbd>Shift</kbd> and point at a word</h3>
+      <p>Its meaning pops up. Let go and it disappears.</p>
     </li>
     <li>
-      <h3>Mark what you know, if you want that</h3>
-      <p>
-        Optional, and off until you turn it on under <b>Settings → Words</b>.
-        Press <kbd>2</kbd> on a word you know, <kbd>3</kbd> on one you never
-        want to be told about again. The percentage is measured against that
-        list, so it means little on your first day and a great deal by your
-        second week. An Anki deck can hand over its words in one go.
-      </p>
-    </li>
-    <li>
-      <h3>On a video, step between the lines</h3>
-      <p>
-        <kbd>A</kbd> back, <kbd>D</kbd> forward. Torval fetches the subtitle
-        file and works out where every line begins and ends, so it can take
-        you to the start of one and play it again.
-      </p>
-    </li>
-    <li>
-      <h3>Send a word to Anki</h3>
-      <p>
-        Install <a href="https://ankiweb.net/shared/info/2055492159">AnkiConnect</a>,
-        leave Anki open, and map your fields once under <b>Settings → Anki</b>.
-        After that <b>+</b> makes the card: the word, the sentence, the
-        definitions, and on a video the frame and the line as it was spoken.
-        No note type you like? Use <a href="anki.html">this one</a>.
-      </p>
+      <h3>Make a flashcard, if you use Anki</h3>
+      <p>Press <b>+</b> in the popup. <a href="anki.html">Setting up Anki</a> takes a few minutes, once.</p>
     </li>
   </ol>
 </section>
 
 <figure>
   <img src="shots/card.jpg" width="1600" height="1000" loading="lazy" alt="An
-    Anki card holding the Italian sentence with the target word in bold, the
-    word itself, two play buttons, the definition and the frame from the
-    video.">
-  <figcaption>What arrives in your collection.</figcaption>
+    Anki card with the sentence, the word, play buttons, the meaning and a
+    frame from the video.">
+  <figcaption>A card made with one click.</figcaption>
 </figure>
 
 <section>
-  <h2>Netflix, and the other protected services</h2>
-  <div class="claim aside">
-    <strong>Subtitles work. The picture and sound ask for something.</strong>
-    <p>
-      <b>Click the Torval button in the toolbar once per tab.</b> A protected
-      video will not hand its pixels to a script, so Torval photographs the
-      window instead, and the browser allows neither that nor the recording
-      until the add-on has been used on the tab.
-    </p>
-    <p>
-      <b>The sound needs Chrome.</b> It has to come off the tab, and Chrome
-      is the only browser that will hand a tab's audio to an add-on
-      (<a href="https://bugzilla.mozilla.org/show_bug.cgi?id=1541425">Mozilla
-      bug 1541425</a>, open since 2019). There is no way around it.
-    </p>
-    <p>
-      <b>The subtitles have to be showing.</b> Netflix hands its subtitle
-      file to nobody, so Torval reads the lines off the screen. It asks the
-      player to turn your language on by itself, and where that does not
-      take, choose it in the player's own menu.
-    </p>
-    <p class="note" style="margin-top:14px">
-      Torval says on the card itself which of the two is missing.
-    </p>
-  </div>
-</section>
-
-<section>
-  <h2>Privacy</h2>
+  <h2>Private by design</h2>
   <div class="claim">
-    <strong>Torval collects nothing.</strong>
-    <p>
-      No account, no telemetry, no analytics, no server. The dictionaries
-      ship inside the add-on. Nothing you read, look up, mark or add to Anki
-      leaves your computer.
-    </p>
-    <p class="note" style="margin-top:14px">
-      <a href="privacy.html">The whole privacy policy</a>. It is short.
-    </p>
+    <strong>Nothing you read leaves your computer.</strong>
+    <p>No account, no ads, no tracking. <a href="privacy.html">Privacy policy</a></p>
   </div>
 </section>
 
 <section id="support">
-  <h2>Support the work</h2>
-  <p>
-    Torval is open source and built in the open, by one person. If you get
-    something out of it, you can help keep it going.
-  </p>
+  <h2>Free, made by one person</h2>
+  <p>If Torval helps you, you can help keep it going.</p>
   <div class="actions">
-    <a class="button" href="https://github.com/sponsors/jacobgerritz">Sponsor on GitHub</a>
+    <a class="button" href="https://github.com/sponsors/jacobgerritz">Support Torval</a>
   </div>
 </section>
 
 <footer>
   <p>
-    <a href="https://github.com/jacobgerritz/Torval">Source</a> ·
+    <a href="help.html">Help</a> ·
+    <a href="anki.html">Anki setup</a> ·
     <a href="privacy.html">Privacy</a> ·
-    <a href="anki.html">Note type</a> ·
-    <a href="https://github.com/jacobgerritz/Torval/issues">Report a problem</a>
-  </p>
-  <p>
-    The program is GPL-3.0. The dictionaries keep their own licences:
-    <b>JMdict</b> from the
-    <a href="https://www.edrdg.org/">EDRDG</a>, <b>Wiktextract</b> from
-    <a href="https://kaikki.org/">kaikki.org</a>, and the Italian and Spanish
-    pronunciations from <a href="https://lingualibre.org/">Lingua Libre</a>,
-    all under
-    <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>;
-    pitch accent from Kanjium; word frequency from hermitdave/FrequencyWords,
-    Wikipedia word counts and JPDB.
+    <a href="https://github.com/jacobgerritz/Torval">Source code</a>
   </p>
   <p>© 2026 Jacob Gerritz</p>
 </footer>

@@ -13,36 +13,32 @@
 
 <a class="back" href="./">← Torval</a>
 
-<h1>A note type for Torval</h1>
+<h1>Setting up Anki</h1>
 
 <p class="lede" style="margin-bottom:40px">
-  If you already have a note type you like, keep it. Torval works with
-  whatever you have. This is for people who don't.
-</p>
-
-<p>
-  It makes a sentence card: the line you met the word in on the front, the
-  word and what it means on the back. It works for every language Torval
-  reads, and a card with no picture or no pitch accent simply leaves those
-  rows out.
-</p>
-
-<p>
-  The field names below are the ones Torval recognises, so once the note type
-  exists, <b>Settings → Anki</b> fills the mapping in by itself and you have
-  nothing to match up by hand.
+  A few minutes, once. After that, <b>+</b> in the popup makes a card.
 </p>
 
 <section>
-  <h2>1. Make the note type</h2>
+  <h2>1. Install AnkiConnect</h2>
   <p>
-    In Anki: <b>Tools → Manage Note Types → Add → Add: Basic</b>, and call it
-    <code>Torval</code>.
+    In <a href="https://apps.ankiweb.net/">Anki</a>: <b>Tools → Add-ons → Get
+    Add-ons</b>, paste <code>2055492159</code>, then restart Anki. Keep Anki
+    open whenever you make cards.
   </p>
 </section>
 
 <section>
-  <h2>2. The fields</h2>
+  <h2>2. Add the Torval note type</h2>
+  <p>
+    Already have a note type you like? Skip to step 3. Otherwise, in Anki:
+    <b>Tools → Manage Note Types → Add → Add: Basic</b>, and call it
+    <code>Torval</code>. Then set it up as below.
+  </p>
+</section>
+
+<section>
+  <h3>The fields</h3>
   <p>
     <b>Fields…</b>, then add these, exactly as spelled and in this order.
     Delete Basic's own <code>Front</code> and <code>Back</code> once the
@@ -57,25 +53,21 @@ Sentence Audio
 Word Audio
 Images</code></pre>
   <p class="note">
-    Reading and Pitch are for Japanese. Keep them anyway: they cost nothing,
-    and the same note type then works for every language. Torval puts the
-    article in front of a noun itself, so no script is needed for il or la.
+    Reading and Pitch are only for Japanese, but keep them: then one note
+    type works for every language.
   </p>
 </section>
 
 <section>
-  <h2>3. The front</h2>
+  <h3>The front</h3>
   <p><b>Cards…</b>, then paste this over the front template.</p>
   <pre><code>&lt;div class="sentence"&gt;{{Sentence}}&lt;/div&gt;
 &lt;div class="target-word"&gt;{{Target Word}}&lt;/div&gt;</code></pre>
-  <p class="note">
-    The word is in bold in the sentence, so you meet it in context first. The
-    word beneath, in grey, says which one is being asked about.
-  </p>
 </section>
 
 <section>
-  <h2>4. The back</h2>
+  <h3>The back</h3>
+  <p>Then this over the back template.</p>
   <pre><code>{{FrontSide}}
 
 &lt;hr id="answer"&gt;
@@ -88,14 +80,10 @@ Images</code></pre>
 &lt;div class="definition"&gt;{{Definitions}}&lt;/div&gt;
 
 {{#Images}}&lt;div class="image-block"&gt;{{Images}}&lt;/div&gt;{{/Images}}</code></pre>
-  <p class="note">
-    The pitch diagram already spells out the reading, so the reading only
-    shows when there is no diagram. Rows with nothing in them leave no gap.
-  </p>
 </section>
 
 <section>
-  <h2>5. The styling</h2>
+  <h3>The styling</h3>
   <p>Same screen, the <b>Styling</b> box.</p>
   <pre><code>.card {
   font-family: -apple-system, "Hiragino Sans", "Helvetica Neue", Arial, sans-serif;
@@ -154,11 +142,11 @@ hr#answer {
 </section>
 
 <section>
-  <h2>6. Point Torval at it</h2>
+  <h2>3. Choose it in Torval</h2>
   <p>
-    <b>Settings → Anki</b>, choose your deck and then <code>Torval</code> as
-    the note type. The fields match themselves. Press <b>+</b> on a word and
-    the card arrives filled in.
+    Click the Torval button in the toolbar, then <b>Settings → Anki</b>.
+    Choose your deck and your note type, and press <b>Save</b>. Torval
+    fills in the right fields by itself.
   </p>
 </section>
 
