@@ -99,27 +99,26 @@ Images</code></pre>
   <p>Same screen, the <b>Styling</b> box.</p>
   <pre><code>.card {
   font-family: -apple-system, "Hiragino Sans", "Helvetica Neue", Arial, sans-serif;
-  font-size: 26px;
   line-height: 1.6;
   text-align: center;
   padding: 0 12px;
 }
 
-.sentence {
+.sentence,
+.target-word {
+  font-size: clamp(30px, 8.5vw, 42px);
   margin-top: 10px;
 }
 
 .target-word {
-  font-size: 28px;
   color: #999;
-  margin-top: 12px;
 }
 
 hr#answer {
   border: none;
   border-top: 2px solid #888;
   width: 80%;
-  margin: 12px auto;
+  margin: 14px auto;
 }
 
 .audio-line {
@@ -130,24 +129,24 @@ hr#answer {
 }
 
 .pitch svg {
-  width: 240px !important;
+  width: clamp(160px, 35vw, 260px) !important;
   height: auto !important;
 }
 
 .reading {
-  font-size: 30px;
+  font-size: clamp(26px, 7vw, 34px);
   margin-bottom: 8px;
 }
 
 .definition {
+  font-size: clamp(22px, 5.5vw, 28px);
   max-width: 700px;
   margin: 0 auto 10px;
   word-wrap: break-word;
 }
 
 .image-block img {
-  width: 25%;
-  min-width: 220px;
+  width: clamp(180px, 45vw, 340px);
   height: auto;
   margin: 5px auto;
   display: block;
